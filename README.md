@@ -45,6 +45,7 @@ Open http://localhost:5173 in your browser.
 
 ### Basic Weapon Structure
 
+```python
 class Weapon:
     def __init__(self):
         self.msg = "Locked and loaded"
