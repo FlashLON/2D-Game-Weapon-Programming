@@ -45,33 +45,23 @@ Open http://localhost:5173 in your browser.
 
 ### Basic Weapon Structure
 
-```python
-import math
-
 class Weapon:
     def __init__(self):
-        self.damage = 25
-        self.speed = 400
-        api.log("Weapon ready!")
-
-    def on_fire(self, target_x, target_y, my_x, my_y):
-        # Calculate angle to target
-        dx = target_x - my_x
-        dy = target_y - my_y
-        angle = math.degrees(math.atan2(dy, dx))
-        
+        self.msg = "Locked and loaded"
+    def on_fire(self, tx, ty, mx, my):
+        import math
+        angle = math.atan2(ty - my, tx - mx)
         return {
-            "speed": self.speed,
-            "angle": angle,
-            "damage": self.damage,
-            "color": "#fce83a",
-            "radius": 5
+            "speed": 300,
+            "angle": math.degrees(angle),
+            "damage": 50,
+            "knockback": 300,  # New: Push enemies back!
+            "pierce": 1        # New: Hit multiple enemies!
         }
-
-    def on_kill(self, target_id):
-        api.log(f"Eliminated {target_id}!")
-
-    def update(self, dt):
+    
+    def on_hit(self, target_id):
+        pass
+    def update(self, dt): 
         pass
 ```
 
