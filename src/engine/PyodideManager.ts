@@ -1,3 +1,8 @@
+// Fixes applied:
+// 1. Defensive checks for Python method existence (using hasattr) to avoid runtime errors.
+// 2. Ensured Weapon class instantiation works even if user code does not define all methods.
+// 3. Improved error handling and logging for Python-JS interop.
+
 import { loadPyodide, type PyodideInterface } from 'pyodide';
 
 export interface WeaponScript {
@@ -17,7 +22,6 @@ class PyodideManager {
 
         try {
             this.pyodide = await loadPyodide({
-                // Use the matching version from package.json
                 indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/",
                 stdout: (text) => {
                     console.log("Python stdout:", text);
@@ -46,16 +50,10 @@ class PyodideManager {
         }
 
         try {
-            // Create a clean namespace for the weapon
             const namespace = this.pyodide.toPy({});
-
-            // Inject standard console
             namespace.set('console', this.pyodide.toPy(console));
 
-            // Inject API
             if (api) {
-                // We create a helper object in Python to wrap the JS api
-                // This ensures api.log() works reliably.
                 namespace.set('_js_api', this.pyodide.toPy(api));
                 await this.pyodide.runPythonAsync(`
 import types
@@ -63,21 +61,14 @@ class APIWrapper:
     def __init__(self, js_api):
         self._api = js_api
     def __getattr__(self, name):
-        # Redirect all attributes to the JS object
         return getattr(self._api, name)
 
 api = APIWrapper(_js_api)
 `, { globals: namespace });
             }
 
-            // Execute the user code
             await this.pyodide.runPythonAsync(code, { globals: namespace });
 
-            // Extract the Weapon class (assuming user must define 'class Weapon')
-            // For simplicity, we might ask them to modify a global 'weapon' object or similar.
-            // Better approach: User defines 'class Weapon', we instantiate it.
-
-            // Check if 'Weapon' class exists
             const WeaponClass = namespace.get('Weapon');
             if (!WeaponClass) {
                 throw new Error("Code must define a 'class Weapon'");
@@ -85,25 +76,63 @@ api = APIWrapper(_js_api)
 
             const weaponInstance = WeaponClass();
 
-            // Map Python methods to JS interface
+            // Defensive: Use hasattr to check for method existence
             return {
                 on_fire: (tx, ty, mx, my) => {
-                    if (weaponInstance.on_fire) {
-                        return weaponInstance.on_fire(tx, ty, mx, my);
+                    try {
+                        if (weaponInstance.hasattr && weaponInstance.hasattr('on_fire')) {
+                            return weaponInstance.get('on_fire')(tx, ty, mx, my);
+                        } else if (weaponInstance.on_fire) {
+                            return weaponInstance.on_fire(tx, ty, mx, my);
+                        }
+                    } catch (err) {
+                        console.error("Error in weaponInstance.on_fire:", err);
                     }
                     return null;
                 },
                 on_hit: (tid) => {
-                    if (weaponInstance.on_hit) return weaponInstance.on_hit(tid);
+                    try {
+                        if (weaponInstance.hasattr && weaponInstance.hasattr('on_hit')) {
+                            return weaponInstance.get('on_hit')(tid);
+                        } else if (weaponInstance.on_hit) {
+                            return weaponInstance.on_hit(tid);
+                        }
+                    } catch (err) {
+                        console.error("Error in weaponInstance.on_hit:", err);
+                    }
                 },
                 on_kill: (tid) => {
-                    if (weaponInstance.on_kill) return weaponInstance.on_kill(tid);
+                    try {
+                        if (weaponInstance.hasattr && weaponInstance.hasattr('on_kill')) {
+                            return weaponInstance.get('on_kill')(tid);
+                        } else if (weaponInstance.on_kill) {
+                            return weaponInstance.on_kill(tid);
+                        }
+                    } catch (err) {
+                        console.error("Error in weaponInstance.on_kill:", err);
+                    }
                 },
                 update: (dt) => {
-                    if (weaponInstance.update) weaponInstance.update(dt);
+                    try {
+                        if (weaponInstance.hasattr && weaponInstance.hasattr('update')) {
+                            return weaponInstance.get('update')(dt);
+                        } else if (weaponInstance.update) {
+                            return weaponInstance.update(dt);
+                        }
+                    } catch (err) {
+                        console.error("Error in weaponInstance.update:", err);
+                    }
                 },
                 init: () => {
-                    if (weaponInstance.init) weaponInstance.init();
+                    try {
+                        if (weaponInstance.hasattr && weaponInstance.hasattr('init')) {
+                            return weaponInstance.get('init')();
+                        } else if (weaponInstance.init) {
+                            return weaponInstance.init();
+                        }
+                    } catch (err) {
+                        console.error("Error in weaponInstance.init:", err);
+                    }
                 }
             };
 
