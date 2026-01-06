@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { WeaponEditor } from './components/WeaponEditor';
 import { Arena } from './components/Arena';
 import { Console, type LogMessage, type LogType } from './components/Console';
@@ -136,7 +137,9 @@ function App() {
   };
 
   return (
-    <div className="h-screen w-screen bg-cyber-dark text-white flex flex-col">
+    <>
+      <Analytics />
+      <div className="h-screen w-screen bg-cyber-dark text-white flex flex-col">
       {/* Header */}
       <header className="h-14 border-b border-cyber-muted flex items-center px-6 justify-between bg-cyber-light shadow-md z-10">
         <div className="flex items-center gap-2">
@@ -205,6 +208,7 @@ function App() {
 
       </div>
     </div>
+    </>
   );
 }
 
