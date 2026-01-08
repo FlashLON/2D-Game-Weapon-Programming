@@ -54,22 +54,32 @@ class PyodideManager {
 
             // Inject API
             if (api) {
-                // METHOD: Manual Attribute Attachment
-                // We create a native Python object 'api' in the namespace.
-                // Then we attach each JS function to it. This avoids Proxy auto-conversion issues.
-                await this.pyodide.runPythonAsync(`
-class GameAPI:
-    pass
-api = GameAPI()
+                console.log("Injecting API into Python...");
+                try {
+                    // Use SimpleNamespace for a clean object structure
+                    await this.pyodide.runPythonAsync(`
+import types
+api = types.SimpleNamespace()
 `, { globals: namespace });
 
-                const pyApi = namespace.get('api');
-                for (const [key, value] of Object.entries(api)) {
-                    // Start of robust function wrapping
-                    // We bind the function to ensure 'this' context if needed, though usually not for this simple API
-                    pyApi.set(key, value);
+                    const pyApi = namespace.get('api');
+
+                    for (const [key, value] of Object.entries(api)) {
+                        // We attach the raw JS function. Pyodide handles the wrapping.
+                        // Using 'set' on a PyProxy of a Python object calls setattr in Python.
+                        pyApi.set(key, value);
+                    }
+
+                    // Cleanup the handle to the api object, not the object itself in the namespace
+                    pyApi.destroy();
+                    console.log("API Injection successful");
+
+                } catch (apiErr) {
+                    console.error("API Injection Failed:", apiErr);
+                    // Don't crash entirely? Or do we?
+                    // If API fails, script will likely fail.
+                    throw apiErr;
                 }
-                pyApi.destroy(); // Cleanup handle
             }
 
             // Execute the user code
