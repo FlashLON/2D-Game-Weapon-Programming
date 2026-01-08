@@ -65,7 +65,7 @@ function App() {
   // Multiplayer State
   const [isConnected, setIsConnected] = useState(false);
   const [showConnect, setShowConnect] = useState(false);
-  const [serverUrl, setServerUrl] = useState("");
+  const [serverUrl, setServerUrl] = useState("https://2d-game-weapon-programming-production.up.railway.app");
 
   const addLog = (msg: string, type: LogType = 'info') => {
     setLogs(prev => [...prev, {

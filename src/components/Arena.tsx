@@ -84,11 +84,24 @@ export const Arena: React.FC = () => {
             [...state.entities, ...state.projectiles].forEach(ent => {
                 ctx.beginPath();
                 ctx.arc(ent.x, ent.y, ent.radius, 0, Math.PI * 2);
-                ctx.fillStyle = ent.color;
+
+                // Determine Color
+                let drawColor = ent.color;
+
+                // If it's another player in multiplayer, assign them "Enemy Red" color
+                // We use NetworkManager to know our own ID
+                if (ent.type === 'player' && networkManager.isConnected()) {
+                    const myId = networkManager.getPlayerId();
+                    if (ent.id !== myId) {
+                        drawColor = '#ff0055'; // Hostile Red
+                    }
+                }
+
+                ctx.fillStyle = drawColor;
 
                 // Add simple glow effect for "cyber" feel
                 ctx.shadowBlur = 10;
-                ctx.shadowColor = ent.color;
+                ctx.shadowColor = drawColor;
 
                 ctx.fill();
                 ctx.shadowBlur = 0; // Reset shadow for other elements

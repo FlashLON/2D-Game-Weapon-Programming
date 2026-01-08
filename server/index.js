@@ -16,9 +16,7 @@ const PORT = process.env.PORT || 3000;
 // Game state
 const gameState = {
     players: {},
-    enemies: [
-        { id: 'enemy1', x: 600, y: 300, radius: 20, color: '#ff0055', hp: 50, maxHp: 50, type: 'enemy', velocity: { x: 0, y: 0 } }
-    ],
+    enemies: [],
     projectiles: [],
     score: 0
 };
