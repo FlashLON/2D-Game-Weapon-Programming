@@ -54,9 +54,22 @@ class PyodideManager {
 
             // Inject API
             if (api) {
-                // Directly expose the JS api object as 'api' in Python
-                // Pyodide handles the proxying of methods automatically.
-                namespace.set('api', this.pyodide.toPy(api));
+                // METHOD: Manual Attribute Attachment
+                // We create a native Python object 'api' in the namespace.
+                // Then we attach each JS function to it. This avoids Proxy auto-conversion issues.
+                await this.pyodide.runPythonAsync(`
+class GameAPI:
+    pass
+api = GameAPI()
+`, { globals: namespace });
+
+                const pyApi = namespace.get('api');
+                for (const [key, value] of Object.entries(api)) {
+                    // Start of robust function wrapping
+                    // We bind the function to ensure 'this' context if needed, though usually not for this simple API
+                    pyApi.set(key, value);
+                }
+                pyApi.destroy(); // Cleanup handle
             }
 
             // Execute the user code
