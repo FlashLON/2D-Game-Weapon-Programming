@@ -109,8 +109,8 @@ io.on('connection', (socket) => {
     });
 });
 
-// Game loop (60 FPS)
-const TICK_RATE = 60;
+// Game loop (30 FPS for bandwidth optimization)
+const TICK_RATE = 30;
 const TICK_INTERVAL = 1000 / TICK_RATE;
 let lastTick = Date.now();
 

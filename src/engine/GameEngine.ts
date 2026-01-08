@@ -120,13 +120,29 @@ export class GameEngine {
      * @param dt Delta time in seconds
      */
     private update(dt: number) {
-        // If in multiplayer mode, we rely on server updates, NOT local physics.
-        // We might run the weapon script purely for visual effects or intent calculation,
-        // but for now, let's just skip the entire local simulation.
+        // --- MULTIPLAYER LOGIC ---
+        // If in multiplayer, we MAINLY rely on server, but we MUST update local player physics
+        // to ensure smooth movement (Client Prediction).
         if (this.isMultiplayer) {
+            if (this.localPlayerId) {
+                const myPlayer = this.state.entities.find(e => e.id === this.localPlayerId);
+                if (myPlayer) {
+                    // Apply velocity to local player
+                    myPlayer.x += myPlayer.velocity.x * dt;
+                    myPlayer.y += myPlayer.velocity.y * dt;
+
+                    // Client-side bounds check
+                    const bounds = this.getArenaBounds();
+                    myPlayer.x = Math.max(myPlayer.radius, Math.min(bounds.width - myPlayer.radius, myPlayer.x));
+                    myPlayer.y = Math.max(myPlayer.radius, Math.min(bounds.height - myPlayer.radius, myPlayer.y));
+                }
+            }
+            // We skip the rest of the simulation (other entities, collisions) 
+            // because the server snapshot handles them.
             return;
         }
 
+        // --- SINGLE PLAYER LOGIC (Normal Loop) ---
         // 1. Run user-defined update code (if any)
         if (this.weaponScript) {
             try {
@@ -447,13 +463,14 @@ export class GameEngine {
 
     // --- MULTIPLAYER SUPPORT ---
     private isMultiplayer = false;
+    private localPlayerId: string | null = null;
 
-    setMultiplayerMode(enabled: boolean) {
+    setMultiplayerMode(enabled: boolean, myId: string | null = null) {
         this.isMultiplayer = enabled;
+        this.localPlayerId = myId;
     }
 
     updateFromSnapshot(snapshot: any) {
-        // Replace local state with server state
         // Transform players dict to array
         const playersArray = Object.values(snapshot.players || {}).map((p: any) => ({
             ...p,
@@ -462,16 +479,40 @@ export class GameEngine {
 
         // Ensure enemies is array
         const enemiesArray = Array.isArray(snapshot.enemies) ? snapshot.enemies : [];
-
-        // Projectiles
         const projectilesArray = Array.isArray(snapshot.projectiles) ? snapshot.projectiles : [];
 
-        this.state = {
-            entities: [...playersArray, ...enemiesArray],
-            projectiles: projectilesArray,
-            score: snapshot.score || 0,
-            gameOver: false
-        };
+        // 1. Process Players
+        // If we are in multiplayer, we want to maintain our LOCAL position for responsiveness (Client Prediction),
+        // but accept the server's truth for everyone else.
+        if (this.isMultiplayer && this.localPlayerId) {
+            // Find our local state currently
+            const myLocalEntity = this.state.entities.find(e => e.id === this.localPlayerId);
+
+            // Merge snapshot with local state
+            const mergedEntities = playersArray.map((serverEnt: any) => {
+                if (serverEnt.id === this.localPlayerId && myLocalEntity) {
+                    // It's me! Keep my local physics coordinates to avoid "rubberbanding"
+                    // Only sync critical state like HP or MaxHP
+                    return {
+                        ...serverEnt,
+                        x: myLocalEntity.x,
+                        y: myLocalEntity.y,
+                        velocity: myLocalEntity.velocity // Keep local velocity too
+                    };
+                }
+                return serverEnt;
+            });
+
+            this.state.entities = [...mergedEntities, ...enemiesArray];
+
+        } else {
+            // Standard full overwrite
+            this.state.entities = [...playersArray, ...enemiesArray];
+        }
+
+        this.state.projectiles = projectilesArray;
+        this.state.score = snapshot.score || 0;
+        this.state.gameOver = false;
 
         this.notify();
     }

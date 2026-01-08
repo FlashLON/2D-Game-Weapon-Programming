@@ -124,7 +124,7 @@ function App() {
   useEffect(() => {
     networkManager.setOnConnectionChange((connected) => {
       setIsConnected(connected);
-      gameEngine.setMultiplayerMode(connected);
+      gameEngine.setMultiplayerMode(connected, networkManager.getPlayerId());
       if (connected) {
         addLog("Connected to Multiplayer Server!", "success");
         setShowConnect(false);
