@@ -8,49 +8,23 @@ import { networkManager } from './utils/NetworkManager';
 import { Play, RotateCcw, X, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
 
 const DEFAULT_CODE = `
-# ==========================================
-#  BASIC WEAPON SCRIPTER
-# ==========================================
-# Target enemies and click to fire.
-# Use 'api' functions to build cool weapons!
-
-import math
-
 class Weapon:
     def __init__(self):
-        # 1. Setup base stats
-        self.damage = 25
-        self.speed = 400
-        api.log("Weapon ready! Click the Arena to fire.")
-
-    # ------------------------------------------
-    # ON FIRE: Spawns the projectile
-    # ------------------------------------------
-    def on_fire(self, target_x, target_y, my_x, my_y):
-        # Calculate angle to where you clicked
-        dx = target_x - my_x
-        dy = target_y - my_y
-        angle = math.degrees(math.atan2(dy, dx))
-        
-        # Return how the shot looks and moves
+        self.msg = "Locked and loaded"
+    def on_fire(self, tx, ty, mx, my):
+        import math
+        angle = math.atan2(ty - my, tx - mx)
         return {
-            "speed": self.speed,
-            "angle": angle,
-            "damage": self.damage,
-            "color": "#fce83a",
-            "radius": 5
+            "speed": 300,
+            "angle": math.degrees(angle),
+            "damage": 50,
+            "knockback": 300,  # New: Push enemies back!
+            "pierce": 1        # New: Hit multiple enemies!
         }
-
-    # ------------------------------------------
-    # ON KILL: Called when an enemy is defeated
-    # ------------------------------------------
-    def on_kill(self, target_id):
-        api.log(f"Target {target_id} eliminated!")
-
-    # ------------------------------------------
-    # UPDATE: Called on every frame
-    # ------------------------------------------
-    def update(self, dt):
+    
+    def on_hit(self, target_id):
+        pass
+    def update(self, dt): 
         pass
 `.trim();
 

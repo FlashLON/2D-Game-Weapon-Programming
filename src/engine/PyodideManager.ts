@@ -54,20 +54,9 @@ class PyodideManager {
 
             // Inject API
             if (api) {
-                // We create a helper object in Python to wrap the JS api
-                // This ensures api.log() works reliably.
-                namespace.set('_js_api', this.pyodide.toPy(api));
-                await this.pyodide.runPythonAsync(`
-import types
-class APIWrapper:
-    def __init__(self, js_api):
-        self._api = js_api
-    def __getattr__(self, name):
-        # Redirect all attributes to the JS object
-        return getattr(self._api, name)
-
-api = APIWrapper(_js_api)
-`, { globals: namespace });
+                // Directly expose the JS api object as 'api' in Python
+                // Pyodide handles the proxying of methods automatically.
+                namespace.set('api', this.pyodide.toPy(api));
             }
 
             // Execute the user code
