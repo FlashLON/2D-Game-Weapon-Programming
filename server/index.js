@@ -195,7 +195,7 @@ setInterval(() => {
         const p = gameState.projectiles[i];
         let hitSomething = false;
 
-        // Check against enemies
+        // 1. Check against enemies (PVE)
         for (const e of gameState.enemies) {
             const dx = p.x - e.x;
             const dy = p.y - e.y;
@@ -220,6 +220,7 @@ setInterval(() => {
                     e.x = Math.random() * 700 + 50;
                     e.y = Math.random() * 500 + 50;
                     e.velocity = { x: 0, y: 0 };
+                    // Global score for PVE
                     gameState.score += 1;
 
                     // Notify the player who got the kill
@@ -232,6 +233,58 @@ setInterval(() => {
                     hitSomething = false;
                 } else {
                     break;
+                }
+            }
+        }
+
+        // 2. Check against other Players (PVP) - FREE FOR ALL
+        if (!hitSomething) {
+            for (const playerId in gameState.players) {
+                // Don't hit yourself
+                if (playerId === p.playerId) continue;
+
+                const player = gameState.players[playerId];
+                const dx = p.x - player.x;
+                const dy = p.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < p.radius + player.radius) {
+                    const dmg = p.damage || 10;
+                    player.hp -= dmg;
+
+                    // Apply knockback
+                    if (p.knockback) {
+                        const angle = Math.atan2(dy, dx);
+                        player.velocity.x -= Math.cos(angle) * p.knockback;
+                        player.velocity.y -= Math.sin(angle) * p.knockback;
+                    }
+
+                    hitSomething = true;
+
+                    // Notify victim they were hit
+                    io.to(playerId).emit('hit', { damage: dmg, attackerId: p.playerId });
+
+                    // Check if player died
+                    if (player.hp <= 0) {
+                        // Respawn player
+                        player.hp = player.maxHp;
+                        player.x = Math.random() * 700 + 50;
+                        player.y = Math.random() * 500 + 50;
+                        player.velocity = { x: 0, y: 0 };
+
+                        // Notify killer
+                        io.to(p.playerId).emit('kill', { enemyId: player.id });
+
+                        // Broadcast kill feed
+                        io.emit('killFeed', { killer: p.playerId, victim: player.id });
+                    }
+
+                    if (p.pierce && p.pierce > 1) {
+                        p.pierce--;
+                        hitSomething = false;
+                    } else {
+                        break;
+                    }
                 }
             }
         }
