@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { WeaponEditor } from './components/WeaponEditor';
 import { Arena } from './components/Arena';
 import { Console, type LogMessage, type LogType } from './components/Console';
@@ -204,6 +205,7 @@ function App() {
 
 
       </div>
+      <SpeedInsights />
     </div>
   );
 }
