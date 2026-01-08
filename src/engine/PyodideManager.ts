@@ -54,30 +54,28 @@ class PyodideManager {
 
             // Inject API
             if (api) {
-                console.log("Injecting API into Python...");
                 try {
-                    // Use SimpleNamespace for a clean object structure
+                    console.log("Injecting API...");
+                    // 1. Create the container
                     await this.pyodide.runPythonAsync(`
 import types
 api = types.SimpleNamespace()
 `, { globals: namespace });
 
-                    const pyApi = namespace.get('api');
-
+                    // 2. Inject each function carefully
                     for (const [key, value] of Object.entries(api)) {
-                        // We attach the raw JS function. Pyodide handles the wrapping.
-                        // Using 'set' on a PyProxy of a Python object calls setattr in Python.
-                        pyApi.set(key, value);
+                        // Inject function into global namespace as a temporary variable
+                        // We assume 'value' is a JS function.
+                        namespace.set(`_temp_${key}`, value);
+
+                        // Move it onto the 'api' object
+                        await this.pyodide.runPythonAsync(`
+setattr(api, '${key}', _temp_${key})
+del _temp_${key}
+`, { globals: namespace });
                     }
-
-                    // Cleanup the handle to the api object, not the object itself in the namespace
-                    pyApi.destroy();
-                    console.log("API Injection successful");
-
                 } catch (apiErr) {
-                    console.error("API Injection Failed:", apiErr);
-                    // Don't crash entirely? Or do we?
-                    // If API fails, script will likely fail.
+                    console.error("API Injection error:", apiErr);
                     throw apiErr;
                 }
             }
