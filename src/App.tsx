@@ -147,13 +147,38 @@ function App() {
     };
   }, []);
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (isConnected) {
       networkManager.disconnect();
     } else {
-      const url = serverUrl || "http://localhost:3000";
-      addLog(`Connecting to ${url}...`, "info");
-      networkManager.connect(url);
+      let url = serverUrl || "http://localhost:3000";
+      // Remove trailing slash for consistency
+      url = url.replace(/\/$/, "");
+
+      addLog(`Checking server at ${url}...`, "info");
+
+      try {
+        // 1. Health Check
+        const response = await fetch(`${url}/health`);
+        const contentType = response.headers.get("content-type");
+
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          // Success - it's our game server
+          addLog("Server found! Connecting...", "info");
+          networkManager.connect(url);
+        } else {
+          // Failure - likely serving the frontend HTML app instead of backend API
+          addLog("Error: Server returned HTML instead of JSON.", "error");
+          addLog("Fix: In Railway settings, set Root Directory to '/server'", "warning");
+        }
+      } catch (err) {
+        addLog(`Connection Failed: ${String(err)}`, "error");
+        // If fetch fails (CORS or offline), we might still try socket if the user insists, 
+        // but usually this means the server is unreachable.
+        // We'll try connecting anyway just in case it's a specific fetch issue.
+        addLog("Attempting socket connection anyway...", "info");
+        networkManager.connect(url);
+      }
     }
   };
 
