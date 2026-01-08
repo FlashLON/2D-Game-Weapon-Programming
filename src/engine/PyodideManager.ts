@@ -56,34 +56,37 @@ class PyodideManager {
             if (api) {
                 try {
                     console.log("Injecting API...");
-                    // 1. Pass the raw JS API object to Python as a hidden variable
-                    // This creates a JsProxy in Python
+                    // 1. Pass the raw JS API object
                     namespace.set('_js_api', this.pyodide.toPy(api));
 
-                    // 2. Define the Wrapper Class in Python
-                    // This wrapper creates a "pythonic" interface that bridges property access
-                    // to the JavaScript getter functions, satisfying the user's diagnostic script.
+                    // 2. Define Wrapper that handles _js_api as a Dictionary
                     await this.pyodide.runPythonAsync(`
 class APIWrapper:
-    def __init__(self, js_api):
-        self._api = js_api
+    def __init__(self, raw_api):
+        self._raw = raw_api # Expecting a dict/map-like interface
 
     # Explicit properties mapping to JS getters
     @property
     def player(self):
-        return self._api.get_player()
+        # Access the function from the dict and call it
+        func = self._raw.get('get_player')
+        return func() if func else None
 
     @property
     def enemies(self):
-        return self._api.get_enemies()
+        func = self._raw.get('get_enemies')
+        return func() if func else []
         
     @property
     def arena(self):
-        return self._api.get_arena_size()
+        func = self._raw.get('get_arena_size')
+        return func() if func else None
 
-    # Forward everything else (like .log(), .get_time())
+    # Forward everything else (like .log(), .get_time()) by looking up keys
     def __getattr__(self, name):
-        return getattr(self._api, name)
+        if name in self._raw:
+            return self._raw[name]
+        raise AttributeError(f"'APIWrapper' object has no attribute '{name}'")
 
 api = APIWrapper(_js_api)
 `, { globals: namespace });
