@@ -56,24 +56,38 @@ class PyodideManager {
             if (api) {
                 try {
                     console.log("Injecting API...");
-                    // 1. Create the container
+                    // 1. Pass the raw JS API object to Python as a hidden variable
+                    // This creates a JsProxy in Python
+                    namespace.set('_js_api', this.pyodide.toPy(api));
+
+                    // 2. Define the Wrapper Class in Python
+                    // This wrapper creates a "pythonic" interface that bridges property access
+                    // to the JavaScript getter functions, satisfying the user's diagnostic script.
                     await this.pyodide.runPythonAsync(`
-import types
-api = types.SimpleNamespace()
+class APIWrapper:
+    def __init__(self, js_api):
+        self._api = js_api
+
+    # Explicit properties mapping to JS getters
+    @property
+    def player(self):
+        return self._api.get_player()
+
+    @property
+    def enemies(self):
+        return self._api.get_enemies()
+        
+    @property
+    def arena(self):
+        return self._api.get_arena_size()
+
+    # Forward everything else (like .log(), .get_time())
+    def __getattr__(self, name):
+        return getattr(self._api, name)
+
+api = APIWrapper(_js_api)
 `, { globals: namespace });
 
-                    // 2. Inject each function carefully
-                    for (const [key, value] of Object.entries(api)) {
-                        // Inject function into global namespace as a temporary variable
-                        // We assume 'value' is a JS function.
-                        namespace.set(`_temp_${key}`, value);
-
-                        // Move it onto the 'api' object
-                        await this.pyodide.runPythonAsync(`
-setattr(api, '${key}', _temp_${key})
-del _temp_${key}
-`, { globals: namespace });
-                    }
                 } catch (apiErr) {
                     console.error("API Injection error:", apiErr);
                     throw apiErr;
