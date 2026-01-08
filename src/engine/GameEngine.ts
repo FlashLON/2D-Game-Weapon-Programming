@@ -120,6 +120,13 @@ export class GameEngine {
      * @param dt Delta time in seconds
      */
     private update(dt: number) {
+        // If in multiplayer mode, we rely on server updates, NOT local physics.
+        // We might run the weapon script purely for visual effects or intent calculation,
+        // but for now, let's just skip the entire local simulation.
+        if (this.isMultiplayer) {
+            return;
+        }
+
         // 1. Run user-defined update code (if any)
         if (this.weaponScript) {
             try {
@@ -402,7 +409,8 @@ export class GameEngine {
                     }
                 }
 
-                this.state.projectiles.push({
+                // Prepare projectile data
+                const projectileData = {
                     id: `proj_${Date.now()}`,
                     x: player.x,
                     y: player.y,
@@ -413,17 +421,59 @@ export class GameEngine {
                     damage: damage,
                     knockback: knockback,
                     pierce: pierce,
-                    type: 'projectile',
+                    type: 'projectile' as const,
                     velocity: { x: vx, y: vy },
                     homing,
                     lifetime,
                     maxLifetime: lifetime,
                     acceleration
-                });
+                };
+
+                // If single player, add to local state immediately
+                if (!this.isMultiplayer) {
+                    this.state.projectiles.push(projectileData);
+                }
+
+                // Return data for UI -> Network Manager
+                return {
+                    vx, vy, color, radius, damage, knockback, pierce, homing, lifetime, acceleration
+                };
             }
         } catch (err) {
             console.error("Error firing weapon:", err);
         }
+        return null;
+    }
+
+    // --- MULTIPLAYER SUPPORT ---
+    private isMultiplayer = false;
+
+    setMultiplayerMode(enabled: boolean) {
+        this.isMultiplayer = enabled;
+    }
+
+    updateFromSnapshot(snapshot: any) {
+        // Replace local state with server state
+        // Transform players dict to array
+        const playersArray = Object.values(snapshot.players || {}).map((p: any) => ({
+            ...p,
+            type: 'player'
+        }));
+
+        // Ensure enemies is array
+        const enemiesArray = Array.isArray(snapshot.enemies) ? snapshot.enemies : [];
+
+        // Projectiles
+        const projectilesArray = Array.isArray(snapshot.projectiles) ? snapshot.projectiles : [];
+
+        this.state = {
+            entities: [...playersArray, ...enemiesArray],
+            projectiles: projectilesArray,
+            score: snapshot.score || 0,
+            gameOver: false
+        };
+
+        this.notify();
     }
 }
 

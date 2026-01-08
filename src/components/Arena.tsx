@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { gameEngine, type GameState } from '../engine/GameEngine';
 
+import { networkManager } from '../utils/NetworkManager';
+
 export const Arena: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -48,7 +50,11 @@ export const Arena: React.FC = () => {
                 vy = (vy / magnitude) * moveSpeed;
             }
 
-            gameEngine.setPlayerVelocity(vx, vy);
+            if (networkManager.isConnected()) {
+                networkManager.sendMovement(vx, vy);
+            } else {
+                gameEngine.setPlayerVelocity(vx, vy);
+            }
         };
 
         // Main render function called whenever game state changes
@@ -140,7 +146,12 @@ export const Arena: React.FC = () => {
         const y = e.clientY - rect.top;
 
         // Trigger fire action in engine (which calls Python logic)
-        gameEngine.fireWeapon(x, y);
+        // returns projectile data if intent is valid
+        const projectileData = gameEngine.fireWeapon(x, y);
+
+        if (networkManager.isConnected() && projectileData) {
+            networkManager.sendFire(projectileData);
+        }
     };
 
     return (

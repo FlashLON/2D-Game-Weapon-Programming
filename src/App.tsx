@@ -4,7 +4,8 @@ import { Arena } from './components/Arena';
 import { Console, type LogMessage, type LogType } from './components/Console';
 import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
-import { Play, RotateCcw } from 'lucide-react';
+import { networkManager } from './utils/NetworkManager';
+import { Play, RotateCcw, X, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
 
 const DEFAULT_CODE = `
 # ==========================================
@@ -61,6 +62,11 @@ function App() {
   const [showDocs, setShowDocs] = useState(false);
   const [logs, setLogs] = useState<LogMessage[]>([]);
 
+  // Multiplayer State
+  const [isConnected, setIsConnected] = useState(false);
+  const [showConnect, setShowConnect] = useState(false);
+  const [serverUrl, setServerUrl] = useState("");
+
   const addLog = (msg: string, type: LogType = 'info') => {
     setLogs(prev => [...prev, {
       id: Math.random().toString(36).substr(2, 9),
@@ -114,6 +120,43 @@ function App() {
     init();
   }, []);
 
+  // Network Listeners
+  useEffect(() => {
+    networkManager.setOnConnectionChange((connected) => {
+      setIsConnected(connected);
+      gameEngine.setMultiplayerMode(connected);
+      if (connected) {
+        addLog("Connected to Multiplayer Server!", "success");
+        setShowConnect(false);
+      } else {
+        addLog("Disconnected from Server", "warning");
+      }
+    });
+
+    networkManager.setOnStateUpdate((state) => {
+      gameEngine.updateFromSnapshot(state);
+    });
+
+    networkManager.setOnKill((id) => {
+      addLog(`Eliminated enemy ${id}!`, "success");
+    });
+
+    // Clean up
+    return () => {
+      networkManager.disconnect();
+    };
+  }, []);
+
+  const handleConnect = () => {
+    if (isConnected) {
+      networkManager.disconnect();
+    } else {
+      const url = serverUrl || "http://localhost:3000";
+      addLog(`Connecting to ${url}...`, "info");
+      networkManager.connect(url);
+    }
+  };
+
   const handleCompile = async (source: string) => {
     setStatus("Compiling...");
     try {
@@ -159,6 +202,69 @@ function App() {
           >
             {showDocs ? "Hide Guide" : "Code Guide"}
           </button>
+
+          {/* Multiplayer Button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowConnect(!showConnect)}
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${isConnected
+                ? "bg-cyber-accent/20 text-cyber-accent border border-cyber-accent"
+                : "text-gray-300 hover:bg-cyber-muted border border-transparent"}`}
+            >
+              {isConnected ? <CheckCircle2 size={16} /> : <LinkIcon size={16} />}
+              {isConnected ? "Online" : "Multiplayer"}
+            </button>
+
+            {/* Connection Popup */}
+            {showConnect && (
+              <div className="absolute top-12 right-0 w-80 bg-cyber-dark border border-cyber-muted p-4 rounded shadow-2xl z-50">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-white">Multiplayer Connection</h3>
+                  <button onClick={() => setShowConnect(false)} className="text-gray-400 hover:text-white">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {!isConnected ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-cyber-muted block mb-1">Server URL</label>
+                      <input
+                        type="text"
+                        value={serverUrl}
+                        onChange={(e) => setServerUrl(e.target.value)}
+                        placeholder="wss://your-app.railway.app"
+                        className="w-full bg-black/50 border border-cyber-muted rounded px-3 py-2 text-sm text-white focus:border-cyber-accent outline-none"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">Leave empty for localhost:3000</p>
+                    </div>
+                    <button
+                      onClick={handleConnect}
+                      className="w-full bg-cyber-accent text-black font-bold py-2 rounded hover:bg-emerald-400 transition-colors"
+                    >
+                      Connect Server
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 p-3 rounded">
+                      <CheckCircle2 size={24} />
+                      <div>
+                        <div className="font-bold text-sm">Connected</div>
+                        <div className="text-xs opacity-75">Syncing game state...</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => networkManager.disconnect()}
+                      className="w-full border border-red-500 text-red-500 hover:bg-red-500/10 font-bold py-2 rounded transition-colors"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <button
             onClick={() => gameEngine.reset()}
