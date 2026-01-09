@@ -120,17 +120,65 @@ export const Arena: React.FC = () => {
                 }
             });
 
-            // 4. Draw HUD (Heads Up Display)
+            // 4. Draw HUD (Local Stats)
             ctx.fillStyle = '#fff';
-            ctx.font = '20px "Fira Code"';
+            ctx.font = 'bold 20px "Outfit", sans-serif';
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
             ctx.fillText(`SCORE: ${state.score}`, 20, 40);
 
+            // If in multiplayer, show my kills/deaths
+            if (networkManager.isConnected()) {
+                const myId = networkManager.getPlayerId();
+                const me = state.entities.find(e => e.id === myId);
+                if (me) {
+                    ctx.fillStyle = '#00ff9f';
+                    ctx.font = '16px "Outfit", sans-serif';
+                    ctx.fillText(`KILLS: ${me.kills || 0}`, 20, 70);
+                    ctx.fillStyle = '#ff0055';
+                    ctx.fillText(`DEATHS: ${me.deaths || 0}`, 20, 95);
+                }
+            }
+            ctx.shadowBlur = 0;
+
+            // 5. Draw Leaderboard (Multiplayer)
+            if (state.leaderboard && state.leaderboard.length > 0) {
+                const myId = networkManager.getPlayerId();
+                const lbX = canvas.width - 180;
+                const lbY = 40;
+
+                // Header
+                ctx.fillStyle = 'rgba(10, 10, 15, 0.8)';
+                ctx.fillRect(lbX - 10, lbY - 25, 170, 30 + state.leaderboard.length * 25);
+                ctx.strokeStyle = '#00ff9f';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(lbX - 10, lbY - 25, 170, 30 + state.leaderboard.length * 25);
+
+                ctx.fillStyle = '#00ff9f';
+                ctx.font = 'bold 14px "Outfit", sans-serif';
+                ctx.fillText("LEADERBOARD", lbX, lbY);
+
+                state.leaderboard.slice(0, 5).forEach((entry: any, i: number) => {
+                    const isMe = entry.id === myId;
+                    ctx.fillStyle = isMe ? '#00ff9f' : '#fff';
+                    ctx.font = isMe ? 'bold 13px "Outfit", sans-serif' : '13px "Outfit", sans-serif';
+
+                    const name = isMe ? "YOU" : `Player ${entry.id.substring(0, 4)}`;
+                    ctx.fillText(`${i + 1}. ${name}`, lbX, lbY + 25 + i * 25);
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`${entry.kills}`, lbX + 150, lbY + 25 + i * 25);
+                    ctx.textAlign = 'left';
+                });
+            }
+
             if (state.gameOver) {
-                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff0055';
-                ctx.font = '40px "Fira Code"';
-                ctx.fillText("GAME OVER", canvas.width / 2 - 100, canvas.height / 2);
+                ctx.font = 'bold 48px "Outfit", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+                ctx.textAlign = 'left';
             }
         };
 

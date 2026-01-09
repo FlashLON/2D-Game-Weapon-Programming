@@ -18,7 +18,7 @@ const gameState = {
     players: {},
     enemies: [],
     projectiles: [],
-    score: 0
+    score: 0 // Global enemy kill score
 };
 
 // --- SPATIAL PARTITIONING GRID ---
@@ -91,7 +91,9 @@ io.on('connection', (socket) => {
         hp: 100,
         maxHp: 100,
         type: 'player',
-        velocity: { x: 0, y: 0 }
+        velocity: { x: 0, y: 0 },
+        kills: 0,
+        deaths: 0
     };
 
     // Send initial state to new player
@@ -423,9 +425,17 @@ setInterval(() => {
                     ent.x = Math.random() * 700 + 50;
                     ent.y = Math.random() * 500 + 50;
                     ent.velocity = { x: 0, y: 0 };
+
+                    // Award kill to attacker
+                    const attacker = gameState.players[p.playerId];
+                    if (attacker) {
+                        attacker.kills = (attacker.kills || 0) + 1;
+                    }
+
                     if (ent.type === 'enemy') {
                         gameState.score += 1;
                     } else {
+                        ent.deaths = (ent.deaths || 0) + 1;
                         io.emit('killFeed', { killer: p.playerId, victim: ent.id });
                     }
                     io.to(p.playerId).emit('kill', { enemyId: ent.id });
@@ -503,7 +513,9 @@ setInterval(() => {
                 id: p.id,
                 x: Math.round(p.x), y: Math.round(p.y),
                 vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
-                hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius
+                hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius,
+                kills: p.kills || 0,
+                deaths: p.deaths || 0
             };
         });
 

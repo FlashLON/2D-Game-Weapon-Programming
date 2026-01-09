@@ -34,6 +34,8 @@ export interface Entity {
     chain_range?: number;
     orbit_speed?: number;
     orbit_radius?: number;
+    kills?: number;
+    deaths?: number;
 }
 
 /**
@@ -45,6 +47,7 @@ export interface GameState {
     projectiles: Entity[];
     score: number;
     gameOver: boolean;
+    leaderboard?: { id: string; kills: number; deaths: number }[];
 }
 
 /**
@@ -598,6 +601,15 @@ export class GameEngine {
         }));
 
         this.state.score = snapshot.score || 0;
+
+        // 4. Leaderboard
+        const leaderboard = Object.values(snapshot.players || {}).map((p: any) => ({
+            id: p.id,
+            kills: p.kills || 0,
+            deaths: p.deaths || 0
+        })).sort((a: any, b: any) => b.kills - a.kills);
+
+        this.state.leaderboard = leaderboard;
         this.state.gameOver = false;
         this.notify();
     }
