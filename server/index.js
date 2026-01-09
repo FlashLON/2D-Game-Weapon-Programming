@@ -21,6 +21,53 @@ const gameState = {
     score: 0
 };
 
+// --- SPATIAL PARTITIONING GRID ---
+const CELL_SIZE = 100;
+const GRID_COLS = 8; // 800 / 100
+const GRID_ROWS = 6; // 600 / 100
+let spatialGrid = []; // Array of Cells, each cell is a Map of entities
+
+function resetGrid() {
+    spatialGrid = Array.from({ length: GRID_COLS * GRID_ROWS }, () => []);
+}
+
+function getCellIndex(x, y) {
+    const col = Math.floor(Math.max(0, Math.min(x, 799)) / CELL_SIZE);
+    const row = Math.floor(Math.max(0, Math.min(y, 599)) / CELL_SIZE);
+    return row * GRID_COLS + col;
+}
+
+function updateGrid() {
+    resetGrid();
+    // Add enemies to grid
+    gameState.enemies.forEach(e => {
+        const idx = getCellIndex(e.x, e.y);
+        spatialGrid[idx].push(e);
+    });
+    // Add players to grid
+    Object.values(gameState.players).forEach(p => {
+        const idx = getCellIndex(p.x, p.y);
+        spatialGrid[idx].push(p);
+    });
+}
+
+function getNearbyEntities(x, y) {
+    const col = Math.floor(Math.max(0, Math.min(x, 799)) / CELL_SIZE);
+    const row = Math.floor(Math.max(0, Math.min(y, 599)) / CELL_SIZE);
+
+    let nearby = [];
+    for (let r = row - 1; r <= row + 1; r++) {
+        for (let c = col - 1; c <= col + 1; c++) {
+            if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
+                const idx = r * GRID_COLS + c;
+                nearby.push(...spatialGrid[idx]);
+            }
+        }
+    }
+    return nearby;
+}
+// ---------------------------------
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({
@@ -160,7 +207,10 @@ setInterval(() => {
     const dt = Math.min((now - lastTick) / 1000, 0.1);
     lastTick = now;
 
-    // --- 1. PHYSICS UPDATE ---
+    // --- 1. PREPARE GRID ---
+    updateGrid();
+
+    // --- 2. PHYSICS UPDATE ---
 
     // Update players
     Object.values(gameState.players).forEach(player => {
@@ -229,28 +279,16 @@ setInterval(() => {
             if (proj.homing && proj.homing > 0) {
                 let nearest = null;
                 let minDistSq = Infinity;
+                const nearby = getNearbyEntities(proj.x, proj.y);
 
-                // Scan enemies
-                gameState.enemies.forEach(enemy => {
-                    const dx = enemy.x - proj.x;
-                    const dy = enemy.y - proj.y;
-                    const distSq = dx * dx + dy * dy;
-                    if (distSq < minDistSq) {
-                        minDistSq = distSq;
-                        nearest = enemy;
-                    }
-                });
-
-                // Scan players (PVP)
-                Object.values(gameState.players).forEach(p => {
-                    if (p.id !== proj.playerId) {
-                        const dx = p.x - proj.x;
-                        const dy = p.y - proj.y;
-                        const distSq = dx * dx + dy * dy;
-                        if (distSq < minDistSq) {
-                            minDistSq = distSq;
-                            nearest = p;
-                        }
+                nearby.forEach(ent => {
+                    if (ent.id === proj.playerId) return;
+                    const dx = ent.x - proj.x;
+                    const dy = ent.y - proj.y;
+                    const dSq = dx * dx + dy * dy;
+                    if (dSq < minDistSq) {
+                        minDistSq = dSq;
+                        nearest = ent;
                     }
                 });
 
@@ -296,48 +334,25 @@ setInterval(() => {
         // --- ATTRACTION FORCE LOGIC ---
         if (proj.attraction_force && proj.attraction_force > 0) {
             const range = 200;
+            const rangeSq = range * range;
             const force = proj.attraction_force * 1000;
+            const nearby = getNearbyEntities(proj.x, proj.y);
 
-            // Pull enemies
-            gameState.enemies.forEach(e => {
+            nearby.forEach(e => {
+                if (e.id === proj.playerId) return;
                 const dx = proj.x - e.x;
                 const dy = proj.y - e.y;
                 const distSq = dx * dx + dy * dy;
-                if (distSq < range * range && distSq > 100) {
+                if (distSq < rangeSq && distSq > 100) {
                     const dist = Math.sqrt(distSq);
                     const ax = (dx / dist) * (force / distSq);
                     const ay = (dy / dist) * (force / distSq);
-                    // Server relies on client prediction somewhat, but simple physics update helps
-                    // Note: Enemy velocity logic isn't fully simulated on server like player, 
-                    // but we can nudge their position or add velocity property to enemies if missing.
-                    // Current enemies have velocity {x,y} in initialization? No, I need to check.
-                    // Assuming they do or adding it now.
+
                     if (!e.velocity) e.velocity = { x: 0, y: 0 };
                     e.velocity.x += ax * dt;
                     e.velocity.y += ay * dt;
-                    // Use velocity to move them? 
-                    // The main loop doesn't update enemy position by velocity yet!
-                    // I'll add that to the enemy loop below if needed.
-                    // Actually, let's just nudge position directly for now to be safe, 
-                    // or better, update the Main Loop to move enemies.
-                    e.x += ax * dt * dt * 0.5; // Approximation
+                    e.x += ax * dt * dt * 0.5;
                     e.y += ay * dt * dt * 0.5;
-                }
-            });
-
-            // Pull other players
-            Object.values(gameState.players).forEach(p => {
-                if (p.id !== proj.playerId) {
-                    const dx = proj.x - p.x;
-                    const dy = proj.y - p.y;
-                    const distSq = dx * dx + dy * dy;
-                    if (distSq < range * range && distSq > 100) {
-                        const dist = Math.sqrt(distSq);
-                        const ax = (dx / dist) * (force / distSq);
-                        const ay = (dy / dist) * (force / distSq);
-                        p.velocity.x += ax * dt;
-                        p.velocity.y += ay * dt;
-                    }
                 }
             });
         }
@@ -364,17 +379,19 @@ setInterval(() => {
     for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
         const p = gameState.projectiles[i];
         let hitSomething = false;
+        const nearby = getNearbyEntities(p.x, p.y);
 
-        // 1. Check against enemies (PVE)
-        for (const e of gameState.enemies) {
-            const dx = p.x - e.x;
-            const dy = p.y - e.y;
+        for (const ent of nearby) {
+            if (ent.id === p.playerId) continue;
+
+            const dx = p.x - ent.x;
+            const dy = p.y - ent.y;
             const distSq = dx * dx + dy * dy;
-            const combinedRadius = p.radius + e.radius;
+            const combinedRadius = p.radius + ent.radius;
 
             if (distSq < combinedRadius * combinedRadius) {
                 const dmg = p.damage || 10;
-                e.hp -= dmg;
+                ent.hp -= dmg;
 
                 // Vampirism
                 if (p.vampirism && p.vampirism > 0) {
@@ -389,180 +406,66 @@ setInterval(() => {
                 // Apply knockback
                 if (p.knockback) {
                     const angle = Math.atan2(dy, dx);
-                    if (!e.velocity) e.velocity = { x: 0, y: 0 };
-                    e.velocity.x -= Math.cos(angle) * p.knockback;
-                    e.velocity.y -= Math.sin(angle) * p.knockback;
-                    // Simple positional nudge
-                    e.x -= Math.cos(angle) * p.knockback * 0.1;
-                    e.y -= Math.sin(angle) * p.knockback * 0.1;
+                    if (!ent.velocity) ent.velocity = { x: 0, y: 0 };
+                    ent.velocity.x -= Math.cos(angle) * p.knockback;
+                    ent.velocity.y -= Math.sin(angle) * p.knockback;
+                    ent.x -= Math.cos(angle) * p.knockback * 0.1;
+                    ent.y -= Math.sin(angle) * p.knockback * 0.1;
                 }
 
                 hitSomething = true;
-
-                // Check if enemy died
-                if (e.hp <= 0) {
-                    e.hp = e.maxHp;
-                    e.x = Math.random() * 700 + 50;
-                    e.y = Math.random() * 500 + 50;
-                    e.velocity = { x: 0, y: 0 };
-                    gameState.score += 1;
-                    io.to(p.playerId).emit('kill', { enemyId: e.id });
+                if (ent.type === 'player') {
+                    io.to(ent.id).emit('hit', { damage: dmg, attackerId: p.playerId });
                 }
 
-                // Handle chain / pierce
+                if (ent.hp <= 0) {
+                    ent.hp = ent.maxHp;
+                    ent.x = Math.random() * 700 + 50;
+                    ent.y = Math.random() * 500 + 50;
+                    ent.velocity = { x: 0, y: 0 };
+                    if (ent.type === 'enemy') {
+                        gameState.score += 1;
+                    } else {
+                        io.emit('killFeed', { killer: p.playerId, victim: ent.id });
+                    }
+                    io.to(p.playerId).emit('kill', { enemyId: ent.id });
+                }
+
+                // Chain range
                 if (p.chain_range && p.chain_range > 0) {
-                    // Find nearest enemy EXCEPT the one we just hit
-                    let nearest = null;
-                    let minDistSq = Infinity;
-                    gameState.enemies.forEach(enemy => {
-                        if (enemy.id !== e.id) {
-                            const dSq = (enemy.x - p.x) ** 2 + (enemy.y - p.y) ** 2;
-                            if (dSq < minDistSq) {
-                                minDistSq = dSq;
-                                nearest = enemy;
-                            }
+                    const targets = getNearbyEntities(p.x, p.y);
+                    let nearestChain = null;
+                    let minChainSq = Infinity;
+                    const chainRangeSq = p.chain_range * p.chain_range;
+
+                    targets.forEach(t => {
+                        if (t.id === ent.id || t.id === p.playerId) return;
+                        const dSq = (t.x - p.x) ** 2 + (t.y - p.y) ** 2;
+                        if (dSq < minChainSq && dSq <= chainRangeSq) {
+                            minChainSq = dSq;
+                            nearestChain = t;
                         }
                     });
 
-                    if (nearest && Math.sqrt(minDistSq) <= p.chain_range) {
-                        // Jump!
+                    if (nearestChain) {
                         const speed = Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2);
-                        const angle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+                        const angle = Math.atan2(nearestChain.y - p.y, nearestChain.x - p.x);
                         p.velocity.x = Math.cos(angle) * speed;
                         p.velocity.y = Math.sin(angle) * speed;
-
-                        // We hit, so check pierce
                         if (p.pierce && p.pierce > 1) {
                             p.pierce--;
                             hitSomething = false;
-                        } else {
-                            hitSomething = true;
                         }
-                    } else {
-                        // No chain target, check normal pierce
-                        if (p.pierce && p.pierce > 1) {
-                            p.pierce--;
-                            hitSomething = false;
-                        } else {
-                            hitSomething = true;
-                        }
-                    }
-                } else {
-                    // Normal pierce
-                    if (p.pierce && p.pierce > 1) {
+                    } else if (p.pierce && p.pierce > 1) {
                         p.pierce--;
                         hitSomething = false;
-                    } else {
-                        hitSomething = true;
                     }
+                } else if (p.pierce && p.pierce > 1) {
+                    p.pierce--;
+                    hitSomething = false;
                 }
 
                 if (hitSomething) break;
-            }
-        }
-
-        // 2. Check against other Players (PVP) - FREE FOR ALL
-        if (!hitSomething) {
-            for (const playerId in gameState.players) {
-                if (playerId === p.playerId) continue;
-
-                const player = gameState.players[playerId];
-                const dx = p.x - player.x;
-                const dy = p.y - player.y;
-                const distSq = dx * dx + dy * dy;
-                const combinedRadius = p.radius + player.radius;
-
-                if (distSq < combinedRadius * combinedRadius) {
-                    const dmg = p.damage || 10;
-                    player.hp -= dmg;
-
-                    // Vampirism
-                    if (p.vampirism && p.vampirism > 0) {
-                        const owner = gameState.players[p.playerId];
-                        if (owner) {
-                            const heal = dmg * (p.vampirism / 100);
-                            owner.hp = Math.min(owner.maxHp, owner.hp + heal);
-                            io.to(p.playerId).emit('heal', { amount: heal, hp: owner.hp });
-                        }
-                    }
-
-                    // Apply knockback
-                    if (p.knockback) {
-                        const angle = Math.atan2(dy, dx);
-                        player.velocity.x -= Math.cos(angle) * p.knockback;
-                        player.velocity.y -= Math.sin(angle) * p.knockback;
-                    }
-
-                    hitSomething = true;
-                    io.to(playerId).emit('hit', { damage: dmg, attackerId: p.playerId });
-
-                    if (player.hp <= 0) {
-                        player.hp = player.maxHp;
-                        player.x = Math.random() * 700 + 50;
-                        player.y = Math.random() * 500 + 50;
-                        player.velocity = { x: 0, y: 0 };
-                        io.to(p.playerId).emit('kill', { enemyId: player.id });
-                        io.emit('killFeed', { killer: p.playerId, victim: player.id });
-                    }
-
-                    // Handle chain / pierce
-                    if (p.chain_range && p.chain_range > 0) {
-                        // Find nearest target (enemy or player) EXCEPT the one we just hit
-                        let nearest = null;
-                        let minDistSq = Infinity;
-
-                        // Enemies
-                        gameState.enemies.forEach(enemy => {
-                            const dSq = (enemy.x - p.x) ** 2 + (enemy.y - p.y) ** 2;
-                            if (dSq < minDistSq) {
-                                minDistSq = dSq;
-                                nearest = enemy;
-                            }
-                        });
-
-                        // Players
-                        Object.values(gameState.players).forEach(otherPlayer => {
-                            if (otherPlayer.id !== player.id) { // Not the one we just hit
-                                const dSq = (otherPlayer.x - p.x) ** 2 + (otherPlayer.y - p.y) ** 2;
-                                if (dSq < minDistSq) {
-                                    minDistSq = dSq;
-                                    nearest = otherPlayer;
-                                }
-                            }
-                        });
-
-                        if (nearest && Math.sqrt(minDistSq) <= p.chain_range) {
-                            // Jump!
-                            const speed = Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2);
-                            const angle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
-                            p.velocity.x = Math.cos(angle) * speed;
-                            p.velocity.y = Math.sin(angle) * speed;
-
-                            if (p.pierce && p.pierce > 1) {
-                                p.pierce--;
-                                hitSomething = false;
-                            } else {
-                                hitSomething = true;
-                            }
-                        } else {
-                            if (p.pierce && p.pierce > 1) {
-                                p.pierce--;
-                                hitSomething = false;
-                            } else {
-                                hitSomething = true;
-                            }
-                        }
-                    } else {
-                        if (p.pierce && p.pierce > 1) {
-                            p.pierce--;
-                            hitSomething = false;
-                        } else {
-                            hitSomething = true;
-                        }
-                    }
-
-                    if (hitSomething) break;
-                }
             }
         }
 
@@ -571,39 +474,42 @@ setInterval(() => {
         }
     }
 
-    // --- 2. BROADCAST (Reduced Frequency) ---
+}
+    // --- 3. BROADCAST (Reduced Frequency) ---
     if (now - lastBroadcast > BROADCAST_INTERVAL) {
-        lastBroadcast = now;
+    lastBroadcast = now;
 
-        // Create a slim snapshot to save bandwidth
-        const slimState = {
-            players: {},
-            enemies: gameState.enemies.map(e => ({
-                id: e.id, x: e.x, y: e.y,
-                vx: e.velocity ? e.velocity.x : 0,
-                vy: e.velocity ? e.velocity.y : 0,
-                hp: e.hp, maxHp: e.maxHp, radius: e.radius, color: e.color
-            })),
-            projectiles: gameState.projectiles.map(p => ({
-                id: p.id, x: p.x, y: p.y,
-                vx: p.velocity.x, vy: p.velocity.y,
-                radius: p.radius, color: p.color,
-                orbit_player: p.orbit_player, // needed for client visuals
-                playerId: p.playerId
-            })),
-            score: gameState.score
+    const slimState = {
+        players: {},
+        enemies: gameState.enemies.map(e => ({
+            id: e.id,
+            x: Math.round(e.x), y: Math.round(e.y),
+            vx: Math.round(e.velocity ? e.velocity.x : 0),
+            vy: Math.round(e.velocity ? e.velocity.y : 0),
+            hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
+        })),
+        projectiles: gameState.projectiles.map(p => ({
+            id: p.id,
+            x: Math.round(p.x), y: Math.round(p.y),
+            vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
+            radius: p.radius, color: p.color,
+            orbit_player: p.orbit_player,
+            playerId: p.playerId
+        })),
+        score: gameState.score
+    };
+
+    Object.values(gameState.players).forEach(p => {
+        slimState.players[p.id] = {
+            id: p.id,
+            x: Math.round(p.x), y: Math.round(p.y),
+            vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
+            hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius
         };
+    });
 
-        // Map players
-        Object.values(gameState.players).forEach(p => {
-            slimState.players[p.id] = {
-                id: p.id, x: p.x, y: p.y, vx: p.velocity.x, vy: p.velocity.y,
-                hp: p.hp, maxHp: p.maxHp, color: p.color, radius: p.radius
-            };
-        });
-
-        io.emit('state', slimState);
-    }
+    io.emit('state', slimState);
+}
 }, TICK_INTERVAL);
 
 server.listen(PORT, () => {
