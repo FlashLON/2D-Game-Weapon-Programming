@@ -83,6 +83,32 @@ function App() {
     get_entities_in_range: (x: number, y: number, range: number) => {
       return gameEngine.getEntitiesInRange(x, y, range);
     },
+    get_projectiles: () => {
+      return gameEngine.getAllProjectiles();
+    },
+    spawn_projectile: (params: any) => {
+      // Convert Python Map to object if needed
+      let jsParams = params;
+      if (params && typeof params.toJs === 'function') {
+        const raw = params.toJs();
+        if (raw instanceof Map || (raw && typeof raw.get === 'function')) {
+          jsParams = {};
+          raw.forEach((v: any, k: any) => { (jsParams as any)[k] = v; });
+        } else {
+          jsParams = raw;
+        }
+      }
+
+      const proj = gameEngine.spawnProjectile(jsParams);
+      if (proj && isConnected) {
+        networkManager.sendFire({
+          ...proj,
+          vx: proj.velocity.x,
+          vy: proj.velocity.y
+        });
+      }
+      return proj;
+    },
     // Utilities
     get_time: () => Date.now(),
     rand_float: () => Math.random(),

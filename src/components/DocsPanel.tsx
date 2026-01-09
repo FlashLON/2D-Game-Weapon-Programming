@@ -62,9 +62,14 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
                         <span className="text-purple-400">pierce</span> <span>(number) Targets to hit</span>
 
                         <span className="text-orange-400">orbit_player</span> <span>(bool) Rotate around player</span>
+                        <span className="text-orange-400">orbit_speed</span> <span>(number) Rotation speed (Rad/s)</span>
+                        <span className="text-orange-400">orbit_radius</span> <span>(number) Distance from player</span>
                         <span className="text-orange-400">vampirism</span> <span>(number) Heal % of damage dealt</span>
                         <span className="text-red-500">split_on_death</span> <span>(number) Fragments upon expiry</span>
                         <span className="text-red-500">attraction_force</span> <span>(number) Pull enemies (Grav)</span>
+                        <span className="text-blue-400">bounciness</span> <span>(number) Bounce mult (0.0 - 1.0)</span>
+                        <span className="text-blue-400">spin</span> <span>(number) Rotation in degrees/sec</span>
+                        <span className="text-green-400">chain_range</span> <span>(number) Jump to next enemy hit</span>
                     </div>
                 </section>
 
@@ -76,12 +81,14 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
                         <div>
                             <code className="text-cyber-accent block mb-1">api.get_enemies()</code>
                             <p>Returns a list of all active enemies.</p>
-                            <pre className="bg-black/50 p-2 rounded text-gray-400 text-xs mt-1">
-                                {`[
-  {"id": "e1", "x": 100, "y": 200, "hp": 50},
-  ...
-]`}
-                            </pre>
+                        </div>
+                        <div>
+                            <code className="text-cyber-accent block mb-1">api.get_projectiles()</code>
+                            <p>Returns a list of all active projectiles.</p>
+                        </div>
+                        <div>
+                            <code className="text-cyber-accent block mb-1">api.spawn_projectile(params)</code>
+                            <p>Manually spawn a projectile (params dict). Returns projectile info.</p>
                         </div>
                         <div>
                             <code className="text-cyber-accent block mb-1">api.get_player()</code>

@@ -94,7 +94,12 @@ io.on('connection', (socket) => {
                 orbit_player: data.orbit_player || false,
                 vampirism: data.vampirism || 0,
                 split_on_death: data.split_on_death || 0,
-                attraction_force: data.attraction_force || 0
+                attraction_force: data.attraction_force || 0,
+                bounciness: data.bounciness || 0,
+                spin: data.spin || 0,
+                chain_range: data.chain_range || 0,
+                orbit_speed: data.orbit_speed || 3.0,
+                orbit_radius: data.orbit_radius || 60
             };
 
             gameState.projectiles.push(projectile);
@@ -172,14 +177,12 @@ setInterval(() => {
                     // Calculate initial angle and radius relative to owner
                     const dx = proj.x - owner.x;
                     const dy = proj.y - owner.y;
-                    let r = Math.sqrt(dx * dx + dy * dy);
+                    let r = proj.orbit_radius || Math.sqrt(dx * dx + dy * dy);
                     let angle = Math.atan2(dy, dx);
 
                     // If spawned too close to center (e.g. at player pos), default to a visible ring
                     if (r < 20) {
-                        r = 60;
-                        // Spread projectiles out if multiple are spawned? 
-                        // We can use a random angle or just 0.
+                        r = proj.orbit_radius || 60;
                         angle = (Math.random() * Math.PI * 2);
                     }
 
@@ -187,7 +190,7 @@ setInterval(() => {
                     proj.orbitAngle = angle;
                 }
 
-                const orbitSpeed = 4.0;
+                const orbitSpeed = proj.orbit_speed || 4.0;
                 proj.orbitAngle += orbitSpeed * dt;
 
                 proj.x = owner.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
@@ -203,6 +206,17 @@ setInterval(() => {
             if (proj.acceleration) {
                 proj.velocity.x *= (1 + proj.acceleration * dt);
                 proj.velocity.y *= (1 + proj.acceleration * dt);
+            }
+
+            // Spin logic
+            if (proj.spin) {
+                const spinRad = (proj.spin * Math.PI / 180) * dt;
+                const cos = Math.cos(spinRad);
+                const sin = Math.sin(spinRad);
+                const nx = proj.velocity.x * cos - proj.velocity.y * sin;
+                const ny = proj.velocity.x * sin + proj.velocity.y * cos;
+                proj.velocity.x = nx;
+                proj.velocity.y = ny;
             }
 
             // Homing
@@ -247,6 +261,26 @@ setInterval(() => {
             // Move
             proj.x += proj.velocity.x * dt;
             proj.y += proj.velocity.y * dt;
+
+            // Bounciness logic
+            if (proj.bounciness && proj.bounciness > 0) {
+                const width = 800;
+                const height = 600;
+                if (proj.x < proj.radius) {
+                    proj.x = proj.radius;
+                    proj.velocity.x *= -proj.bounciness;
+                } else if (proj.x > width - proj.radius) {
+                    proj.x = width - proj.radius;
+                    proj.velocity.x *= -proj.bounciness;
+                }
+                if (proj.y < proj.radius) {
+                    proj.y = proj.radius;
+                    proj.velocity.y *= -proj.bounciness;
+                } else if (proj.y > height - proj.radius) {
+                    proj.y = height - proj.radius;
+                    proj.velocity.y *= -proj.bounciness;
+                }
+            }
         }
 
         // --- ATTRACTION FORCE LOGIC ---
@@ -364,13 +398,55 @@ setInterval(() => {
                     io.to(p.playerId).emit('kill', { enemyId: e.id });
                 }
 
-                // Handle pierce
-                if (p.pierce && p.pierce > 1) {
-                    p.pierce--;
-                    hitSomething = false;
+                // Handle chain / pierce
+                if (p.chain_range && p.chain_range > 0) {
+                    // Find nearest enemy EXCEPT the one we just hit
+                    let nearest = null;
+                    let minDistSq = Infinity;
+                    gameState.enemies.forEach(enemy => {
+                        if (enemy.id !== e.id) {
+                            const dSq = (enemy.x - p.x) ** 2 + (enemy.y - p.y) ** 2;
+                            if (dSq < minDistSq) {
+                                minDistSq = dSq;
+                                nearest = enemy;
+                            }
+                        }
+                    });
+
+                    if (nearest && Math.sqrt(minDistSq) <= p.chain_range) {
+                        // Jump!
+                        const speed = Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2);
+                        const angle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+                        p.velocity.x = Math.cos(angle) * speed;
+                        p.velocity.y = Math.sin(angle) * speed;
+
+                        // We hit, so check pierce
+                        if (p.pierce && p.pierce > 1) {
+                            p.pierce--;
+                            hitSomething = false;
+                        } else {
+                            hitSomething = true;
+                        }
+                    } else {
+                        // No chain target, check normal pierce
+                        if (p.pierce && p.pierce > 1) {
+                            p.pierce--;
+                            hitSomething = false;
+                        } else {
+                            hitSomething = true;
+                        }
+                    }
                 } else {
-                    break;
+                    // Normal pierce
+                    if (p.pierce && p.pierce > 1) {
+                        p.pierce--;
+                        hitSomething = false;
+                    } else {
+                        hitSomething = true;
+                    }
                 }
+
+                if (hitSomething) break;
             }
         }
 
@@ -417,12 +493,63 @@ setInterval(() => {
                         io.emit('killFeed', { killer: p.playerId, victim: player.id });
                     }
 
-                    if (p.pierce && p.pierce > 1) {
-                        p.pierce--;
-                        hitSomething = false;
+                    // Handle chain / pierce
+                    if (p.chain_range && p.chain_range > 0) {
+                        // Find nearest target (enemy or player) EXCEPT the one we just hit
+                        let nearest = null;
+                        let minDistSq = Infinity;
+
+                        // Enemies
+                        gameState.enemies.forEach(enemy => {
+                            const dSq = (enemy.x - p.x) ** 2 + (enemy.y - p.y) ** 2;
+                            if (dSq < minDistSq) {
+                                minDistSq = dSq;
+                                nearest = enemy;
+                            }
+                        });
+
+                        // Players
+                        Object.values(gameState.players).forEach(otherPlayer => {
+                            if (otherPlayer.id !== player.id) { // Not the one we just hit
+                                const dSq = (otherPlayer.x - p.x) ** 2 + (otherPlayer.y - p.y) ** 2;
+                                if (dSq < minDistSq) {
+                                    minDistSq = dSq;
+                                    nearest = otherPlayer;
+                                }
+                            }
+                        });
+
+                        if (nearest && Math.sqrt(minDistSq) <= p.chain_range) {
+                            // Jump!
+                            const speed = Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2);
+                            const angle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+                            p.velocity.x = Math.cos(angle) * speed;
+                            p.velocity.y = Math.sin(angle) * speed;
+
+                            if (p.pierce && p.pierce > 1) {
+                                p.pierce--;
+                                hitSomething = false;
+                            } else {
+                                hitSomething = true;
+                            }
+                        } else {
+                            if (p.pierce && p.pierce > 1) {
+                                p.pierce--;
+                                hitSomething = false;
+                            } else {
+                                hitSomething = true;
+                            }
+                        }
                     } else {
-                        break;
+                        if (p.pierce && p.pierce > 1) {
+                            p.pierce--;
+                            hitSomething = false;
+                        } else {
+                            hitSomething = true;
+                        }
                     }
+
+                    if (hitSomething) break;
                 }
             }
         }
