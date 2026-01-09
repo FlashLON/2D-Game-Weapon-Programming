@@ -169,12 +169,22 @@ setInterval(() => {
             const owner = gameState.players[proj.playerId];
             if (owner) {
                 if (proj.orbitAngle === undefined) {
-                    proj.orbitAngle = Math.atan2(proj.y - owner.y, proj.x - owner.x);
+                    // Calculate initial angle and radius relative to owner
                     const dx = proj.x - owner.x;
                     const dy = proj.y - owner.y;
                     let r = Math.sqrt(dx * dx + dy * dy);
-                    if (r < 20) r = 60;
+                    let angle = Math.atan2(dy, dx);
+
+                    // If spawned too close to center (e.g. at player pos), default to a visible ring
+                    if (r < 20) {
+                        r = 60;
+                        // Spread projectiles out if multiple are spawned? 
+                        // We can use a random angle or just 0.
+                        angle = (Math.random() * Math.PI * 2);
+                    }
+
                     proj.orbitRadius = r;
+                    proj.orbitAngle = angle;
                 }
 
                 const orbitSpeed = 4.0;
