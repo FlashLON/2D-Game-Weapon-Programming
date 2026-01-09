@@ -21,6 +21,7 @@ export interface Entity {
     maxLifetime?: number;// Initial lifetime in seconds
     acceleration?: number; // Acceleration factor
     velocity: { x: number; y: number };
+    playerId?: string;   // Owner of the entity (for projectiles)
     // Advanced Behaviors
     orbit_player?: boolean;
     vampirism?: number;       // Heal percent
@@ -126,17 +127,34 @@ export class GameEngine {
 
     private update(dt: number) {
         if (this.isMultiplayer) {
-            if (this.localPlayerId) {
-                const myPlayer = this.state.entities.find(e => e.id === this.localPlayerId);
-                if (myPlayer) {
-                    myPlayer.x += myPlayer.velocity.x * dt;
-                    myPlayer.y += myPlayer.velocity.y * dt;
+            // CLIENT-SIDE EXTRAPOLATION
+            // We move everything locally while waiting for server snapshots
+            this.state.entities.forEach(ent => {
+                ent.x += ent.velocity.x * dt;
+                ent.y += ent.velocity.y * dt;
 
-                    const bounds = this.getArenaBounds();
-                    myPlayer.x = Math.max(myPlayer.radius, Math.min(bounds.width - myPlayer.radius, myPlayer.x));
-                    myPlayer.y = Math.max(myPlayer.radius, Math.min(bounds.height - myPlayer.radius, myPlayer.y));
+                const bounds = this.getArenaBounds();
+                ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
+                ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
+            });
+
+            this.state.projectiles.forEach(proj => {
+                // Simplified movement extrapolation
+                if (proj.orbit_player) {
+                    // Orbit extrapolation is complex without player ref, but we try
+                    const player = this.state.entities.find(e => e.id === proj.playerId);
+                    if (player) {
+                        const orbitSpeed = proj.orbit_speed || 3.0;
+                        const angle = Math.atan2(proj.y - player.y, proj.x - player.x) + orbitSpeed * dt;
+                        const r = proj.orbit_radius || 60;
+                        proj.x = player.x + Math.cos(angle) * r;
+                        proj.y = player.y + Math.sin(angle) * r;
+                    }
+                } else {
+                    proj.x += proj.velocity.x * dt;
+                    proj.y += proj.velocity.y * dt;
                 }
-            }
+            });
             return;
         }
 
@@ -526,24 +544,59 @@ export class GameEngine {
     }
 
     updateFromSnapshot(snapshot: any) {
-        const playersArray = Object.values(snapshot.players || {}).map((p: any) => ({ ...p, type: 'player' }));
-        const enemiesArray = Array.isArray(snapshot.enemies) ? snapshot.enemies : [];
-        const projectilesArray = Array.isArray(snapshot.projectiles) ? snapshot.projectiles : [];
+        // 1. Prepare Snapshots
+        const playersArray = Object.values(snapshot.players || {}).map((p: any) => ({ ...p, type: 'player' as const }));
+        const enemiesArray = (snapshot.enemies || []).map((e: any) => ({ ...e, type: 'enemy' as const }));
+        const projectilesArray = snapshot.projectiles || [];
 
-        if (this.isMultiplayer && this.localPlayerId) {
-            const myLocalEntity = this.state.entities.find(e => e.id === this.localPlayerId);
-            const mergedEntities = playersArray.map((serverEnt: any) => {
-                if (serverEnt.id === this.localPlayerId && myLocalEntity) {
-                    return { ...serverEnt, x: myLocalEntity.x, y: myLocalEntity.y, velocity: myLocalEntity.velocity };
+        // 2. Reconcile Entities (Players & Enemies)
+        // We use a combination of "Server Reconciliation" for self and "Soft Interpolation" for others
+        const allServerEntities = [...playersArray, ...enemiesArray];
+
+        // Find entities that should persist or be created
+        const nextEntities: Entity[] = [];
+
+        allServerEntities.forEach(serverEnt => {
+            const localEnt = this.state.entities.find(e => e.id === serverEnt.id);
+
+            if (localEnt) {
+                if (serverEnt.id === this.localPlayerId) {
+                    // SELF: Keep local physics, only sync stats
+                    nextEntities.push({
+                        ...serverEnt,
+                        x: localEnt.x,
+                        y: localEnt.y,
+                        velocity: localEnt.velocity
+                    });
+                } else {
+                    // OTHERS: Soft pull towards server position to avoid jumpiness
+                    // We don't snap 100% to avoid "stuttering". 
+                    // The update loop is already moving them (extrapolation).
+                    const lerpFactor = 0.4;
+                    nextEntities.push({
+                        ...serverEnt,
+                        x: localEnt.x + (serverEnt.x - localEnt.x) * lerpFactor,
+                        y: localEnt.y + (serverEnt.y - localEnt.y) * lerpFactor,
+                        velocity: serverEnt.vx !== undefined ? { x: serverEnt.vx, y: serverEnt.vy } : serverEnt.velocity
+                    });
                 }
-                return serverEnt;
-            });
-            this.state.entities = [...mergedEntities, ...enemiesArray];
-        } else {
-            this.state.entities = [...playersArray, ...enemiesArray];
-        }
+            } else {
+                // NEW ENTITY: Spawn immediately
+                if (serverEnt.vx !== undefined) {
+                    serverEnt.velocity = { x: serverEnt.vx, y: serverEnt.vy };
+                }
+                nextEntities.push(serverEnt);
+            }
+        });
 
-        this.state.projectiles = projectilesArray;
+        this.state.entities = nextEntities;
+
+        // 3. Projectiles (Snapping is fine for fast moving shots)
+        this.state.projectiles = projectilesArray.map((p: any) => ({
+            ...p,
+            velocity: p.vx !== undefined ? { x: p.vx, y: p.vy } : p.velocity
+        }));
+
         this.state.score = snapshot.score || 0;
         this.state.gameOver = false;
         this.notify();

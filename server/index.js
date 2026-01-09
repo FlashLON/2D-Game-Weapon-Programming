@@ -146,21 +146,27 @@ const spawnFragments = (parent, count) => {
 };
 
 // Game loop (30 FPS for bandwidth optimization)
-const TICK_RATE = 30;
+// Physics and Network configuration
+const TICK_RATE = 60;
 const TICK_INTERVAL = 1000 / TICK_RATE;
+const BROADCAST_RATE = 20;
+const BROADCAST_INTERVAL = 1000 / BROADCAST_RATE;
+
 let lastTick = Date.now();
+let lastBroadcast = 0;
 
 setInterval(() => {
     const now = Date.now();
     const dt = Math.min((now - lastTick) / 1000, 0.1);
     lastTick = now;
 
+    // --- 1. PHYSICS UPDATE ---
+
     // Update players
     Object.values(gameState.players).forEach(player => {
         player.x += player.velocity.x * dt;
         player.y += player.velocity.y * dt;
 
-        // Keep in bounds
         player.x = Math.max(player.radius, Math.min(800 - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(600 - player.radius, player.y));
     });
@@ -357,11 +363,10 @@ setInterval(() => {
 
         // 1. Check against enemies (PVE)
         for (const e of gameState.enemies) {
-            const dx = p.x - e.x;
-            const dy = p.y - e.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const distSq = dx * dx + dy * dy;
+            const combinedRadius = p.radius + e.radius;
 
-            if (dist < p.radius + e.radius) {
+            if (distSq < combinedRadius * combinedRadius) {
                 const dmg = p.damage || 10;
                 e.hp -= dmg;
 
@@ -458,9 +463,10 @@ setInterval(() => {
                 const player = gameState.players[playerId];
                 const dx = p.x - player.x;
                 const dy = p.y - player.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const distSq = dx * dx + dy * dy;
+                const combinedRadius = p.radius + player.radius;
 
-                if (dist < p.radius + player.radius) {
+                if (distSq < combinedRadius * combinedRadius) {
                     const dmg = p.damage || 10;
                     player.hp -= dmg;
 
@@ -559,8 +565,39 @@ setInterval(() => {
         }
     }
 
-    // Broadcast state to all clients
-    io.emit('state', gameState);
+    // --- 2. BROADCAST (Reduced Frequency) ---
+    if (now - lastBroadcast > BROADCAST_INTERVAL) {
+        lastBroadcast = now;
+
+        // Create a slim snapshot to save bandwidth
+        const slimState = {
+            players: {},
+            enemies: gameState.enemies.map(e => ({
+                id: e.id, x: e.x, y: e.y,
+                vx: e.velocity ? e.velocity.x : 0,
+                vy: e.velocity ? e.velocity.y : 0,
+                hp: e.hp, maxHp: e.maxHp, radius: e.radius, color: e.color
+            })),
+            projectiles: gameState.projectiles.map(p => ({
+                id: p.id, x: p.x, y: p.y,
+                vx: p.velocity.x, vy: p.velocity.y,
+                radius: p.radius, color: p.color,
+                orbit_player: p.orbit_player, // needed for client visuals
+                playerId: p.playerId
+            })),
+            score: gameState.score
+        };
+
+        // Map players
+        Object.values(gameState.players).forEach(p => {
+            slimState.players[p.id] = {
+                id: p.id, x: p.x, y: p.y, vx: p.velocity.x, vy: p.velocity.y,
+                hp: p.hp, maxHp: p.maxHp, color: p.color, radius: p.radius
+            };
+        });
+
+        io.emit('state', slimState);
+    }
 }, TICK_INTERVAL);
 
 server.listen(PORT, () => {
