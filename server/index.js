@@ -173,11 +173,11 @@ setInterval(() => {
                     const dx = proj.x - owner.x;
                     const dy = proj.y - owner.y;
                     let r = Math.sqrt(dx * dx + dy * dy);
-                    if (r < 10) r = 60;
+                    if (r < 20) r = 60;
                     proj.orbitRadius = r;
                 }
 
-                const orbitSpeed = 3.0;
+                const orbitSpeed = 4.0;
                 proj.orbitAngle += orbitSpeed * dt;
 
                 proj.x = owner.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
@@ -185,6 +185,8 @@ setInterval(() => {
 
                 proj.velocity.x = -proj.orbitRadius * orbitSpeed * Math.sin(proj.orbitAngle);
                 proj.velocity.y = proj.orbitRadius * orbitSpeed * Math.cos(proj.orbitAngle);
+            } else {
+                proj.orbit_player = false;
             }
         } else {
             // Standard Movement
@@ -325,6 +327,7 @@ setInterval(() => {
                     if (owner) {
                         const heal = dmg * (p.vampirism / 100);
                         owner.hp = Math.min(owner.maxHp, owner.hp + heal);
+                        io.to(p.playerId).emit('heal', { amount: heal, hp: owner.hp });
                     }
                 }
 
@@ -381,6 +384,7 @@ setInterval(() => {
                         if (owner) {
                             const heal = dmg * (p.vampirism / 100);
                             owner.hp = Math.min(owner.maxHp, owner.hp + heal);
+                            io.to(p.playerId).emit('heal', { amount: heal, hp: owner.hp });
                         }
                     }
 
