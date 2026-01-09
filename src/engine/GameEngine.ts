@@ -184,7 +184,10 @@ export class GameEngine {
                         // Store radius on the object (runtime property)
                         const dx = proj.x - player.x;
                         const dy = proj.y - player.y;
-                        (proj as any).orbitRadius = Math.sqrt(dx * dx + dy * dy);
+                        let r = Math.sqrt(dx * dx + dy * dy);
+                        // Fix for spawn-at-center: If radius is ~0, default to 60 (orbit around player)
+                        if (r < 10) r = 60;
+                        (proj as any).orbitRadius = r;
                     }
 
                     // Rotate
