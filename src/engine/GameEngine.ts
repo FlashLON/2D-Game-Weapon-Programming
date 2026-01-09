@@ -181,7 +181,10 @@ export class GameEngine {
                     // Initialize orbit state if needed
                     if ((proj as any).orbitAngle === undefined) {
                         (proj as any).orbitAngle = Math.atan2(proj.y - player.y, proj.x - player.x);
-                        (proj as any).orbitRadius = Math.sqrt((proj.x - player.x) ** 2 + (proj.y - player.y) ** 2);
+                        // Store radius on the object (runtime property)
+                        const dx = proj.x - player.x;
+                        const dy = proj.y - player.y;
+                        (proj as any).orbitRadius = Math.sqrt(dx * dx + dy * dy);
                     }
 
                     // Rotate
@@ -358,6 +361,37 @@ export class GameEngine {
             if (hitSomething) {
                 this.state.projectiles.splice(i, 1);
             }
+        }
+    }
+
+    /**
+     * Spawns fragments from a destroyed projectile.
+     */
+    private spawnFragments(parent: Entity, count: number) {
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count;
+            const speed = 200;
+
+            const fragment: Entity = {
+                id: `frag_${parent.id}_${i}_${Date.now()}`,
+                x: parent.x,
+                y: parent.y,
+                radius: Math.max(2, parent.radius * 0.6),
+                color: parent.color,
+                hp: 1,
+                maxHp: 1,
+                damage: Math.ceil((parent.damage || 10) * 0.5),
+                type: 'projectile',
+                velocity: {
+                    x: Math.cos(angle) * speed,
+                    y: Math.sin(angle) * speed
+                },
+                lifetime: 0.5,
+                maxLifetime: 0.5
+                // Note: We deliberately do NOT copy split_on_death to fragments to avoid infinite recursion
+            };
+
+            this.state.projectiles.push(fragment);
         }
     }
 
