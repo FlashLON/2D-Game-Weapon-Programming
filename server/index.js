@@ -147,7 +147,7 @@ const spawnFragments = (parent, count) => {
 
 // Game loop (30 FPS for bandwidth optimization)
 // Physics and Network configuration
-const TICK_RATE = 60;
+const TICK_RATE = 45;
 const TICK_INTERVAL = 1000 / TICK_RATE;
 const BROADCAST_RATE = 20;
 const BROADCAST_INTERVAL = 1000 / BROADCAST_RATE;
@@ -232,17 +232,21 @@ setInterval(() => {
 
                 // Scan enemies
                 gameState.enemies.forEach(enemy => {
-                    const distSq = (enemy.x - proj.x) ** 2 + (enemy.y - proj.y) ** 2;
+                    const dx = enemy.x - proj.x;
+                    const dy = enemy.y - proj.y;
+                    const distSq = dx * dx + dy * dy;
                     if (distSq < minDistSq) {
                         minDistSq = distSq;
                         nearest = enemy;
                     }
                 });
 
-                // Scan players (PVP) - target nearest valid player
+                // Scan players (PVP)
                 Object.values(gameState.players).forEach(p => {
                     if (p.id !== proj.playerId) {
-                        const distSq = (p.x - proj.x) ** 2 + (p.y - proj.y) ** 2;
+                        const dx = p.x - proj.x;
+                        const dy = p.y - proj.y;
+                        const distSq = dx * dx + dy * dy;
                         if (distSq < minDistSq) {
                             minDistSq = distSq;
                             nearest = p;
@@ -250,7 +254,7 @@ setInterval(() => {
                     }
                 });
 
-                if (nearest) {
+                if (nearest && minDistSq > 0) {
                     const currentAngle = Math.atan2(proj.velocity.y, proj.velocity.x);
                     const targetAngle = Math.atan2(nearest.y - proj.y, nearest.x - proj.x);
                     let angleDiff = targetAngle - currentAngle;
@@ -363,6 +367,8 @@ setInterval(() => {
 
         // 1. Check against enemies (PVE)
         for (const e of gameState.enemies) {
+            const dx = p.x - e.x;
+            const dy = p.y - e.y;
             const distSq = dx * dx + dy * dy;
             const combinedRadius = p.radius + e.radius;
 

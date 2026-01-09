@@ -572,7 +572,7 @@ export class GameEngine {
                     // OTHERS: Soft pull towards server position to avoid jumpiness
                     // We don't snap 100% to avoid "stuttering". 
                     // The update loop is already moving them (extrapolation).
-                    const lerpFactor = 0.4;
+                    const lerpFactor = 0.2;
                     nextEntities.push({
                         ...serverEnt,
                         x: localEnt.x + (serverEnt.x - localEnt.x) * lerpFactor,
