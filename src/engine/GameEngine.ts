@@ -344,7 +344,7 @@ export class GameEngine {
 
     getPlayer() {
         const p = this.state.entities.find(e => e.type === 'player');
-        if (p) return { x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp };
+        if (p) return { id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp };
         return null;
     }
 
