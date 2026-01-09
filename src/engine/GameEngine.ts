@@ -21,6 +21,11 @@ export interface Entity {
     maxLifetime?: number;// Initial lifetime in seconds
     acceleration?: number; // Acceleration factor
     velocity: { x: number; y: number };
+    // Advanced Behaviors
+    orbit_player?: boolean;
+    vampirism?: number;       // Heal percent
+    split_on_death?: number;  // Fragments count
+    attraction_force?: number;// Pull strength
 }
 
 /**
@@ -169,55 +174,99 @@ export class GameEngine {
         for (let i = this.state.projectiles.length - 1; i >= 0; i--) {
             const proj = this.state.projectiles[i];
 
+            // --- ORBIT PLAYER LOGIC ---
+            if (proj.orbit_player) {
+                const player = this.state.entities.find(e => e.type === 'player');
+                if (player) {
+                    // Initialize orbit state if needed
+                    if ((proj as any).orbitAngle === undefined) {
+                        (proj as any).orbitAngle = Math.atan2(proj.y - player.y, proj.x - player.x);
+                        (proj as any).orbitRadius = Math.sqrt((proj.x - player.x) ** 2 + (proj.y - player.y) ** 2);
+                    }
+
+                    // Rotate
+                    const orbitSpeed = 3.0; // Rad/s
+                    (proj as any).orbitAngle += orbitSpeed * dt;
+
+                    proj.x = player.x + Math.cos((proj as any).orbitAngle) * (proj as any).orbitRadius;
+                    proj.y = player.y + Math.sin((proj as any).orbitAngle) * (proj as any).orbitRadius;
+
+                    // Sync velocity for visual trail / other logic
+                    // Tangential velocity: v = r * w
+                    // vx = -r * w * sin(theta)
+                    // vy = r * w * cos(theta)
+                    proj.velocity.x = -(proj as any).orbitRadius * orbitSpeed * Math.sin((proj as any).orbitAngle);
+                    proj.velocity.y = (proj as any).orbitRadius * orbitSpeed * Math.cos((proj as any).orbitAngle);
+                }
+            }
+            // --- STANDARD MOVEMENT LOGIC (Only if not orbiting) ---
+            else {
+                // Acceleration
+                if (proj.acceleration) {
+                    proj.velocity.x *= (1 + proj.acceleration * dt);
+                    proj.velocity.y *= (1 + proj.acceleration * dt);
+                }
+
+                // Homing
+                if (proj.homing && proj.homing > 0) {
+                    const nearest = this.getNearestEnemy(proj.x, proj.y);
+                    if (nearest) {
+                        const currentAngle = Math.atan2(proj.velocity.y, proj.velocity.x);
+                        const targetAngle = Math.atan2(nearest.y - proj.y, nearest.x - proj.x);
+                        let angleDiff = targetAngle - currentAngle;
+                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                        const turnSpeed = proj.homing * 5 * dt;
+                        const newAngle = currentAngle + Math.max(-turnSpeed, Math.min(turnSpeed, angleDiff));
+                        const speed = Math.sqrt(proj.velocity.x ** 2 + proj.velocity.y ** 2);
+                        proj.velocity.x = Math.cos(newAngle) * speed;
+                        proj.velocity.y = Math.sin(newAngle) * speed;
+                    }
+                }
+
+                // Move
+                proj.x += proj.velocity.x * dt;
+                proj.y += proj.velocity.y * dt;
+            }
+
+            // --- ATTRACTION FORCE LOGIC ---
+            if (proj.attraction_force && proj.attraction_force > 0) {
+                const range = 200; // Pull range
+                const force = proj.attraction_force * 1000;
+
+                this.state.entities.forEach(e => {
+                    if (e.type === 'enemy') {
+                        const dx = proj.x - e.x;
+                        const dy = proj.y - e.y;
+                        const distSq = dx * dx + dy * dy;
+
+                        if (distSq < range * range && distSq > 100) { // Don't pull if too close (jitter)
+                            const dist = Math.sqrt(distSq);
+                            // Normalize direction * force * (1/dist behavior)
+                            const ax = (dx / dist) * (force / distSq);
+                            const ay = (dy / dist) * (force / distSq);
+
+                            e.velocity.x += ax * dt;
+                            e.velocity.y += ay * dt;
+                        }
+                    }
+                });
+            }
+
             // --- LIFETIME LOGIC ---
             if (proj.lifetime !== undefined) {
                 proj.lifetime -= dt;
                 if (proj.lifetime <= 0) {
+                    // SPLIT ON DEATH
+                    if (proj.split_on_death) {
+                        this.spawnFragments(proj, proj.split_on_death);
+                    }
                     this.state.projectiles.splice(i, 1);
                     continue;
                 }
             }
 
-            // --- ACCELERATION LOGIC ---
-            if (proj.acceleration) {
-                // Increase speed by acceleration factor
-                proj.velocity.x *= (1 + proj.acceleration * dt);
-                proj.velocity.y *= (1 + proj.acceleration * dt);
-            }
-
-            // --- HOMING LOGIC ---
-            if (proj.homing && proj.homing > 0) {
-                const nearest = this.getNearestEnemy(proj.x, proj.y);
-                if (nearest) {
-                    // Current velocity angle
-                    const currentAngle = Math.atan2(proj.velocity.y, proj.velocity.x);
-                    // Target angle
-                    const targetAngle = Math.atan2(nearest.y - proj.y, nearest.x - proj.x);
-
-                    // Steer towards target (simple lerp of angle)
-                    // Homing strength determines how fast we turn
-                    let angleDiff = targetAngle - currentAngle;
-
-                    // Normalize to -PI to PI
-                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-                    const turnSpeed = proj.homing * 5 * dt; // Arbitrary 5.0 turn multiplier
-                    const newAngle = currentAngle + Math.max(-turnSpeed, Math.min(turnSpeed, angleDiff));
-
-                    const speed = Math.sqrt(proj.velocity.x ** 2 + proj.velocity.y ** 2);
-                    proj.velocity.x = Math.cos(newAngle) * speed;
-                    proj.velocity.y = Math.sin(newAngle) * speed;
-                }
-            }
-
-            // Move
-            proj.x += proj.velocity.x * dt;
-            proj.y += proj.velocity.y * dt;
-
-            // Simple bounds check (remove if off screen)
-            // World bounds are 800x600
-            // Extended bounds for projectiles to allow them to come back if homing
+            // Bounds check
             if (proj.x < -100 || proj.x > 900 || proj.y < -100 || proj.y > 700) {
                 this.state.projectiles.splice(i, 1);
             }
@@ -250,6 +299,15 @@ export class GameEngine {
                         // Collision detected!
                         const dmg = p.damage || 10;
                         e.hp -= dmg;
+
+                        // VAMPIRISM LOGIC
+                        if (p.vampirism && p.vampirism > 0) {
+                            const heal = dmg * (p.vampirism / 100);
+                            const player = this.state.entities.find(ent => ent.type === 'player');
+                            if (player) {
+                                player.hp = Math.min(player.maxHp, player.hp + heal);
+                            }
+                        }
 
                         // Apply knockback if specified
                         if (p.knockback) {
@@ -382,6 +440,11 @@ export class GameEngine {
                 let lifetime = 5;
                 let acceleration = 0;
 
+                let orbit_player = false;
+                let vampirism = 0;
+                let split_on_death = 0;
+                let attraction_force = 0;
+
                 // Helper to unwrap pyodide proxy
                 const res = result.toJs ? result.toJs() : result;
 
@@ -395,6 +458,12 @@ export class GameEngine {
                     if (res.has('homing')) homing = res.get('homing');
                     if (res.has('lifetime')) lifetime = res.get('lifetime');
                     if (res.has('acceleration')) acceleration = res.get('acceleration');
+
+                    // New properties
+                    if (res.has('orbit_player')) orbit_player = res.get('orbit_player');
+                    if (res.has('vampirism')) vampirism = res.get('vampirism');
+                    if (res.has('split_on_death')) split_on_death = res.get('split_on_death');
+                    if (res.has('attraction_force')) attraction_force = res.get('attraction_force');
 
                     // Handle velocity/angle from Map
                     if (res.has('speed') && res.has('angle')) {
@@ -414,6 +483,12 @@ export class GameEngine {
                     if (res.homing) homing = res.homing;
                     if (res.lifetime) lifetime = res.lifetime;
                     if (res.acceleration) acceleration = res.acceleration;
+
+                    // New properties
+                    if (res.orbit_player) orbit_player = res.orbit_player;
+                    if (res.vampirism) vampirism = res.vampirism;
+                    if (res.split_on_death) split_on_death = res.split_on_death;
+                    if (res.attraction_force) attraction_force = res.attraction_force;
 
                     if (res.vx !== undefined && res.vy !== undefined) {
                         vx = res.vx;
@@ -442,7 +517,9 @@ export class GameEngine {
                     homing,
                     lifetime,
                     maxLifetime: lifetime,
-                    acceleration
+                    acceleration,
+                    // New props
+                    orbit_player, vampirism, split_on_death, attraction_force
                 };
 
                 // If single player, add to local state immediately
@@ -452,7 +529,8 @@ export class GameEngine {
 
                 // Return data for UI -> Network Manager
                 return {
-                    vx, vy, color, radius, damage, knockback, pierce, homing, lifetime, acceleration
+                    vx, vy, color, radius, damage, knockback, pierce, homing, lifetime, acceleration,
+                    orbit_player, vampirism, split_on_death, attraction_force
                 };
             }
         } catch (err) {

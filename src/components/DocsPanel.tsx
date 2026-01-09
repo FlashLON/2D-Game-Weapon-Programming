@@ -60,6 +60,11 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
                         <span className="text-pink-400">acceleration</span> <span>(number) Speed mult/sec</span>
                         <span className="text-purple-400">knockback</span> <span>(number) Push force</span>
                         <span className="text-purple-400">pierce</span> <span>(number) Targets to hit</span>
+
+                        <span className="text-orange-400">orbit_player</span> <span>(bool) Rotate around player</span>
+                        <span className="text-orange-400">vampirism</span> <span>(number) Heal % of damage dealt</span>
+                        <span className="text-red-500">split_on_death</span> <span>(number) Fragments upon expiry</span>
+                        <span className="text-red-500">attraction_force</span> <span>(number) Pull enemies (Grav)</span>
                     </div>
                 </section>
 
