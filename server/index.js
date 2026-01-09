@@ -474,42 +474,41 @@ setInterval(() => {
         }
     }
 
-}
     // --- 3. BROADCAST (Reduced Frequency) ---
     if (now - lastBroadcast > BROADCAST_INTERVAL) {
-    lastBroadcast = now;
+        lastBroadcast = now;
 
-    const slimState = {
-        players: {},
-        enemies: gameState.enemies.map(e => ({
-            id: e.id,
-            x: Math.round(e.x), y: Math.round(e.y),
-            vx: Math.round(e.velocity ? e.velocity.x : 0),
-            vy: Math.round(e.velocity ? e.velocity.y : 0),
-            hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
-        })),
-        projectiles: gameState.projectiles.map(p => ({
-            id: p.id,
-            x: Math.round(p.x), y: Math.round(p.y),
-            vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
-            radius: p.radius, color: p.color,
-            orbit_player: p.orbit_player,
-            playerId: p.playerId
-        })),
-        score: gameState.score
-    };
-
-    Object.values(gameState.players).forEach(p => {
-        slimState.players[p.id] = {
-            id: p.id,
-            x: Math.round(p.x), y: Math.round(p.y),
-            vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
-            hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius
+        const slimState = {
+            players: {},
+            enemies: gameState.enemies.map(e => ({
+                id: e.id,
+                x: Math.round(e.x), y: Math.round(e.y),
+                vx: Math.round(e.velocity ? e.velocity.x : 0),
+                vy: Math.round(e.velocity ? e.velocity.y : 0),
+                hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
+            })),
+            projectiles: gameState.projectiles.map(p => ({
+                id: p.id,
+                x: Math.round(p.x), y: Math.round(p.y),
+                vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
+                radius: p.radius, color: p.color,
+                orbit_player: p.orbit_player,
+                playerId: p.playerId
+            })),
+            score: gameState.score
         };
-    });
 
-    io.emit('state', slimState);
-}
+        Object.values(gameState.players).forEach(p => {
+            slimState.players[p.id] = {
+                id: p.id,
+                x: Math.round(p.x), y: Math.round(p.y),
+                vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
+                hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius
+            };
+        });
+
+        io.emit('state', slimState);
+    }
 }, TICK_INTERVAL);
 
 server.listen(PORT, () => {
