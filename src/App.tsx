@@ -53,10 +53,20 @@ function App() {
   // Define API for Python environment
   const api = {
     get_enemies: () => {
-      return gameEngine.getEnemies();
+      // Return a clean list of enemies with a nice string representation
+      return gameEngine.getEnemies().map(e => ({
+        ...e,
+        toString: () => `Enemy(id=${e.id}, x=${Math.round(e.x)}, y=${Math.round(e.y)}, hp=${e.hp})`
+      }));
     },
     get_player: () => {
-      return gameEngine.getPlayer();
+      const p = gameEngine.getPlayer();
+      if (!p) return null;
+      // Return a clean player object with a nice string representation
+      return {
+        ...p,
+        toString: () => `Player(id=${p.id}, x=${Math.round(p.x)}, y=${Math.round(p.y)}, hp=${p.hp})`
+      };
     },
     get_arena_size: () => {
       return gameEngine.getArenaBounds();
