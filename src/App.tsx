@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { WeaponEditor } from './components/WeaponEditor';
 import { Arena } from './components/Arena';
+import { Lobby } from './components/Lobby';
 import { Console, type LogMessage, type LogType } from './components/Console';
 import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
 import { networkManager } from './utils/NetworkManager';
-import { Play, RotateCcw, X, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
+import { Play, RotateCcw, X, Link as LinkIcon, CheckCircle2, LogOut } from 'lucide-react';
 
 const DEFAULT_CODE = `
 class Weapon:
@@ -39,6 +40,7 @@ function App() {
   // Multiplayer State
   const [isConnected, setIsConnected] = useState(false);
   const [showConnect, setShowConnect] = useState(false);
+  const [currentRoom, setCurrentRoom] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState("https://2d-game-weapon-programming-production.up.railway.app");
 
   const addLog = (msg: string, type: LogType = 'info') => {
@@ -157,6 +159,18 @@ function App() {
     };
   }, []);
 
+  const handleJoinRoom = (roomId: string) => {
+    networkManager.joinRoom(roomId);
+    setCurrentRoom(roomId);
+    addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
+  };
+
+  const handleLeaveRoom = () => {
+    setCurrentRoom(null);
+    networkManager.joinRoom(''); // Reset to no room
+    addLog("Returned to lobby", "info");
+  };
+
   const handleConnect = async () => {
     if (isConnected) {
       networkManager.disconnect();
@@ -250,6 +264,16 @@ function App() {
               {isConnected ? "Online" : "Multiplayer"}
             </button>
 
+            {isConnected && currentRoom && (
+              <button
+                onClick={handleLeaveRoom}
+                className="flex items-center gap-2 px-3 py-1 mr-2 rounded bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500/20 transition-colors text-sm"
+              >
+                <LogOut size={14} />
+                Leave Party
+              </button>
+            )}
+
             {/* Connection Popup */}
             {showConnect && (
               <div className="absolute top-12 right-0 w-80 bg-cyber-dark border border-cyber-muted p-4 rounded shadow-2xl z-50">
@@ -326,10 +350,14 @@ function App() {
           <WeaponEditor code={code} onChange={(val) => setCode(val || "")} />
         </div>
 
-        {/* Arena Pane */}
+        {/* Arena/Lobby Pane */}
         <div className="flex-1 h-full relative flex flex-col min-w-0">
-          <div className="flex-1 relative bg-black/50">
-            <Arena />
+          <div className="flex-1 relative bg-black/50 overflow-hidden flex flex-col">
+            {!isConnected || !currentRoom ? (
+              <Lobby isConnected={isConnected} onJoinRoom={handleJoinRoom} />
+            ) : (
+              <Arena />
+            )}
             {/* Documentation Panel Overlay - kept relative to Arena */}
             {showDocs && <DocsPanel onClose={() => setShowDocs(false)} />}
           </div>
