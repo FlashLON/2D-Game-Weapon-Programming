@@ -11,6 +11,7 @@ class NetworkManager {
     private onConnectionChange: ((connected: boolean) => void) | null = null;
     private onPlayerCountChange: ((count: number) => void) | null = null;
     private onKill: ((enemyId: string) => void) | null = null;
+    private onInit: ((playerId: string) => void) | null = null;
 
     connect(serverUrl: string) {
         if (this.socket) {
@@ -49,6 +50,7 @@ class NetworkManager {
         this.socket.on('init', (data: { playerId: string; gameState: GameState }) => {
             console.log('Received initial state, player ID:', data.playerId);
             this.playerId = data.playerId;
+            this.onInit?.(data.playerId);
             this.onStateUpdate?.(data.gameState);
         });
 
@@ -119,6 +121,10 @@ class NetworkManager {
 
     setOnKill(callback: (enemyId: string) => void) {
         this.onKill = callback;
+    }
+
+    setOnInit(callback: (playerId: string) => void) {
+        this.onInit = callback;
     }
 
     // Getters
