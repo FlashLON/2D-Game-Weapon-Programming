@@ -138,8 +138,8 @@ io.on('connection', (socket) => {
             const projectile = {
                 id: `proj_${Math.random().toString(36).substr(2, 9)}_${socket.id}`,
                 playerId: socket.id,
-                x: fireX,
-                y: fireY,
+                x: data.x ?? player.x,
+                y: data.y ?? player.y,
                 radius: data.radius || 5,
                 color: data.color || '#fce83a',
                 damage: data.damage || 25,
@@ -433,16 +433,19 @@ setInterval(() => {
                 x: Math.round(e.x), y: Math.round(e.y),
                 vx: e.velocity ? Math.round(e.velocity.x / 10) * 10 : 0,
                 vy: e.velocity ? Math.round(e.velocity.y / 10) * 10 : 0,
-                hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
+                x: e.x, y: e.y,
+                vx: e.velocity ? e.velocity.x : 0,
+                vy: e.velocity ? e.velocity.y : 0,
+                hp: e.hp, maxHp: e.maxHp, radius: e.radius, color: e.color
             })),
             // Filter out orbiting projectiles - client simulates them locally
             projectiles: gameState.projectiles
                 .filter(p => !p.orbit_player)
                 .map(p => ({
                     id: p.id,
-                    x: Math.round(p.x), y: Math.round(p.y),
-                    vx: Math.round(p.velocity.x / 10) * 10,  // Round to nearest 10
-                    vy: Math.round(p.velocity.y / 10) * 10,
+                    x: p.x, y: p.y,
+                    vx: p.velocity.x,
+                    vy: p.velocity.y,
                     radius: p.radius, color: p.color,
                     playerId: p.playerId
                 })),
@@ -452,10 +455,10 @@ setInterval(() => {
         Object.values(gameState.players).forEach(p => {
             slimState.players[p.id] = {
                 id: p.id,
-                x: Math.round(p.x), y: Math.round(p.y),
-                vx: p.velocity ? Math.round(p.velocity.x / 10) * 10 : 0,
-                vy: p.velocity ? Math.round(p.velocity.y / 10) * 10 : 0,
-                hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius,
+                x: p.x, y: p.y,
+                vx: p.velocity ? p.velocity.x : 0,
+                vy: p.velocity ? p.velocity.y : 0,
+                hp: p.hp, maxHp: p.maxHp, color: p.color, radius: p.radius,
                 kills: p.kills || 0,
                 deaths: p.deaths || 0
             };
