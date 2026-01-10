@@ -99,9 +99,11 @@ export const Arena: React.FC = () => {
 
                 ctx.fillStyle = drawColor;
 
-                // Add simple glow effect for "cyber" feel
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = drawColor;
+                // ONLY apply glow to players and enemies (Projectiles are too numerous)
+                if (ent.type !== 'projectile') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = drawColor;
+                }
 
                 ctx.fill();
                 ctx.shadowBlur = 0; // Reset shadow for other elements
