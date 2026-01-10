@@ -214,8 +214,10 @@ setInterval(() => {
     const dt = Math.min((now - lastTick) / 1000, 0.1);
     lastTick = now;
 
-    // --- 1. SPAWN ENEMIES ---
-    if (gameState.enemies.length < 8) {
+    // --- 1. SPAWN ENEMIES (Offline/Solo only) ---
+    // We disable AI spawn in true multiplayer (more than 1 player) to reduce lag
+    const playerIds = Object.keys(gameState.players);
+    if (playerIds.length <= 1 && gameState.enemies.length < 8) {
         gameState.enemies.push({
             id: 'enemy_' + Math.random().toString(36).substr(2, 9),
             x: Math.random() * 700 + 50,
@@ -230,6 +232,9 @@ setInterval(() => {
                 y: (Math.random() - 0.5) * 100
             }
         });
+    } else if (playerIds.length > 1 && gameState.enemies.length > 0) {
+        // Clear existing enemies when entering multiplayer to focus on PvP and save performance
+        gameState.enemies = [];
     }
 
     // --- 2. PREPARE GRID ---
