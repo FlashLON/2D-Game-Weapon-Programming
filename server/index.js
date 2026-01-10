@@ -174,10 +174,12 @@ io.on('connection', (socket) => {
 // Helper to spawn fragments
 const spawnFragments = (parent, count) => {
     for (let i = 0; i < count; i++) {
+        if (gameState.projectiles.length >= PROJECTILE_CAP) break;
+
         const angle = (Math.PI * 2 / count) * i;
         const speed = 200;
         gameState.projectiles.push({
-            id: `frag_${parent.id}_${i}`,
+            id: `frag_${parent.id}_${i}_${Math.random().toString(36).substr(2, 5)}`,
             playerId: parent.playerId,
             x: parent.x,
             y: parent.y,
@@ -212,7 +214,25 @@ setInterval(() => {
     const dt = Math.min((now - lastTick) / 1000, 0.1);
     lastTick = now;
 
-    // --- 1. PREPARE GRID ---
+    // --- 1. SPAWN ENEMIES ---
+    if (gameState.enemies.length < 8) {
+        gameState.enemies.push({
+            id: 'enemy_' + Math.random().toString(36).substr(2, 9),
+            x: Math.random() * 700 + 50,
+            y: Math.random() * 500 + 50,
+            radius: 20,
+            color: '#ff0055',
+            hp: 50,
+            maxHp: 50,
+            type: 'enemy',
+            velocity: {
+                x: (Math.random() - 0.5) * 100,
+                y: (Math.random() - 0.5) * 100
+            }
+        });
+    }
+
+    // --- 2. PREPARE GRID ---
     updateGrid();
 
     // --- 2. PHYSICS UPDATE ---
@@ -230,6 +250,9 @@ setInterval(() => {
     for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
         const proj = gameState.projectiles[i];
         let removed = false;
+
+        // Single optimized spatial lookup for all behaviors in this tick
+        const nearby = getNearbyEntities(proj.x, proj.y);
 
         // --- 1. MOVEMENT & SPECIAL BEHAVIORS ---
         if (proj.orbit_player) {
@@ -270,7 +293,6 @@ setInterval(() => {
             if (proj.homing && proj.homing > 0) {
                 let nearest = null;
                 let minDistSq = Infinity;
-                const nearby = getNearbyEntities(proj.x, proj.y);
                 nearby.forEach(ent => {
                     if (ent.id === proj.playerId) return;
                     const dx = ent.x - proj.x;
@@ -306,7 +328,6 @@ setInterval(() => {
         // --- 2. ATTRACTION & COLLISION ---
         if (proj.attraction_force && proj.attraction_force > 0) {
             const rangeSq = 200 * 200, force = proj.attraction_force * 1000;
-            const nearby = getNearbyEntities(proj.x, proj.y);
             nearby.forEach(e => {
                 if (e.id === proj.playerId) return;
                 const dx = proj.x - e.x, dy = proj.y - e.y, distSq = dx * dx + dy * dy;
@@ -319,10 +340,9 @@ setInterval(() => {
             });
         }
 
-        const collisionNearby = getNearbyEntities(proj.x, proj.y);
         let hitSomething = false;
 
-        for (const ent of collisionNearby) {
+        for (const ent of nearby) {
             if (ent.id === proj.playerId) continue;
             const dx = proj.x - ent.x, dy = proj.y - ent.y, distSq = dx * dx + dy * dy;
             const combinedRadius = proj.radius + ent.radius;
@@ -409,8 +429,8 @@ setInterval(() => {
             enemies: gameState.enemies.map(e => ({
                 id: e.id,
                 x: Math.round(e.x), y: Math.round(e.y),
-                vx: Math.round(e.velocity ? e.velocity.x / 10) * 10,  // Round to nearest 10 for bandwidth
-                vy: Math.round(e.velocity ? e.velocity.y / 10) * 10,
+                vx: e.velocity ? Math.round(e.velocity.x / 10) * 10 : 0,
+                vy: e.velocity ? Math.round(e.velocity.y / 10) * 10 : 0,
                 hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
             })),
             // Filter out orbiting projectiles - client simulates them locally
@@ -431,8 +451,8 @@ setInterval(() => {
             slimState.players[p.id] = {
                 id: p.id,
                 x: Math.round(p.x), y: Math.round(p.y),
-                vx: Math.round(p.velocity.x / 10) * 10,  // Round to nearest 10
-                vy: Math.round(p.velocity.y / 10) * 10,
+                vx: p.velocity ? Math.round(p.velocity.x / 10) * 10 : 0,
+                vy: p.velocity ? Math.round(p.velocity.y / 10) * 10 : 0,
                 hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius,
                 kills: p.kills || 0,
                 deaths: p.deaths || 0
