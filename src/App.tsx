@@ -6,7 +6,8 @@ import { Console, type LogMessage, type LogType } from './components/Console';
 import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
 import { networkManager } from './utils/NetworkManager';
-import { Play, RotateCcw, X, Link as LinkIcon, CheckCircle2, LogOut } from 'lucide-react';
+import { Play, RotateCcw, Link as LinkIcon, CheckCircle2, LogOut } from 'lucide-react';
+import { DocsPanel } from './components/DocsPanel';
 
 const DEFAULT_CODE = `
 class Weapon:
@@ -19,8 +20,8 @@ class Weapon:
             "speed": 300,
             "angle": math.degrees(angle),
             "damage": 50,
-            "knockback": 300,  # New: Push enemies back!
-            "pierce": 1        # New: Hit multiple enemies!
+            "knockback": 300,
+            "pierce": 1
         }
     
     def on_hit(self, target_id):
@@ -28,8 +29,6 @@ class Weapon:
     def update(self, dt): 
         pass
 `.trim();
-
-import { DocsPanel } from './components/DocsPanel';
 
 function App() {
   const [code, setCode] = useState(DEFAULT_CODE);
@@ -39,7 +38,6 @@ function App() {
 
   // Multiplayer State
   const [isConnected, setIsConnected] = useState(false);
-  const [showConnect, setShowConnect] = useState(false);
   const [currentRoom, setCurrentRoom] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState("https://2d-game-weapon-programming-production.up.railway.app");
 
@@ -49,13 +47,12 @@ function App() {
       timestamp: Date.now(),
       message: msg,
       type
-    }].slice(-200)); // Keep last 200 logs
+    }].slice(-200));
   };
 
   // Define API for Python environment
   const api = {
     get_enemies: () => {
-      // Return a clean list of enemies with a nice string representation
       return gameEngine.getEnemies().map(e => ({
         ...e,
         toString: () => `Enemy(id=${e.id}, x=${Math.round(e.x)}, y=${Math.round(e.y)}, hp=${e.hp})`
@@ -64,56 +61,88 @@ function App() {
     get_player: () => {
       const p = gameEngine.getPlayer();
       if (!p) return null;
-      // Return a clean player object with a nice string representation
       return {
         ...p,
         toString: () => `Player(id=${p.id}, x=${Math.round(p.x)}, y=${Math.round(p.y)}, hp=${p.hp})`
       };
     },
-    get_arena_size: () => {
-      return gameEngine.getArenaBounds();
-    },
-    // We can add more helpers here
+    get_arena_size: () => gameEngine.getArenaBounds(),
     log: (msg: string) => {
       console.log("PY:", msg);
       addLog(msg, 'info');
     },
-    // Enhanced Spatial Queries
-    get_nearest_enemy: (x: number, y: number) => {
-      return gameEngine.getNearestEnemy(x, y);
-    },
-    get_entities_in_range: (x: number, y: number, range: number) => {
-      return gameEngine.getEntitiesInRange(x, y, range);
-    },
-    get_projectiles: () => {
-      return gameEngine.getAllProjectiles();
-    },
+    get_nearest_enemy: (x: number, y: number) => gameEngine.getNearestEnemy(x, y),
+    get_entities_in_range: (x: number, y: number, range: number) => gameEngine.getEntitiesInRange(x, y, range),
+    get_projectiles: () => gameEngine.getAllProjectiles(),
     spawn_projectile: (params: any, shouldNetwork: boolean = true) => {
-      // Convert Python Map to object if needed
       let jsParams = params;
       if (params && typeof params.toJs === 'function') {
         const raw = params.toJs();
         if (raw instanceof Map || (raw && typeof raw.get === 'function')) {
           jsParams = {};
           raw.forEach((v: any, k: any) => { (jsParams as any)[k] = v; });
-        } else {
-          jsParams = raw;
-        }
+        } else { jsParams = raw; }
       }
-
       const proj = gameEngine.spawnProjectile(jsParams);
       if (proj && isConnected && shouldNetwork) {
-        networkManager.sendFire({
-          ...proj,
-          vx: proj.velocity.x,
-          vy: proj.velocity.y
-        });
+        networkManager.sendFire({ ...proj, vx: proj.velocity.x, vy: proj.velocity.y });
       }
       return proj;
     },
-    // Utilities
     get_time: () => Date.now(),
     rand_float: () => Math.random(),
+  };
+
+  const handleCompile = async (sourceCode: string) => {
+    try {
+      setStatus("Compiling...");
+      const weaponInstance = await pyodideManager.loadWeaponCode(sourceCode, api);
+      if (weaponInstance) {
+        setStatus("Ready to deploy");
+        gameEngine.setWeaponScript(weaponInstance);
+      } else {
+        setStatus("Compilation failed");
+      }
+    } catch (err) {
+      setStatus("Error: " + String(err));
+    }
+  };
+
+  const handleSave = () => {
+    handleCompile(code);
+    addLog("Weapon logic updated!", "success");
+  };
+
+  const handleJoinRoom = (roomId: string) => {
+    if (roomId === 'offline') {
+      setCurrentRoom('offline');
+      gameEngine.setMultiplayerMode(false);
+      if (isConnected) networkManager.disconnect();
+      addLog("Starting Solo Sandbox", "info");
+    } else {
+      networkManager.joinRoom(roomId);
+      setCurrentRoom(roomId);
+      addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    setCurrentRoom(null);
+    networkManager.joinRoom('');
+    addLog("Returned to lobby", "info");
+  };
+
+  const handleConnect = async () => {
+    if (isConnected) {
+      networkManager.disconnect();
+    } else {
+      try {
+        setStatus("Connecting to server...");
+        networkManager.connect(serverUrl || "http://localhost:3000");
+      } catch (err) {
+        addLog("Connection failed: " + String(err), "error");
+      }
+    }
   };
 
   useEffect(() => {
@@ -123,7 +152,6 @@ function App() {
           addLog(msg, isError ? 'error' : 'info');
         });
         setStatus("Ready to compile");
-        // Load default code
         handleCompile(DEFAULT_CODE);
       } catch (err) {
         setStatus("Failed to load System: " + String(err));
@@ -132,14 +160,12 @@ function App() {
     init();
   }, []);
 
-  // Network Listeners
   useEffect(() => {
     networkManager.setOnConnectionChange((connected) => {
       setIsConnected(connected);
       gameEngine.setMultiplayerMode(connected, networkManager.getPlayerId());
       if (connected) {
         addLog("Connected to Multiplayer Server!", "success");
-        setShowConnect(false);
       } else {
         addLog("Disconnected from Server", "warning");
       }
@@ -148,89 +174,12 @@ function App() {
     networkManager.setOnStateUpdate((state) => {
       gameEngine.updateFromSnapshot(state);
     });
-
-    networkManager.setOnKill((id) => {
-      addLog(`Eliminated enemy ${id}!`, "success");
-    });
-
-    // Clean up
-    return () => {
-      networkManager.disconnect();
-    };
   }, []);
 
-  const handleJoinRoom = (roomId: string) => {
-    networkManager.joinRoom(roomId);
-    setCurrentRoom(roomId);
-    addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
-  };
-
-  const handleLeaveRoom = () => {
-    setCurrentRoom(null);
-    networkManager.joinRoom(''); // Reset to no room
-    addLog("Returned to lobby", "info");
-  };
-
-  const handleConnect = async () => {
-    if (isConnected) {
-      networkManager.disconnect();
-    } else {
-      let url = serverUrl || "http://localhost:3000";
-      // Remove trailing slash for consistency
-      url = url.replace(/\/$/, "");
-
-      addLog(`Checking server at ${url}...`, "info");
-
-      try {
-        // 1. Health Check
-        const response = await fetch(`${url}/health`);
-        const contentType = response.headers.get("content-type");
-
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          // Success - it's our game server
-          addLog("Server found! Connecting...", "info");
-          networkManager.connect(url);
-        } else {
-          // Failure - likely serving the frontend HTML app instead of backend API
-          addLog("Error: Server returned HTML instead of JSON.", "error");
-          addLog("Fix: In Railway settings, set Root Directory to '/server'", "warning");
-        }
-      } catch (err) {
-        addLog(`Connection Failed: ${String(err)}`, "error");
-        // If fetch fails (CORS or offline), we might still try socket if the user insists, 
-        // but usually this means the server is unreachable.
-        // We'll try connecting anyway just in case it's a specific fetch issue.
-        addLog("Attempting socket connection anyway...", "info");
-        networkManager.connect(url);
-      }
-    }
-  };
-
-  const handleCompile = async (source: string) => {
-    setStatus("Compiling...");
-    try {
-      // Pass API to Pyodide
-      const script = await pyodideManager.loadWeaponCode(source, api);
-      if (script) {
-        gameEngine.setWeaponScript(script);
-        setStatus("Weapon Updated!");
-        setTimeout(() => setStatus("Ready"), 2000);
-      } else {
-        setStatus("Compilation Failed (Check Console)");
-      }
-    } catch (err) {
-      setStatus("Error: " + String(err));
-    }
-  };
-
-  const handleSave = () => {
-    handleCompile(code);
-  };
-
   return (
-    <div className="h-screen w-screen bg-cyber-dark text-white flex flex-col">
-      {/* Header */}
-      <header className="h-14 border-b border-cyber-muted flex items-center px-6 justify-between bg-cyber-light shadow-md z-10">
+    <div className="h-screen w-screen flex flex-col bg-cyber-dark text-white font-sans overflow-hidden">
+      {/* Dynamic Header */}
+      <header className="h-14 border-b border-cyber-muted flex items-center px-6 justify-between bg-cyber-light shadow-md z-10 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded bg-gradient-to-tr from-cyber-accent to-blue-500 flex items-center justify-center font-bold text-black border border-white/20">
             CA
@@ -252,126 +201,79 @@ function App() {
             {showDocs ? "Hide Guide" : "Code Guide"}
           </button>
 
-          {/* Multiplayer Button */}
-          <div className="relative">
-            <button
-              onClick={() => setShowConnect(!showConnect)}
-              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${isConnected
-                ? "bg-cyber-accent/20 text-cyber-accent border border-cyber-accent"
-                : "text-gray-300 hover:bg-cyber-muted border border-transparent"}`}
-            >
-              {isConnected ? <CheckCircle2 size={16} /> : <LinkIcon size={16} />}
-              {isConnected ? "Online" : "Multiplayer"}
-            </button>
-
-            {isConnected && currentRoom && (
-              <button
-                onClick={handleLeaveRoom}
-                className="flex items-center gap-2 px-3 py-1 mr-2 rounded bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500/20 transition-colors text-sm"
-              >
-                <LogOut size={14} />
-                Leave Party
-              </button>
-            )}
-
-            {/* Connection Popup */}
-            {showConnect && (
-              <div className="absolute top-12 right-0 w-80 bg-cyber-dark border border-cyber-muted p-4 rounded shadow-2xl z-50">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-white">Multiplayer Connection</h3>
-                  <button onClick={() => setShowConnect(false)} className="text-gray-400 hover:text-white">
-                    <X size={16} />
-                  </button>
-                </div>
-
-                {!isConnected ? (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs text-cyber-muted block mb-1">Server URL</label>
-                      <input
-                        type="text"
-                        value={serverUrl}
-                        onChange={(e) => setServerUrl(e.target.value)}
-                        placeholder="wss://your-app.railway.app"
-                        className="w-full bg-black/50 border border-cyber-muted rounded px-3 py-2 text-sm text-white focus:border-cyber-accent outline-none"
-                      />
-                      <p className="text-[10px] text-gray-500 mt-1">Leave empty for localhost:3000</p>
-                    </div>
-                    <button
-                      onClick={handleConnect}
-                      className="w-full bg-cyber-accent text-black font-bold py-2 rounded hover:bg-emerald-400 transition-colors"
-                    >
-                      Connect Server
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 p-3 rounded">
-                      <CheckCircle2 size={24} />
-                      <div>
-                        <div className="font-bold text-sm">Connected</div>
-                        <div className="text-xs opacity-75">Syncing game state...</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => networkManager.disconnect()}
-                      className="w-full border border-red-500 text-red-500 hover:bg-red-500/10 font-bold py-2 rounded transition-colors"
-                    >
-                      Disconnect
-                    </button>
-                  </div>
-                )}
-              </div>
+          <div className="flex items-center gap-2 px-3 py-1 rounded bg-black/30 border border-cyber-muted">
+            {isConnected ? (
+              <>
+                <CheckCircle2 size={14} className="text-cyber-accent" />
+                <span className="text-[10px] text-cyber-accent font-bold uppercase tracking-widest">Online</span>
+              </>
+            ) : (
+              <>
+                <LinkIcon size={14} className="text-cyber-danger" />
+                <span className="text-[10px] text-cyber-danger font-bold uppercase tracking-widest">Offline</span>
+              </>
             )}
           </div>
 
-          <button
-            onClick={() => gameEngine.reset()}
-            className="p-2 hover:bg-cyber-muted rounded transition-colors text-gray-300"
-            title="Reset Arena"
-          >
-            <RotateCcw size={20} />
-          </button>
-
-          <button
-            onClick={handleSave}
-            className="flex items-center gap-2 bg-cyber-accent hover:bg-emerald-400 text-black px-4 py-1.5 rounded font-bold transition-all shadow-[0_0_15px_rgba(0,255,159,0.3)] hover:shadow-[0_0_25px_rgba(0,255,159,0.5)]"
-          >
-            <Play size={16} fill="black" />
-            DEPLOY WEAPON
-          </button>
+          {currentRoom && (
+            <button
+              onClick={handleLeaveRoom}
+              className="flex items-center gap-2 px-3 py-1 rounded bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500/20 transition-colors text-sm font-bold"
+            >
+              <LogOut size={14} />
+              EXIT TO HOME
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content Areas */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Editor Pane */}
-        <div className="w-1/2 min-w-[400px] h-full shadow-xl z-0">
-          <WeaponEditor code={code} onChange={(val) => setCode(val || "")} />
-        </div>
+        {!currentRoom ? (
+          <Lobby
+            isConnected={isConnected}
+            onJoinRoom={handleJoinRoom}
+            onConnect={handleConnect}
+            serverUrl={serverUrl}
+            setServerUrl={setServerUrl}
+          />
+        ) : (
+          <>
+            {/* Editor Pane (Left) */}
+            <div className="w-1/2 min-w-[400px] h-full shadow-xl z-0 overflow-hidden flex flex-col border-r border-cyber-muted">
+              <WeaponEditor code={code} onChange={(val) => setCode(val || "")} />
+            </div>
 
-        {/* Arena/Lobby Pane */}
-        <div className="flex-1 h-full relative flex flex-col min-w-0">
-          <div className="flex-1 relative bg-black/50 overflow-hidden flex flex-col">
-            {!isConnected || !currentRoom ? (
-              <Lobby isConnected={isConnected} onJoinRoom={handleJoinRoom} />
-            ) : (
-              <Arena />
-            )}
-            {/* Documentation Panel Overlay - kept relative to Arena */}
-            {showDocs && <DocsPanel onClose={() => setShowDocs(false)} />}
-          </div>
+            {/* Arena/Console Pane (Right) */}
+            <div className="flex-1 h-full relative flex flex-col min-w-0">
+              <div className="flex-1 relative bg-black/50 overflow-hidden">
+                <Arena />
+                {showDocs && <DocsPanel onClose={() => setShowDocs(false)} />}
+              </div>
+              <div className="h-48 shrink-0 border-t border-cyber-muted bg-cyber-dark/80">
+                <Console logs={logs} onClear={() => setLogs([])} />
+              </div>
+            </div>
 
-          <div className="h-48 shrink-0 z-10 border-t border-cyber-muted">
-            <Console
-              logs={logs}
-              onClear={() => setLogs([])}
-              className="h-full"
-            />
-          </div>
-        </div>
-
-
+            {/* Contextual Actions (Floating) */}
+            <div className="absolute top-4 right-4 flex gap-2 z-20">
+              <button
+                onClick={() => gameEngine.reset()}
+                className="p-2 bg-cyber-light/90 border border-cyber-muted rounded-lg text-white hover:bg-cyber-muted transition-all backdrop-blur-sm"
+                title="Reset Arena"
+              >
+                <RotateCcw size={18} />
+              </button>
+              <button
+                onClick={handleSave}
+                className="flex items-center gap-2 bg-cyber-accent text-black font-black px-4 py-2 rounded-lg shadow-xl shadow-cyber-accent/30 hover:bg-emerald-400 transition-all font-mono text-sm active:scale-95"
+              >
+                <Play size={14} fill="currentColor" />
+                DEPLOY LOGIC
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
