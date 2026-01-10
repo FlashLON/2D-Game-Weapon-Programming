@@ -134,18 +134,13 @@ function App() {
   useEffect(() => {
     networkManager.setOnConnectionChange((connected) => {
       setIsConnected(connected);
+      gameEngine.setMultiplayerMode(connected, networkManager.getPlayerId());
       if (connected) {
         addLog("Connected to Multiplayer Server!", "success");
         setShowConnect(false);
       } else {
-        gameEngine.setMultiplayerMode(false, null);
         addLog("Disconnected from Server", "warning");
       }
-    });
-
-    networkManager.setOnInit((playerId) => {
-      gameEngine.setMultiplayerMode(true, playerId);
-      addLog("Multiplayer Identity Established: " + playerId.substring(0, 6) + "...", "info");
     });
 
     networkManager.setOnStateUpdate((state) => {

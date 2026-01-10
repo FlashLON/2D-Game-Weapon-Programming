@@ -485,10 +485,7 @@ export class GameEngine {
     getArenaBounds() { return { width: 800, height: 600 }; }
 
     setPlayerVelocity(vx: number, vy: number) {
-        const player = this.localPlayerId
-            ? this.state.entities.find(e => e.id === this.localPlayerId)
-            : this.state.entities.find(e => e.type === 'player');
-
+        const player = this.state.entities.find(e => e.type === 'player');
         if (player) {
             player.velocity.x = vx;
             player.velocity.y = vy;
@@ -497,12 +494,7 @@ export class GameEngine {
 
     fireWeapon(targetX: number, targetY: number) {
         if (!this.weaponScript || !this.weaponScript.on_fire) return;
-
-        // Find the correct player (self in multiplayer, or the only player in solo)
-        const player = this.localPlayerId
-            ? this.state.entities.find(e => e.id === this.localPlayerId)
-            : this.state.entities.find(e => e.type === 'player');
-
+        const player = this.state.entities.find(e => e.type === 'player');
         if (!player) return;
         try {
             const result = this.weaponScript.on_fire(targetX, targetY, player.x, player.y);
@@ -555,16 +547,6 @@ export class GameEngine {
                 localMe.deaths = serverMe.deaths;
             }
         }
-
-        // Leaderboard Sync
-        const leaderboard = Object.values(snapshot.players || {}).map((p: any) => ({
-            id: p.id,
-            kills: p.kills || 0,
-            deaths: p.deaths || 0
-        })).sort((a: any, b: any) => b.kills - a.kills);
-
-        this.state.leaderboard = leaderboard;
-        this.notify();
     }
 
     private interpolateMultiplayer(dt: number) {
