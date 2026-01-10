@@ -507,8 +507,15 @@ export class GameEngine {
             .filter(e => e.dist <= range);
     }
 
+    private getLocalPlayer() {
+        if (this.localPlayerId) {
+            return this.state.entities.find(e => e.id === this.localPlayerId && e.type === 'player');
+        }
+        return this.state.entities.find(e => e.type === 'player');
+    }
+
     getPlayer() {
-        const p = this.state.entities.find(e => e.type === 'player');
+        const p = this.getLocalPlayer();
         if (p) return { id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp };
         return null;
     }
@@ -516,7 +523,7 @@ export class GameEngine {
     getArenaBounds() { return { width: 800, height: 600 }; }
 
     setPlayerVelocity(vx: number, vy: number) {
-        const player = this.state.entities.find(e => e.type === 'player');
+        const player = this.getLocalPlayer();
         if (player) {
             player.velocity.x = vx;
             player.velocity.y = vy;
@@ -525,7 +532,7 @@ export class GameEngine {
 
     fireWeapon(targetX: number, targetY: number) {
         if (!this.weaponScript || !this.weaponScript.on_fire) return;
-        const player = this.state.entities.find(e => e.type === 'player');
+        const player = this.getLocalPlayer();
         if (!player) return;
         try {
             const result = this.weaponScript.on_fire(targetX, targetY, player.x, player.y);

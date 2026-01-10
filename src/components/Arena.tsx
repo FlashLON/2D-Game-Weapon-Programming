@@ -210,10 +210,17 @@ export const Arena: React.FC = () => {
 
     // Handle mouse clicks to fire weapon
     const handleClick = (e: React.MouseEvent) => {
-        const rect = canvasRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+
+        // Scale mouse coordinates to match 800x600 internal resolution
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
 
         // Trigger fire action in engine
         const projectileData = gameEngine.fireWeapon(x, y);
