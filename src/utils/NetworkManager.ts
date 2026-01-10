@@ -11,8 +11,6 @@ class NetworkManager {
     private onConnectionChange: ((connected: boolean) => void) | null = null;
     private onPlayerCountChange: ((count: number) => void) | null = null;
     private onKill: ((enemyId: string) => void) | null = null;
-    private onProjectileSpawn: ((proj: any) => void) | null = null;
-    private onProjectileDestroy: ((data: { id: string }) => void) | null = null;
 
     connect(serverUrl: string) {
         if (this.socket) {
@@ -72,14 +70,6 @@ class NetworkManager {
             console.log('You killed:', data.enemyId);
             this.onKill?.(data.enemyId);
         });
-
-        this.socket.on('projectileSpawn', (projectile: any) => {
-            this.onProjectileSpawn?.(projectile);
-        });
-
-        this.socket.on('projectileDestroy', (data: { id: string }) => {
-            this.onProjectileDestroy?.(data);
-        });
     }
 
     disconnect() {
@@ -129,14 +119,6 @@ class NetworkManager {
 
     setOnKill(callback: (enemyId: string) => void) {
         this.onKill = callback;
-    }
-
-    setOnProjectileSpawn(callback: (proj: any) => void) {
-        this.onProjectileSpawn = callback;
-    }
-
-    setOnProjectileDestroy(callback: (data: { id: string }) => void) {
-        this.onProjectileDestroy = callback;
     }
 
     // Getters

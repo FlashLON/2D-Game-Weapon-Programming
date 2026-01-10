@@ -122,7 +122,7 @@ io.on('connection', (socket) => {
         const player = gameState.players[socket.id];
         if (player) {
             const projectile = {
-                id: `proj_${Date.now()}_${socket.id}_${Math.random().toString(36).substr(2, 5)}`,
+                id: `proj_${Date.now()}_${socket.id}`,
                 playerId: socket.id,
                 x: player.x,
                 y: player.y,
@@ -140,6 +140,7 @@ io.on('connection', (socket) => {
                 acceleration: data.acceleration || 0,
                 knockback: data.knockback || 0,
                 pierce: data.pierce || 1,
+                // Advanced behaviors
                 orbit_player: data.orbit_player || false,
                 vampirism: data.vampirism || 0,
                 split_on_death: data.split_on_death || 0,
@@ -153,7 +154,6 @@ io.on('connection', (socket) => {
 
             if (gameState.projectiles.length < PROJECTILE_CAP) {
                 gameState.projectiles.push(projectile);
-                io.emit('projectileSpawn', projectile);
             }
         }
     });
@@ -176,7 +176,7 @@ const spawnFragments = (parent, count) => {
     for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 / count) * i;
         const speed = 200;
-        const projectile = {
+        gameState.projectiles.push({
             id: `frag_${parent.id}_${i}`,
             playerId: parent.playerId,
             x: parent.x,
@@ -191,21 +191,17 @@ const spawnFragments = (parent, count) => {
             },
             lifetime: 1.0,
             maxLifetime: 1.0,
+            // Fragments don't inherit split/orbit to prevent infinite recursion/chaos
             pierce: 1
-        };
-
-        if (gameState.projectiles.length < PROJECTILE_CAP) {
-            gameState.projectiles.push(projectile);
-            io.emit('projectileSpawn', projectile);
-        }
+        });
     }
 };
 
 // Game loop (30 FPS for bandwidth optimization)
-// Physics and Network configuration (Optimized for high entity counts)
-const TICK_RATE = 20;
+// Physics and Network configuration
+const TICK_RATE = 45;
 const TICK_INTERVAL = 1000 / TICK_RATE;
-const BROADCAST_RATE = 10;
+const BROADCAST_RATE = 20;
 const BROADCAST_INTERVAL = 1000 / BROADCAST_RATE;
 
 let lastTick = Date.now();
@@ -385,7 +381,6 @@ setInterval(() => {
 
         if (hitSomething) {
             if (proj.split_on_death) spawnFragments(proj, proj.split_on_death);
-            io.emit('projectileDestroy', { id: proj.id });
             gameState.projectiles.splice(i, 1);
             removed = true;
         }
@@ -395,13 +390,11 @@ setInterval(() => {
                 proj.lifetime -= dt;
                 if (proj.lifetime <= 0) {
                     if (proj.split_on_death) spawnFragments(proj, proj.split_on_death);
-                    io.emit('projectileDestroy', { id: proj.id });
                     gameState.projectiles.splice(i, 1);
                     removed = true;
                 }
             }
             if (!removed && (proj.x < -100 || proj.x > 900 || proj.y < -100 || proj.y > 700)) {
-                io.emit('projectileDestroy', { id: proj.id });
                 gameState.projectiles.splice(i, 1);
             }
         }
@@ -420,7 +413,14 @@ setInterval(() => {
                 vy: Math.round(e.velocity ? e.velocity.y : 0),
                 hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
             })),
-            // Projectiles are now synced via spawn/destroy events for performance
+            projectiles: gameState.projectiles.map(p => ({
+                id: p.id,
+                x: Math.round(p.x), y: Math.round(p.y),
+                vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
+                radius: p.radius, color: p.color,
+                orbit_player: p.orbit_player,
+                playerId: p.playerId
+            })),
             score: gameState.score
         };
 
