@@ -276,8 +276,13 @@ setInterval(() => {
                     ent.hp -= (proj.damage || 10);
                     hitSomething = true;
                     if (ent.hp <= 0) {
-                        ent.hp = ent.maxHp; ent.x = Math.random() * 700 + 50; ent.y = Math.random() * 500 + 50;
-                        if (room.players[proj.playerId]) room.players[proj.playerId].kills++;
+                        ent.hp = ent.maxHp;
+                        ent.x = Math.random() * 700 + 50;
+                        ent.y = Math.random() * 500 + 50;
+                        ent.deaths = (ent.deaths || 0) + 1;
+                        if (room.players[proj.playerId]) {
+                            room.players[proj.playerId].kills = (room.players[proj.playerId].kills || 0) + 1;
+                        }
                     }
                     if (proj.pierce > 1) { proj.pierce--; hitSomething = false; }
                     if (hitSomething) break;
