@@ -409,8 +409,8 @@ setInterval(() => {
             enemies: gameState.enemies.map(e => ({
                 id: e.id,
                 x: Math.round(e.x), y: Math.round(e.y),
-                vx: Math.round((e.velocity ? e.velocity.x : 0) / 10) * 10,  // Round to nearest 10 for bandwidth
-                vy: Math.round((e.velocity ? e.velocity.y : 0) / 10) * 10,
+                vx: Math.round(e.velocity ? e.velocity.x / 10) * 10,  // Round to nearest 10 for bandwidth
+                vy: Math.round(e.velocity ? e.velocity.y / 10) * 10,
                 hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
             })),
             // Filter out orbiting projectiles - client simulates them locally
@@ -431,8 +431,8 @@ setInterval(() => {
             slimState.players[p.id] = {
                 id: p.id,
                 x: Math.round(p.x), y: Math.round(p.y),
-                vx: Math.round((p.velocity.x) / 10) * 10,  // Round to nearest 10
-                vy: Math.round((p.velocity.y) / 10) * 10,
+                vx: Math.round(p.velocity.x / 10) * 10,  // Round to nearest 10
+                vy: Math.round(p.velocity.y / 10) * 10,
                 hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius,
                 kills: p.kills || 0,
                 deaths: p.deaths || 0
