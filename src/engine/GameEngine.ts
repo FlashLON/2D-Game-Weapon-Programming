@@ -130,34 +130,18 @@ export class GameEngine {
 
     private update(dt: number) {
         if (this.isMultiplayer) {
-            // CLIENT-SIDE EXTRAPOLATION
-            // We move everything locally while waiting for server snapshots
+            // Extrapolate entities (Players/Enemies)
             this.state.entities.forEach(ent => {
                 ent.x += ent.velocity.x * dt;
                 ent.y += ent.velocity.y * dt;
-
                 const bounds = this.getArenaBounds();
                 ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
                 ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
             });
 
-            this.state.projectiles.forEach(proj => {
-                // Simplified movement extrapolation
-                if (proj.orbit_player) {
-                    // Orbit extrapolation is complex without player ref, but we try
-                    const player = this.state.entities.find(e => e.id === proj.playerId);
-                    if (player) {
-                        const orbitSpeed = proj.orbit_speed || 3.0;
-                        const angle = Math.atan2(proj.y - player.y, proj.x - player.x) + orbitSpeed * dt;
-                        const r = proj.orbit_radius || 60;
-                        proj.x = player.x + Math.cos(angle) * r;
-                        proj.y = player.y + Math.sin(angle) * r;
-                    }
-                } else {
-                    proj.x += proj.velocity.x * dt;
-                    proj.y += proj.velocity.y * dt;
-                }
-            });
+            // FULL SIMULATION for Projectiles in Multiplayer
+            // Since server no longer syncs individual bullets, we simulate them locally.
+            this.updateProjectiles(dt);
             return;
         }
 
@@ -180,11 +164,15 @@ export class GameEngine {
             }
         });
 
+        this.updateProjectiles(dt);
+    }
+
+    private updateProjectiles(dt: number) {
         for (let i = this.state.projectiles.length - 1; i >= 0; i--) {
             const proj = this.state.projectiles[i];
 
             if (proj.orbit_player) {
-                const player = this.state.entities.find(e => e.type === 'player');
+                const player = this.state.entities.find(e => e.id === proj.playerId);
                 if (player) {
                     if ((proj as any).orbitAngle === undefined) {
                         (proj as any).orbitAngle = Math.atan2(proj.y - player.y, proj.x - player.x);
@@ -550,7 +538,8 @@ export class GameEngine {
         // 1. Prepare Snapshots
         const playersArray = Object.values(snapshot.players || {}).map((p: any) => ({ ...p, type: 'player' as const }));
         const enemiesArray = (snapshot.enemies || []).map((e: any) => ({ ...e, type: 'enemy' as const }));
-        const projectilesArray = snapshot.projectiles || [];
+        // Projectiles are now fully simulated client-side in multiplayer, no longer synced from snapshot.
+        // const projectilesArray = snapshot.projectiles || [];
 
         // 2. Reconcile Entities (Players & Enemies)
         // We use a combination of "Server Reconciliation" for self and "Soft Interpolation" for others
@@ -573,7 +562,7 @@ export class GameEngine {
                     });
                 } else {
                     // OTHERS: Soft pull towards server position to avoid jumpiness
-                    // We don't snap 100% to avoid "stuttering". 
+                    // We don't snap 100% to avoid "stuttering".
                     // The update loop is already moving them (extrapolation).
                     const lerpFactor = 0.2;
                     nextEntities.push({
@@ -593,13 +582,6 @@ export class GameEngine {
         });
 
         this.state.entities = nextEntities;
-
-        // 3. Projectiles (Snapping is fine for fast moving shots)
-        this.state.projectiles = projectilesArray.map((p: any) => ({
-            ...p,
-            velocity: p.vx !== undefined ? { x: p.vx, y: p.vy } : p.velocity
-        }));
-
         this.state.score = snapshot.score || 0;
 
         // 4. Leaderboard
@@ -612,6 +594,22 @@ export class GameEngine {
         this.state.leaderboard = leaderboard;
         this.state.gameOver = false;
         this.notify();
+    }
+
+    addProjectile(proj: any) {
+        // Prevent duplicate IDs if they arrive via multiple channels
+        if (!this.state.projectiles.find(p => p.id === proj.id)) {
+            // Ensure velocity is in the correct format
+            const p = {
+                ...proj,
+                velocity: proj.vx !== undefined ? { x: proj.vx, y: proj.vy } : proj.velocity
+            };
+            this.state.projectiles.push(p);
+        }
+    }
+
+    removeProjectile(id: string) {
+        this.state.projectiles = this.state.projectiles.filter(p => p.id !== id);
     }
 }
 

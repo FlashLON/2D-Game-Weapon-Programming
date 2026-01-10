@@ -151,6 +151,14 @@ function App() {
       addLog(`Eliminated enemy ${id}!`, "success");
     });
 
+    networkManager.setOnProjectileSpawn((proj) => {
+      gameEngine.addProjectile(proj);
+    });
+
+    networkManager.setOnProjectileDestroy((data) => {
+      gameEngine.removeProjectile(data.id);
+    });
+
     // Clean up
     return () => {
       networkManager.disconnect();
