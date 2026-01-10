@@ -87,10 +87,34 @@ app.get('/health', (req, res) => {
 io.on('connection', (socket) => {
     let currentRoomId = null;
 
+    const leaveRoom = (id) => {
+        if (currentRoomId && rooms[currentRoomId]) {
+            const room = rooms[currentRoomId];
+            delete room.players[id];
+
+            if (Object.keys(room.players).length === 0) {
+                delete rooms[currentRoomId];
+            } else {
+                io.to(currentRoomId).emit('playerLeft', {
+                    playerId: id,
+                    playerCount: Object.keys(room.players).length
+                });
+            }
+        }
+    };
+
     socket.on('join_room', ({ roomId }) => {
+        // CLEANUP: Always leave old room before joining new one
+        leaveRoom(socket.id);
         if (currentRoomId) socket.leave(currentRoomId);
 
-        currentRoomId = roomId || 'lobby';
+        // If no roomId (joining Home Page / Limbo), just exit
+        if (!roomId) {
+            currentRoomId = null;
+            return;
+        }
+
+        currentRoomId = roomId;
         socket.join(currentRoomId);
 
         if (!rooms[currentRoomId]) {
@@ -162,19 +186,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        if (currentRoomId && rooms[currentRoomId]) {
-            const room = rooms[currentRoomId];
-            delete room.players[socket.id];
-
-            if (Object.keys(room.players).length === 0) {
-                delete rooms[currentRoomId];
-            } else {
-                io.to(currentRoomId).emit('playerLeft', {
-                    playerId: socket.id,
-                    playerCount: Object.keys(room.players).length
-                });
-            }
-        }
+        leaveRoom(socket.id);
     });
 });
 
