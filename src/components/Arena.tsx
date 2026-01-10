@@ -93,7 +93,7 @@ export const Arena: React.FC = () => {
                 if (ent.type === 'player' && networkManager.isConnected()) {
                     const myId = networkManager.getPlayerId();
                     if (ent.id !== myId) {
-                        drawColor = '#ff0055'; // Restored: Hostile Red for all enemies
+                        drawColor = '#ff9f00'; // Vibrant Orange for Other Players
                     }
                 }
 
@@ -110,15 +110,26 @@ export const Arena: React.FC = () => {
 
                 // Draw HP bar for living entities (not projectiles)
                 if (ent.type !== 'projectile') {
-                    const hpPct = ent.hp / ent.maxHp;
-                    const barW = 30;
-                    const barH = 4;
-                    // Background bar
-                    ctx.fillStyle = '#333';
-                    ctx.fillRect(ent.x - barW / 2, ent.y - ent.radius - 10, barW, barH);
-                    // Health fill (Green if healthy, Red if low)
-                    ctx.fillStyle = hpPct > 0.5 ? '#00ff9f' : '#ff0055';
-                    ctx.fillRect(ent.x - barW / 2, ent.y - ent.radius - 10, barW * hpPct, barH);
+                    const hpPct = Math.max(0, Math.min(1, ent.hp / ent.maxHp));
+                    const barW = 32;
+                    const barH = 3;
+                    const barY = ent.y - ent.radius - 8;
+
+                    // Background Bar (Outer border/shadow)
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(ent.x - barW / 2 - 1, barY - 1, barW + 2, barH + 2);
+
+                    // Background bar (Dark base)
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(ent.x - barW / 2, barY, barW, barH);
+
+                    // Health fill color logic: Green -> Yellow -> Red
+                    let hpColor = '#00ff9f'; // Healthy Green
+                    if (hpPct < 0.3) hpColor = '#ff0055'; // Critical Red
+                    else if (hpPct < 0.6) hpColor = '#ff9f00'; // Warning Orange
+
+                    ctx.fillStyle = hpColor;
+                    ctx.fillRect(ent.x - barW / 2, barY, barW * hpPct, barH);
                 }
             });
 
@@ -215,7 +226,12 @@ export const Arena: React.FC = () => {
         const y = (e.clientY - rect.top) * scaleY;
 
         // Trigger fire action in engine
-        gameEngine.fireWeapon(x, y);
+        const projectileData = gameEngine.fireWeapon(x, y);
+
+        // SYNC WITH SERVER: This was missing in the last update, causing "direction" issues
+        if (networkManager.isConnected() && projectileData) {
+            networkManager.sendFire(projectileData);
+        }
     };
 
     return (
