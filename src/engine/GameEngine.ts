@@ -142,18 +142,25 @@ export class GameEngine {
             });
 
             this.state.projectiles.forEach(proj => {
-                // Simplified movement extrapolation
                 if (proj.orbit_player) {
-                    // Orbit extrapolation is complex without player ref, but we try
+                    // Full orbit simulation - server doesn't sync these anymore
                     const player = this.state.entities.find(e => e.id === proj.playerId);
                     if (player) {
+                        // Initialize orbit angle if not set
+                        if ((proj as any).orbitAngle === undefined) {
+                            (proj as any).orbitAngle = Math.atan2(proj.y - player.y, proj.x - player.x);
+                            (proj as any).orbitRadius = proj.orbit_radius || 60;
+                        }
+
                         const orbitSpeed = proj.orbit_speed || 3.0;
-                        const angle = Math.atan2(proj.y - player.y, proj.x - player.x) + orbitSpeed * dt;
-                        const r = proj.orbit_radius || 60;
-                        proj.x = player.x + Math.cos(angle) * r;
-                        proj.y = player.y + Math.sin(angle) * r;
+                        (proj as any).orbitAngle += orbitSpeed * dt;
+
+                        const r = (proj as any).orbitRadius;
+                        proj.x = player.x + Math.cos((proj as any).orbitAngle) * r;
+                        proj.y = player.y + Math.sin((proj as any).orbitAngle) * r;
                     }
                 } else {
+                    // Standard linear projectiles
                     proj.x += proj.velocity.x * dt;
                     proj.y += proj.velocity.y * dt;
                 }
