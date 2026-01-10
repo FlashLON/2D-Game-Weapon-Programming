@@ -557,6 +557,9 @@ export class GameEngine {
         if (this.localPlayerId) {
             return this.state.entities.find(e => e.id === this.localPlayerId && e.type === 'player');
         }
+        // In multiplayer, if we don't have our ID yet, we must NOT default to others
+        if (this.isMultiplayer) return null;
+
         return this.state.entities.find(e => e.type === 'player');
     }
 

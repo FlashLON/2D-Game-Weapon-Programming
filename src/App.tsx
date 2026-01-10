@@ -172,6 +172,11 @@ function App() {
     });
 
     networkManager.setOnStateUpdate((state) => {
+      // CRITICAL: Ensure engine knows our ID (arrives via init packet)
+      const myId = networkManager.getPlayerId();
+      if (myId) {
+        gameEngine.setMultiplayerMode(isConnected, myId);
+      }
       gameEngine.updateFromSnapshot(state);
     });
   }, []);
