@@ -63,6 +63,14 @@ export const Arena: React.FC = () => {
             ctx.fillStyle = '#0a0a0f'; // BG color matched to theme
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // IMPACT SCREENSHAKE: Offset context
+            if (state.screenshake > 0) {
+                const shake = state.screenshake * 15;
+                const ox = (Math.random() - 0.5) * shake;
+                const oy = (Math.random() - 0.5) * shake;
+                ctx.translate(ox, oy);
+            }
+
             // Draw Grid
             ctx.strokeStyle = '#1a1a2e';
             ctx.lineWidth = 1;
@@ -154,34 +162,100 @@ export const Arena: React.FC = () => {
             }
             ctx.shadowBlur = 0;
 
-            // 5. Draw Leaderboard (Multiplayer)
-            if (state.leaderboard && state.leaderboard.length > 0) {
-                const myId = networkManager.getPlayerId();
+            // 5. Draw Feedback: Damage Numbers
+            state.damageNumbers.forEach(dn => {
+                ctx.globalAlpha = dn.life;
+                ctx.fillStyle = dn.color;
+                ctx.font = `bold ${14 + dn.value * 0.1}px "Outfit", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.fillText(`-${dn.value}`, dn.x, dn.y);
+            });
+            ctx.globalAlpha = 1.0;
+            ctx.textAlign = 'left';
+            ctx.shadowBlur = 0;
+
+            // 6. Draw Leaderboard & Kill Feed (Multiplayer)
+            if (networkManager.isConnected()) {
                 const lbX = canvas.width - 180;
                 const lbY = 40;
 
-                // Header
-                ctx.fillStyle = 'rgba(10, 10, 15, 0.8)';
-                ctx.fillRect(lbX - 10, lbY - 25, 170, 30 + state.leaderboard.length * 25);
-                ctx.strokeStyle = '#00ff9f';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(lbX - 10, lbY - 25, 170, 30 + state.leaderboard.length * 25);
-
-                ctx.fillStyle = '#00ff9f';
-                ctx.font = 'bold 14px "Outfit", sans-serif';
-                ctx.fillText("LEADERBOARD", lbX, lbY);
-
-                state.leaderboard.slice(0, 5).forEach((entry: any, i: number) => {
-                    const isMe = entry.id === myId;
-                    ctx.fillStyle = isMe ? '#00ff9f' : '#fff';
-                    ctx.font = isMe ? 'bold 13px "Outfit", sans-serif' : '13px "Outfit", sans-serif';
-
-                    const name = isMe ? "YOU" : `Player ${entry.id.substring(0, 4)}`;
-                    ctx.fillText(`${i + 1}. ${name}`, lbX, lbY + 25 + i * 25);
-                    ctx.textAlign = 'right';
-                    ctx.fillText(`${entry.kills}`, lbX + 150, lbY + 25 + i * 25);
-                    ctx.textAlign = 'left';
+                // Kill Feed (Top Left)
+                state.notifications.forEach((n, i) => {
+                    ctx.globalAlpha = n.life;
+                    ctx.fillStyle = 'rgba(255, 0, 85, 0.2)';
+                    ctx.fillRect(20, 110 + i * 30, 200, 25);
+                    ctx.fillStyle = '#ff0055';
+                    ctx.font = 'bold 11px font-mono';
+                    ctx.fillText(`⚡ ${n.attacker.toUpperCase()} TERMINATED ${n.victim.toUpperCase()}`, 30, 127 + i * 30);
                 });
+                ctx.globalAlpha = 1.0;
+
+                if (state.leaderboard && state.leaderboard.length > 0) {
+                    const myId = networkManager.getPlayerId();
+                    // Header
+                    ctx.fillStyle = 'rgba(10, 10, 15, 0.8)';
+                    ctx.fillRect(lbX - 10, lbY - 25, 170, 30 + state.leaderboard.length * 25);
+                    ctx.strokeStyle = '#00ff9f';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(lbX - 10, lbY - 25, 170, 30 + state.leaderboard.length * 25);
+
+                    ctx.fillStyle = '#00ff9f';
+                    ctx.font = 'bold 14px "Outfit", sans-serif';
+                    ctx.fillText("LEADERBOARD", lbX, lbY);
+
+                    state.leaderboard.slice(0, 5).forEach((entry: any, i: number) => {
+                        const isMe = entry.id === myId;
+                        ctx.fillStyle = isMe ? '#00ff9f' : '#fff';
+                        ctx.font = isMe ? 'bold 13px "Outfit", sans-serif' : '13px "Outfit", sans-serif';
+
+                        const name = isMe ? "YOU" : `Player ${entry.id.substring(0, 4)}`;
+                        ctx.fillText(`${i + 1}. ${name}`, lbX, lbY + 25 + i * 25);
+                        ctx.textAlign = 'right';
+                        ctx.fillText(`${entry.kills}`, lbX + 150, lbY + 25 + i * 25);
+                        ctx.textAlign = 'left';
+                    });
+                }
+            }
+
+            // 7. Reset Context (after shake)
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            // 8. Draw Neural HUD (Local Stats - Screen Space)
+            const myPlayer = state.entities.find(e => e.id === networkManager.getPlayerId());
+            if (myPlayer) {
+                const hudX = 30;
+                const hudY = canvas.height - 50;
+
+                // Health Bar Container
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(hudX, hudY, 200, 12);
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.strokeRect(hudX - 1, hudY - 1, 202, 14);
+
+                // Health Fill
+                const hpPct = myPlayer.hp / myPlayer.maxHp;
+                const fillGrad = ctx.createLinearGradient(hudX, 0, hudX + 200, 0);
+                fillGrad.addColorStop(0, hpPct < 0.3 ? '#ff0055' : '#00ff9f');
+                fillGrad.addColorStop(1, hpPct < 0.3 ? '#880022' : '#004422');
+
+                ctx.fillStyle = fillGrad;
+                ctx.fillRect(hudX, hudY, 200 * hpPct, 12);
+
+                // HUD Text
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px "Outfit", sans-serif';
+                ctx.fillText(`SYSTEM HP: ${Math.round(myPlayer.hp)}%`, hudX, hudY - 10);
+
+                // Segment lines
+                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                for (let i = 1; i < 10; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(hudX + i * 20, hudY);
+                    ctx.lineTo(hudX + i * 20, hudY + 12);
+                    ctx.stroke();
+                }
             }
 
             if (state.gameOver) {

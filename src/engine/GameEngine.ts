@@ -38,6 +38,22 @@ export interface Entity {
     deaths?: number;
 }
 
+export interface DamageNumber {
+    id: string;
+    x: number;
+    y: number;
+    value: number;
+    color: string;
+    life: number; // 0 to 1
+}
+
+export interface KillNotification {
+    id: string;
+    attacker: string;
+    victim: string;
+    life: number;
+}
+
 /**
  * The global state of the game.
  * Contains all active entities, score, and status.
@@ -48,6 +64,9 @@ export interface GameState {
     score: number;
     gameOver: boolean;
     leaderboard?: { id: string; kills: number; deaths: number }[];
+    damageNumbers: DamageNumber[];
+    notifications: KillNotification[];
+    screenshake: number; // 0 to 1
 }
 
 /**
@@ -73,6 +92,9 @@ export class GameEngine {
             projectiles: [],
             score: 0,
             gameOver: false,
+            damageNumbers: [],
+            notifications: [],
+            screenshake: 0
         };
     }
 
@@ -111,6 +133,9 @@ export class GameEngine {
             projectiles: [],
             score: 0,
             gameOver: false,
+            damageNumbers: [],
+            notifications: [],
+            screenshake: 0
         };
         this.notify();
     }
@@ -129,6 +154,23 @@ export class GameEngine {
     };
 
     private update(dt: number) {
+        // Update Feedback Effects
+        if (this.state.screenshake > 0) {
+            this.state.screenshake -= dt * 5; // Decay
+            if (this.state.screenshake < 0) this.state.screenshake = 0;
+        }
+
+        this.state.damageNumbers.forEach(dn => {
+            dn.y -= 40 * dt; // Rise
+            dn.life -= dt * 1.5; // Fade duration
+        });
+        this.state.damageNumbers = this.state.damageNumbers.filter(dn => dn.life > 0);
+
+        this.state.notifications.forEach(n => {
+            n.life -= dt * 0.5;
+        });
+        this.state.notifications = this.state.notifications.filter(n => n.life > 0);
+
         if (this.isMultiplayer) {
             // CLIENT-SIDE EXTRAPOLATION
             // We move everything locally while waiting for server snapshots
@@ -581,6 +623,35 @@ export class GameEngine {
             const localEnt = this.state.entities.find(e => e.id === serverEnt.id);
 
             if (localEnt) {
+                // COMBAT FEEDBACK: Calculate Damage Numbers
+                if (serverEnt.hp < localEnt.hp) {
+                    const diff = localEnt.hp - serverEnt.hp;
+
+                    // Trigger Screenshake if it's the local player
+                    if (serverEnt.id === this.localPlayerId) {
+                        this.state.screenshake = 0.5;
+                    }
+
+                    this.state.damageNumbers.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        x: serverEnt.x,
+                        y: serverEnt.y - 10,
+                        value: Math.round(diff),
+                        color: serverEnt.id === this.localPlayerId ? '#ff0055' : '#fce83a',
+                        life: 1.0
+                    });
+                }
+
+                // KILL DETECTION: If kills count increased
+                if (serverEnt.kills > (localEnt.kills || 0)) {
+                    this.state.notifications.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        attacker: serverEnt.id === this.localPlayerId ? "You" : `Player ${serverEnt.id.substring(0, 4)}`,
+                        victim: "Enemy", // Simplified since server doesn't send victim name yet
+                        life: 4.0
+                    });
+                }
+
                 if (serverEnt.id === this.localPlayerId) {
                     // SELF: Keep local physics, only sync stats
                     nextEntities.push({
@@ -591,9 +662,8 @@ export class GameEngine {
                     });
                 } else {
                     // OTHERS: Soft pull towards server position to avoid jumpiness
-                    // We don't snap 100% to avoid "stuttering". 
-                    // The update loop is already moving them (extrapolation).
-                    const lerpFactor = 0.2;
+                    // INCREASED LERP for better responsiveness (0.2 -> 0.35)
+                    const lerpFactor = 0.35;
                     nextEntities.push({
                         ...serverEnt,
                         x: localEnt.x + (serverEnt.x - localEnt.x) * lerpFactor,
