@@ -93,7 +93,7 @@ export const Arena: React.FC = () => {
                 if (ent.type === 'player' && networkManager.isConnected()) {
                     const myId = networkManager.getPlayerId();
                     if (ent.id !== myId) {
-                        drawColor = '#ff0055'; // Hostile Red
+                        drawColor = '#ff9f00'; // Vibrant Orange for Other Players
                     }
                 }
 
@@ -119,6 +119,14 @@ export const Arena: React.FC = () => {
                     // Health fill (Green if healthy, Red if low)
                     ctx.fillStyle = hpPct > 0.5 ? '#00ff9f' : '#ff0055';
                     ctx.fillRect(ent.x - barW / 2, ent.y - ent.radius - 10, barW * hpPct, barH);
+
+                    // Draw Type/ID label
+                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                    ctx.font = '10px "Outfit", sans-serif';
+                    ctx.textAlign = 'center';
+                    const label = ent.type === 'player' ? (ent.id === networkManager.getPlayerId() ? 'YOU' : `PLAYER`) : 'BOT';
+                    ctx.fillText(label, ent.x, ent.y - ent.radius - 15);
+                    ctx.textAlign = 'left';
                 }
             });
 
@@ -204,12 +212,10 @@ export const Arena: React.FC = () => {
     const handleClick = (e: React.MouseEvent) => {
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
-        // Calculate click position relative to canvas
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // Trigger fire action in engine (which calls Python logic)
-        // returns projectile data if intent is valid
+        // Trigger fire action in engine
         const projectileData = gameEngine.fireWeapon(x, y);
 
         if (networkManager.isConnected() && projectileData) {
