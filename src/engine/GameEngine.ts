@@ -656,13 +656,25 @@ export class GameEngine {
                 }
 
                 if (serverEnt.id === this.localPlayerId) {
-                    // SELF: Keep local physics, only sync stats
-                    nextEntities.push({
-                        ...serverEnt,
-                        x: localEnt.x,
-                        y: localEnt.y,
-                        velocity: localEnt.velocity
-                    });
+                    // SELF (Client-Side Prediction with Light Reconciliation):
+                    // If we are way off (lag/collision), snap. Otherwise, let local physics rule.
+                    const dist = Math.sqrt((localEnt.x - serverEnt.x) ** 2 + (localEnt.y - serverEnt.y) ** 2);
+                    if (dist > 100) {
+                        // Hard sync if too far
+                        nextEntities.push({
+                            ...serverEnt,
+                            velocity: localEnt.velocity // Keep local velocity for immediate response
+                        });
+                    } else {
+                        // Soft sync: Pull slightly towards server to correct small drifts
+                        const pullFactor = 0.1;
+                        nextEntities.push({
+                            ...serverEnt,
+                            x: localEnt.x + (serverEnt.x - localEnt.x) * pullFactor,
+                            y: localEnt.y + (serverEnt.y - localEnt.y) * pullFactor,
+                            velocity: localEnt.velocity
+                        });
+                    }
                 } else {
                     // OTHERS: Soft pull towards server position to avoid jumpiness
                     // INCREASED LERP for better responsiveness (0.2 -> 0.35)

@@ -52,9 +52,8 @@ export const Arena: React.FC = () => {
 
             if (networkManager.isConnected()) {
                 networkManager.sendMovement(vx, vy);
-            } else {
-                gameEngine.setPlayerVelocity(vx, vy);
             }
+            gameEngine.setPlayerVelocity(vx, vy);
         };
 
         // Main render function called whenever game state changes
