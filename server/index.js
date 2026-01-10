@@ -1,11 +1,8 @@
 const express = require('express');
-const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 
 const app = express();
-app.use(cors()); // Enable CORS for all routes
-
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
@@ -214,21 +211,6 @@ setInterval(() => {
     const now = Date.now();
     const dt = Math.min((now - lastTick) / 1000, 0.1);
     lastTick = now;
-
-    // --- 0. SPAWN ENEMIES IF NEEDED ---
-    if (gameState.enemies.length < 5) {
-        gameState.enemies.push({
-            id: `enemy_${Date.now()}_${Math.random()}`,
-            x: Math.random() * 700 + 50,
-            y: Math.random() * 500 + 50,
-            radius: 20,
-            color: '#ff0055',
-            hp: 50,
-            maxHp: 50,
-            type: 'enemy',
-            velocity: { x: 0, y: 0 }
-        });
-    }
 
     // --- 1. PREPARE GRID ---
     updateGrid();
