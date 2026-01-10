@@ -228,26 +228,9 @@ setInterval(() => {
     const dt = Math.min((now - lastTick) / 1000, 0.1);
     lastTick = now;
 
-    // --- 1. SPAWN ENEMIES (Offline/Solo only) ---
-    // We strictly disable AI spawn in multiplayer (more than 1 player)
-    const playerIds = Object.keys(gameState.players);
-    if (playerIds.length === 1 && gameState.enemies.length < 8) {
-        gameState.enemies.push({
-            id: 'enemy_' + Math.random().toString(36).substr(2, 9),
-            x: Math.random() * 700 + 50,
-            y: Math.random() * 500 + 50,
-            radius: 20,
-            color: '#ff0055',
-            hp: 50,
-            maxHp: 50,
-            type: 'enemy',
-            velocity: {
-                x: (Math.random() - 0.5) * 100,
-                y: (Math.random() - 0.5) * 100
-            }
-        });
-    } else if (playerIds.length > 1 && gameState.enemies.length > 0) {
-        // Strict cleanup for multiplayer performance
+    // --- 1. AI ENEMIES DISABLED ---
+    // AI Bots are removed from the multiplayer server logic to focus on PvP.
+    if (gameState.enemies.length > 0) {
         gameState.enemies = [];
     }
 
