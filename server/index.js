@@ -121,11 +121,25 @@ io.on('connection', (socket) => {
     socket.on('fire', (data) => {
         const player = gameState.players[socket.id];
         if (player) {
+            // FIRING PRECISION: Use client reported position if it's within a small lag buffer (50px)
+            // This ensures the bullet appears to originate from the player's visual position
+            // while the server maintains authority.
+            let fireX = player.x;
+            let fireY = player.y;
+
+            if (data.x !== undefined && data.y !== undefined) {
+                const dist = Math.sqrt((data.x - player.x) ** 2 + (data.y - player.y) ** 2);
+                if (dist < 50) {
+                    fireX = data.x;
+                    fireY = data.y;
+                }
+            }
+
             const projectile = {
-                id: `proj_${Date.now()}_${socket.id}`,
+                id: `proj_${Math.random().toString(36).substr(2, 9)}_${socket.id}`,
                 playerId: socket.id,
-                x: player.x,
-                y: player.y,
+                x: fireX,
+                y: fireY,
                 radius: data.radius || 5,
                 color: data.color || '#fce83a',
                 damage: data.damage || 25,
@@ -215,9 +229,9 @@ setInterval(() => {
     lastTick = now;
 
     // --- 1. SPAWN ENEMIES (Offline/Solo only) ---
-    // We disable AI spawn in true multiplayer (more than 1 player) to reduce lag
+    // We strictly disable AI spawn in multiplayer (more than 1 player)
     const playerIds = Object.keys(gameState.players);
-    if (playerIds.length <= 1 && gameState.enemies.length < 8) {
+    if (playerIds.length === 1 && gameState.enemies.length < 8) {
         gameState.enemies.push({
             id: 'enemy_' + Math.random().toString(36).substr(2, 9),
             x: Math.random() * 700 + 50,
@@ -233,7 +247,7 @@ setInterval(() => {
             }
         });
     } else if (playerIds.length > 1 && gameState.enemies.length > 0) {
-        // Clear existing enemies when entering multiplayer to focus on PvP and save performance
+        // Strict cleanup for multiplayer performance
         gameState.enemies = [];
     }
 

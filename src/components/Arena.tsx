@@ -93,7 +93,7 @@ export const Arena: React.FC = () => {
                 if (ent.type === 'player' && networkManager.isConnected()) {
                     const myId = networkManager.getPlayerId();
                     if (ent.id !== myId) {
-                        drawColor = '#ff9f00'; // Vibrant Orange for Other Players
+                        drawColor = '#ff0055'; // Restored: Hostile Red for all enemies
                     }
                 }
 
@@ -119,14 +119,6 @@ export const Arena: React.FC = () => {
                     // Health fill (Green if healthy, Red if low)
                     ctx.fillStyle = hpPct > 0.5 ? '#00ff9f' : '#ff0055';
                     ctx.fillRect(ent.x - barW / 2, ent.y - ent.radius - 10, barW * hpPct, barH);
-
-                    // Draw Type/ID label
-                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                    ctx.font = '10px "Outfit", sans-serif';
-                    ctx.textAlign = 'center';
-                    const label = ent.type === 'player' ? (ent.id === networkManager.getPlayerId() ? 'YOU' : `PLAYER`) : 'BOT';
-                    ctx.fillText(label, ent.x, ent.y - ent.radius - 15);
-                    ctx.textAlign = 'left';
                 }
             });
 
@@ -223,11 +215,7 @@ export const Arena: React.FC = () => {
         const y = (e.clientY - rect.top) * scaleY;
 
         // Trigger fire action in engine
-        const projectileData = gameEngine.fireWeapon(x, y);
-
-        if (networkManager.isConnected() && projectileData) {
-            networkManager.sendFire(projectileData);
-        }
+        gameEngine.fireWeapon(x, y);
     };
 
     return (

@@ -86,7 +86,7 @@ function App() {
     get_projectiles: () => {
       return gameEngine.getAllProjectiles();
     },
-    spawn_projectile: (params: any) => {
+    spawn_projectile: (params: any, shouldNetwork: boolean = true) => {
       // Convert Python Map to object if needed
       let jsParams = params;
       if (params && typeof params.toJs === 'function') {
@@ -100,7 +100,7 @@ function App() {
       }
 
       const proj = gameEngine.spawnProjectile(jsParams);
-      if (proj && isConnected) {
+      if (proj && isConnected && shouldNetwork) {
         networkManager.sendFire({
           ...proj,
           vx: proj.velocity.x,

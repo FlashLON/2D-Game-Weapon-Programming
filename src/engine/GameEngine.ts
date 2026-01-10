@@ -423,7 +423,7 @@ export class GameEngine {
     }
 
     spawnProjectile(params: any): Entity | null {
-        const player = this.state.entities.find(e => e.type === 'player');
+        const player = this.getLocalPlayer();
         const x = params.x ?? (player ? player.x : 400);
         const y = params.y ?? (player ? player.y : 300);
         const radius = params.radius ?? 5;
@@ -453,17 +453,21 @@ export class GameEngine {
             vy = Math.sin(rad) * params.speed;
         }
 
-        const projectileData: Entity = {
-            id: `proj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            x, y, radius, color, hp: 1, maxHp: 1, damage, knockback, pierce, type: 'projectile',
-            velocity: { x: vx, y: vy }, homing, lifetime, maxLifetime: lifetime, acceleration,
-            orbit_player, vampirism, split_on_death, attraction_force, bounciness, spin, chain_range, orbit_speed, orbit_radius
+        const proj: Entity = {
+            id: params.id || `proj_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            playerId: params.playerId || (player ? player.id : 'unknown'),
+            x, y, radius, color, damage, type: 'projectile',
+            hp: 1, maxHp: 1,
+            velocity: { x: vx, y: vy },
+            homing, lifetime, maxLifetime: lifetime, acceleration,
+            orbit_player, vampirism, split_on_death, attraction_force,
+            bounciness, spin, chain_range, orbit_speed, orbit_radius,
+            pierce, knockback
         };
-
         if (!this.isMultiplayer) {
-            this.state.projectiles.push(projectileData);
+            this.state.projectiles.push(proj);
         }
-        return projectileData;
+        return proj;
     }
 
     getAllProjectiles() {
