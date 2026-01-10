@@ -62,9 +62,10 @@ export class GameEngine {
     private animationFrameId: number | null = null;
     private onStateChange: ((state: GameState) => void) | null = null;
 
-    // --- MULTIPLAYER PROPERTIES ---
     private isMultiplayer = false;
     private localPlayerId: string | null = null;
+    private snapshots: { timestamp: number; state: any }[] = [];
+    private INTERPOLATION_OFFSET = 60; // ms lookback - lower is more live, higher is smoother
 
     constructor() {
         // Initialize default state with empty arrays
@@ -130,41 +131,7 @@ export class GameEngine {
 
     private update(dt: number) {
         if (this.isMultiplayer) {
-            // CLIENT-SIDE EXTRAPOLATION
-            // We move everything locally while waiting for server snapshots
-            this.state.entities.forEach(ent => {
-                ent.x += ent.velocity.x * dt;
-                ent.y += ent.velocity.y * dt;
-
-                const bounds = this.getArenaBounds();
-                ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
-                ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
-            });
-
-            this.state.projectiles.forEach(proj => {
-                if (proj.orbit_player) {
-                    // Full orbit simulation - server doesn't sync these anymore
-                    const player = this.state.entities.find(e => e.id === proj.playerId);
-                    if (player) {
-                        // Initialize orbit angle if not set
-                        if ((proj as any).orbitAngle === undefined) {
-                            (proj as any).orbitAngle = Math.atan2(proj.y - player.y, proj.x - player.x);
-                            (proj as any).orbitRadius = proj.orbit_radius || 60;
-                        }
-
-                        const orbitSpeed = proj.orbit_speed || 3.0;
-                        (proj as any).orbitAngle += orbitSpeed * dt;
-
-                        const r = (proj as any).orbitRadius;
-                        proj.x = player.x + Math.cos((proj as any).orbitAngle) * r;
-                        proj.y = player.y + Math.sin((proj as any).orbitAngle) * r;
-                    }
-                } else {
-                    // Standard linear projectiles
-                    proj.x += proj.velocity.x * dt;
-                    proj.y += proj.velocity.y * dt;
-                }
-            });
+            this.interpolateMultiplayer(dt);
             return;
         }
 
@@ -457,10 +424,12 @@ export class GameEngine {
             id: `proj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             x, y, radius, color, hp: 1, maxHp: 1, damage, knockback, pierce, type: 'projectile',
             velocity: { x: vx, y: vy }, homing, lifetime, maxLifetime: lifetime, acceleration,
-            orbit_player, vampirism, split_on_death, attraction_force, bounciness, spin, chain_range, orbit_speed, orbit_radius
+            orbit_player, vampirism, split_on_death, attraction_force, bounciness, spin, chain_range, orbit_speed, orbit_radius,
+            playerId: this.localPlayerId || undefined
         };
 
-        if (!this.isMultiplayer) {
+        if (!this.isMultiplayer || projectileData.playerId === this.localPlayerId) {
+            // In multiplayer, we spawn our OWN projectiles immediately for feedback
             this.state.projectiles.push(projectileData);
         }
         return projectileData;
@@ -554,71 +523,139 @@ export class GameEngine {
     }
 
     updateFromSnapshot(snapshot: any) {
-        // 1. Prepare Snapshots
-        const playersArray = Object.values(snapshot.players || {}).map((p: any) => ({ ...p, type: 'player' as const }));
-        const enemiesArray = (snapshot.enemies || []).map((e: any) => ({ ...e, type: 'enemy' as const }));
-        const projectilesArray = snapshot.projectiles || [];
+        // Add to snapshots buffer for interpolation
+        this.snapshots.push({
+            timestamp: Date.now(),
+            state: snapshot
+        });
 
-        // 2. Reconcile Entities (Players & Enemies)
-        // We use a combination of "Server Reconciliation" for self and "Soft Interpolation" for others
+        // Keep buffer manageable (last 1 second)
+        if (this.snapshots.length > 20) {
+            this.snapshots.shift();
+        }
+
+        // Stats and Global State sync
+        this.state.score = snapshot.score || 0;
+
+        // Local Player HUD sync
+        if (this.localPlayerId) {
+            const serverMe = (snapshot.players || {})[this.localPlayerId];
+            const localMe = this.state.entities.find(e => e.id === this.localPlayerId);
+            if (serverMe && localMe) {
+                localMe.hp = serverMe.hp;
+                localMe.kills = serverMe.kills;
+                localMe.deaths = serverMe.deaths;
+            }
+        }
+    }
+
+    private interpolateMultiplayer(dt: number) {
+        if (this.snapshots.length < 2) {
+            // Not enough data yet, just extrapolate local player
+            const me = this.state.entities.find(e => e.id === this.localPlayerId);
+            if (me) {
+                me.x += me.velocity.x * dt;
+                me.y += me.velocity.y * dt;
+                const bounds = this.getArenaBounds();
+                me.x = Math.max(me.radius, Math.min(bounds.width - me.radius, me.x));
+                me.y = Math.max(me.radius, Math.min(bounds.height - me.radius, me.y));
+            }
+            return;
+        }
+
+        const renderTime = Date.now() - this.INTERPOLATION_OFFSET;
+
+        // Find snapshots to interpolate between
+        let s1 = this.snapshots[0];
+        let s2 = this.snapshots[1];
+
+        for (let i = 0; i < this.snapshots.length - 1; i++) {
+            if (renderTime >= this.snapshots[i].timestamp && renderTime <= this.snapshots[i + 1].timestamp) {
+                s1 = this.snapshots[i];
+                s2 = this.snapshots[i + 1];
+                break;
+            }
+        }
+
+        const t = (renderTime - s1.timestamp) / (s2.timestamp - s1.timestamp);
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+        // Reconstruct Entities
+        const playersArray = Object.values(s2.state.players || {}).map((p: any) => ({ ...p, type: 'player' as const }));
+        const enemiesArray = (s2.state.enemies || []).map((e: any) => ({ ...e, type: 'enemy' as const }));
         const allServerEntities = [...playersArray, ...enemiesArray];
 
-        // Find entities that should persist or be created
         const nextEntities: Entity[] = [];
 
-        allServerEntities.forEach(serverEnt => {
-            const localEnt = this.state.entities.find(e => e.id === serverEnt.id);
+        allServerEntities.forEach(e2 => {
+            const e1Arr = [...Object.values(s1.state.players || {}), ...(s1.state.enemies || [])];
+            const e1: any = e1Arr.find((e: any) => e.id === e2.id);
 
-            if (localEnt) {
-                if (serverEnt.id === this.localPlayerId) {
-                    // SELF: Keep local physics, only sync stats
-                    nextEntities.push({
-                        ...serverEnt,
-                        x: localEnt.x,
-                        y: localEnt.y,
-                        velocity: localEnt.velocity
-                    });
+            if (e2.id === this.localPlayerId) {
+                // Local player: Move based on input (Extrapolation)
+                const localMe = this.state.entities.find(ent => ent.id === this.localPlayerId);
+                if (localMe) {
+                    localMe.x += localMe.velocity.x * dt;
+                    localMe.y += localMe.velocity.y * dt;
+                    const b = this.getArenaBounds();
+                    localMe.x = Math.max(localMe.radius, Math.min(b.width - localMe.radius, localMe.x));
+                    localMe.y = Math.max(localMe.radius, Math.min(b.height - localMe.radius, localMe.y));
+                    nextEntities.push(localMe);
                 } else {
-                    // OTHERS: Soft pull towards server position to avoid jumpiness
-                    // We don't snap 100% to avoid "stuttering". 
-                    // The update loop is already moving them (extrapolation).
-                    const lerpFactor = 0.2;
-                    nextEntities.push({
-                        ...serverEnt,
-                        x: localEnt.x + (serverEnt.x - localEnt.x) * lerpFactor,
-                        y: localEnt.y + (serverEnt.y - localEnt.y) * lerpFactor,
-                        velocity: serverEnt.vx !== undefined ? { x: serverEnt.vx, y: serverEnt.vy } : serverEnt.velocity
-                    });
+                    nextEntities.push(e2);
                 }
+            } else if (e1) {
+                // Other entities: Interpolate position
+                nextEntities.push({
+                    ...e2,
+                    x: lerp(e1.x, e2.x, t),
+                    y: lerp(e1.y, e2.y, t),
+                    velocity: e2.vx !== undefined ? { x: e2.vx, y: e2.vy } : e2.velocity
+                });
             } else {
-                // NEW ENTITY: Spawn immediately
-                if (serverEnt.vx !== undefined) {
-                    serverEnt.velocity = { x: serverEnt.vx, y: serverEnt.vy };
-                }
-                nextEntities.push(serverEnt);
+                // No past data: snap to current
+                nextEntities.push(e2);
             }
         });
 
         this.state.entities = nextEntities;
 
-        // 3. Projectiles (Snapping is fine for fast moving shots)
-        this.state.projectiles = projectilesArray.map((p: any) => ({
-            ...p,
-            velocity: p.vx !== undefined ? { x: p.vx, y: p.vy } : p.velocity
-        }));
+        // Interpolate Projectiles (Remote ones only, keep local previews)
+        const p2Arr: any[] = s2.state.projectiles || [];
+        const p1Arr: any[] = s1.state.projectiles || [];
 
-        this.state.score = snapshot.score || 0;
+        // 1. Get interpolated remote projectiles
+        const interpolatedProjectiles = p2Arr
+            .filter(p2 => p2.playerId !== this.localPlayerId) // Ignore server's version of our own shots (we simulate them)
+            .map(p2 => {
+                const p1 = p1Arr.find(p => p.id === p2.id);
+                if (p1) {
+                    return {
+                        ...p2,
+                        x: lerp(p1.x, p2.x, t),
+                        y: lerp(p1.y, p2.y, t),
+                        velocity: p2.vx !== undefined ? { x: p2.vx, y: p2.vy } : p2.velocity
+                    };
+                }
+                return p2;
+            });
 
-        // 4. Leaderboard
-        const leaderboard = Object.values(snapshot.players || {}).map((p: any) => ({
-            id: p.id,
-            kills: p.kills || 0,
-            deaths: p.deaths || 0
-        })).sort((a: any, b: any) => b.kills - a.kills);
+        // 2. Keep local shots that aren't from server
+        const localProjectiles = this.state.projectiles.filter(p => p.playerId === this.localPlayerId);
 
-        this.state.leaderboard = leaderboard;
-        this.state.gameOver = false;
-        this.notify();
+        // 3. Update lifetime for local shots (since we aren't using the server's ones)
+        localProjectiles.forEach(p => {
+            if (p.lifetime !== undefined) {
+                p.lifetime -= dt;
+                p.x += p.velocity.x * dt;
+                p.y += p.velocity.y * dt;
+            }
+        });
+
+        this.state.projectiles = [
+            ...interpolatedProjectiles,
+            ...localProjectiles.filter(p => (p.lifetime ?? 1) > 0)
+        ];
     }
 }
 
