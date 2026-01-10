@@ -198,10 +198,10 @@ const spawnFragments = (parent, count) => {
 };
 
 // Game loop (30 FPS for bandwidth optimization)
-// Physics and Network configuration (High-Sync Mode)
+// Physics and Network configuration (Option A Optimized)
 const TICK_RATE = 45;  // Physics updates at 45 FPS
 const TICK_INTERVAL = 1000 / TICK_RATE;
-const BROADCAST_RATE = 45; // Match broadcast to tick rate for maximum synchronization
+const BROADCAST_RATE = 10;  // Network updates at 10 FPS (50% reduction)
 const BROADCAST_INTERVAL = 1000 / BROADCAST_RATE;
 
 let lastTick = Date.now();
@@ -409,18 +409,21 @@ setInterval(() => {
             enemies: gameState.enemies.map(e => ({
                 id: e.id,
                 x: Math.round(e.x), y: Math.round(e.y),
-                vx: Math.round(e.velocity ? e.velocity.x : 0),
-                vy: Math.round(e.velocity ? e.velocity.y : 0),
+                vx: Math.round(e.velocity ? e.velocity.x / 10) * 10,  // Round to nearest 10 for bandwidth
+                vy: Math.round(e.velocity ? e.velocity.y / 10) * 10,
                 hp: Math.round(e.hp), maxHp: e.maxHp, radius: e.radius, color: e.color
             })),
-            projectiles: gameState.projectiles.map(p => ({
-                id: p.id,
-                x: Math.round(p.x), y: Math.round(p.y),
-                vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
-                radius: p.radius, color: p.color,
-                orbit_player: p.orbit_player,
-                playerId: p.playerId
-            })),
+            // Filter out orbiting projectiles - client simulates them locally
+            projectiles: gameState.projectiles
+                .filter(p => !p.orbit_player)
+                .map(p => ({
+                    id: p.id,
+                    x: Math.round(p.x), y: Math.round(p.y),
+                    vx: Math.round(p.velocity.x / 10) * 10,  // Round to nearest 10
+                    vy: Math.round(p.velocity.y / 10) * 10,
+                    radius: p.radius, color: p.color,
+                    playerId: p.playerId
+                })),
             score: gameState.score
         };
 
@@ -428,7 +431,8 @@ setInterval(() => {
             slimState.players[p.id] = {
                 id: p.id,
                 x: Math.round(p.x), y: Math.round(p.y),
-                vx: Math.round(p.velocity.x), vy: Math.round(p.velocity.y),
+                vx: Math.round(p.velocity.x / 10) * 10,  // Round to nearest 10
+                vy: Math.round(p.velocity.y / 10) * 10,
                 hp: Math.round(p.hp), maxHp: p.maxHp, color: p.color, radius: p.radius,
                 kills: p.kills || 0,
                 deaths: p.deaths || 0
