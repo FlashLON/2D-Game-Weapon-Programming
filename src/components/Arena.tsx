@@ -132,8 +132,11 @@ export const Arena: React.FC = () => {
 
             // 3. Draw all Entities (Players, Enemies, Projectiles)
             [...state.entities, ...state.projectiles].forEach(ent => {
+                const drawX = ent.renderX ?? ent.x;
+                const drawY = ent.renderY ?? ent.y;
+
                 ctx.beginPath();
-                ctx.arc(ent.x, ent.y, ent.radius, 0, Math.PI * 2);
+                ctx.arc(drawX, drawY, ent.radius, 0, Math.PI * 2);
 
                 // Determine Color
                 let drawColor = ent.color;
@@ -149,16 +152,25 @@ export const Arena: React.FC = () => {
 
                 ctx.fillStyle = drawColor;
 
+                // Apply fade for projectiles with fade_over_time
+                if (ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime) {
+                    ctx.globalAlpha = Math.max(0.1, ent.lifetime / ent.maxLifetime);
+                }
+
                 // SPECIAL: Draw velocity trail for projectiles
                 if (ent.type === 'projectile' && ent.velocity) {
                     ctx.beginPath();
                     ctx.strokeStyle = drawColor;
-                    ctx.globalAlpha = 0.4;
+                    const trailAlpha = (ctx.globalAlpha || 1.0) * 0.4;
+                    ctx.globalAlpha = trailAlpha;
                     ctx.lineWidth = ent.radius * 0.8;
-                    ctx.moveTo(ent.x, ent.y);
-                    ctx.lineTo(ent.x - ent.velocity.x * 0.05, ent.y - ent.velocity.y * 0.05);
+                    const tx = ent.renderX ?? ent.x;
+                    const ty = ent.renderY ?? ent.y;
+                    ctx.moveTo(tx, ty);
+                    ctx.lineTo(tx - ent.velocity.x * 0.05, ty - ent.velocity.y * 0.05);
                     ctx.stroke();
-                    ctx.globalAlpha = 1.0;
+                    // Reset alpha for the head
+                    ctx.globalAlpha = ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime ? Math.max(0.1, ent.lifetime / ent.maxLifetime) : 1.0;
                 }
 
                 // ONLY apply glow to players and enemies (Projectiles are too numerous)

@@ -42,6 +42,8 @@ export interface Entity {
     fade_over_time?: boolean;
     kills?: number;
     deaths?: number;
+    renderX?: number; // Visual X for waves
+    renderY?: number; // Visual Y for waves
 }
 
 export interface DamageNumber {
@@ -265,8 +267,21 @@ export class GameEngine {
                     }
                 } else {
                     // Standard linear projectiles
-                    proj.x += proj.velocity.x * dt;
-                    proj.y += proj.velocity.y * dt;
+                    proj.x += (proj.velocity?.x || 0) * dt;
+                    proj.y += (proj.velocity?.y || 0) * dt;
+                }
+
+                // Calculate visual offsets (Waves)
+                if (proj.wave_amplitude && proj.wave_amplitude > 0) {
+                    const elapsed = (proj.maxLifetime || 5) - (proj.lifetime || 5);
+                    const offset = Math.sin(elapsed * (proj.wave_frequency || 1)) * proj.wave_amplitude;
+                    const perpX = -(proj.velocity?.y || 0), perpY = (proj.velocity?.x || 0);
+                    const mag = Math.sqrt(perpX ** 2 + perpY ** 2) || 1;
+                    proj.renderX = proj.x + (perpX / mag) * offset;
+                    proj.renderY = proj.y + (perpY / mag) * offset;
+                } else {
+                    proj.renderX = proj.x;
+                    proj.renderY = proj.y;
                 }
             });
             return;
@@ -348,6 +363,19 @@ export class GameEngine {
                 proj.x += proj.velocity.x * dt;
                 proj.y += proj.velocity.y * dt;
 
+                // Calculate visual offsets (Waves)
+                if (proj.wave_amplitude && proj.wave_amplitude > 0) {
+                    const elapsed = (proj.maxLifetime || 5) - (proj.lifetime || 5);
+                    const offset = Math.sin(elapsed * (proj.wave_frequency || 1)) * proj.wave_amplitude;
+                    const perpX = -proj.velocity.y, perpY = proj.velocity.x;
+                    const mag = Math.sqrt(perpX ** 2 + perpY ** 2) || 1;
+                    proj.renderX = proj.x + (perpX / mag) * offset;
+                    proj.renderY = proj.y + (perpY / mag) * offset;
+                } else {
+                    proj.renderX = proj.x;
+                    proj.renderY = proj.y;
+                }
+
                 if (proj.bounciness && proj.bounciness > 0) {
                     const bounds = this.getArenaBounds();
                     if (proj.x < proj.radius) {
@@ -393,6 +421,10 @@ export class GameEngine {
             if (proj.lifetime !== undefined) {
                 proj.lifetime -= dt;
                 if (proj.lifetime <= 0) {
+                    // EXPLOSION LOGIC (Solo Only - Server handles multi)
+                    if (!this.isMultiplayer && proj.explosion_radius && proj.explosion_radius > 0) {
+                        this.triggerExplosion(proj.renderX || proj.x, proj.renderY || proj.y, proj.explosion_radius, proj.explosion_damage || proj.damage || 10);
+                    }
                     if (proj.split_on_death) {
                         this.spawnFragments(proj, proj.split_on_death);
                     }
@@ -422,13 +454,20 @@ export class GameEngine {
 
             for (const e of this.state.entities) {
                 if (e.type === 'enemy') {
-                    const dx = p.x - e.x;
-                    const dy = p.y - e.y;
+                    const px = p.renderX || p.x;
+                    const py = p.renderY || p.y;
+                    const dx = px - e.x;
+                    const dy = py - e.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist < p.radius + e.radius) {
                         const dmg = p.damage || 10;
                         e.hp -= dmg;
+
+                        // EXPLOSION ON HIT
+                        if (p.explosion_radius && p.explosion_radius > 0) {
+                            this.triggerExplosion(px, py, p.explosion_radius, p.explosion_damage || dmg);
+                        }
 
                         if (p.vampirism && p.vampirism > 0) {
                             const heal = dmg * (p.vampirism / 100);
@@ -551,6 +590,12 @@ export class GameEngine {
         const attraction_force = params.attraction_force ?? 0;
         const bounciness = params.bounciness ?? 0;
         const spin = params.spin ?? 0;
+        const fade_over_time = params.fade_over_time ?? false;
+        const explosion_radius = params.explosion_radius ?? 0;
+        const explosion_damage = params.explosion_damage ?? 0;
+        const wave_amplitude = params.wave_amplitude ?? 0;
+        const wave_frequency = params.wave_frequency ?? 0;
+        const chain_count = params.chain_count ?? 0;
         const chain_range = params.chain_range ?? 0;
         const orbit_speed = params.orbit_speed ?? 3.0;
         const orbit_radius = params.orbit_radius ?? 60;
@@ -573,12 +618,39 @@ export class GameEngine {
             homing, lifetime, maxLifetime: lifetime, acceleration,
             orbit_player, vampirism, split_on_death, attraction_force,
             bounciness, spin, chain_range, orbit_speed, orbit_radius,
-            pierce, knockback
+            pierce, knockback, chain_count,
+            explosion_radius, explosion_damage,
+            wave_amplitude, wave_frequency,
+            fade_over_time
         };
         if (!this.isMultiplayer) {
             this.state.projectiles.push(proj);
         }
         return proj;
+    }
+
+    private triggerExplosion(x: number, y: number, radius: number, damage: number) {
+        // Visuals
+        this.addGridImpulse(x, y, 25, radius * 1.5);
+        this.spawnParticles(x, y, '#ff9f00', 15);
+        this.state.screenshake = 0.3;
+
+        // Damage (Solo Only)
+        this.state.entities.forEach(ent => {
+            if (ent.type === 'enemy') {
+                const dist = Math.sqrt((ent.x - x) ** 2 + (ent.y - y) ** 2);
+                if (dist < radius) {
+                    ent.hp -= damage;
+                    if (ent.hp <= 0) {
+                        ent.hp = ent.maxHp;
+                        ent.x = Math.random() * 700 + 50;
+                        ent.y = Math.random() * 500 + 50;
+                        this.state.score += 1;
+                        if (this.weaponScript?.on_kill) this.weaponScript.on_kill(ent.id);
+                    }
+                }
+            }
+        });
     }
 
     getAllProjectiles() {

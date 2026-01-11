@@ -354,7 +354,10 @@ setInterval(() => {
                 players: {},
                 projectiles: room.projectiles.filter(p => !p.orbit_player).map(p => ({
                     id: p.id, x: p.x, y: p.y, vx: p.velocity.x, vy: p.velocity.y,
-                    radius: p.radius, color: p.color, playerId: p.playerId
+                    radius: p.radius, color: p.color, playerId: p.playerId,
+                    wave_amplitude: p.wave_amplitude, wave_frequency: p.wave_frequency,
+                    lifetime: p.lifetime, maxLifetime: p.maxLifetime,
+                    fade_over_time: p.fade_over_time
                 }))
             };
             Object.values(room.players).forEach(p => {
