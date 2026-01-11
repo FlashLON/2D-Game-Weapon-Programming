@@ -91,6 +91,33 @@ function App() {
     },
     get_time: () => Date.now(),
     rand_float: () => Math.random(),
+    predict_position: (targetId: string, bulletSpeed: number) => {
+      const target = gameEngine.getEnemies().find(e => e.id === targetId) ||
+        gameEngine.getPlayers().find(p => p.id === targetId);
+      if (!target) return null;
+
+      const player = gameEngine.getPlayer();
+      if (!player) return null;
+
+      const dx = target.x - player.x;
+      const dy = target.y - player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const timeToHit = dist / (bulletSpeed || 1);
+
+      const vel = (target as any).velocity || { x: 0, y: 0 };
+
+      return {
+        x: target.x + (vel.x * timeToHit),
+        y: target.y + (vel.y * timeToHit)
+      };
+    },
+    get_closest_projectile: () => {
+      const player = gameEngine.getPlayer();
+      if (!player) return null;
+      return gameEngine.getClosestProjectile(player.x, player.y);
+    },
+    get_last_hit_info: () => gameEngine.getLastHitInfo(),
+    get_leaderboard: () => gameEngine.getState().leaderboard || [],
   };
 
   const handleCompile = async (sourceCode: string) => {

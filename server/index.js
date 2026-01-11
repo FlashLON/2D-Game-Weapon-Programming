@@ -177,9 +177,15 @@ io.on('connection', (socket) => {
                     attraction_force: data.attraction_force || 0,
                     bounciness: data.bounciness || 0,
                     spin: data.spin || 0,
+                    chain_count: data.chain_count || 0,
                     chain_range: data.chain_range || 0,
                     orbit_speed: data.orbit_speed || 3.0,
-                    orbit_radius: data.orbit_radius || 60
+                    orbit_radius: data.orbit_radius || 60,
+                    wave_amplitude: data.wave_amplitude || 0,
+                    wave_frequency: data.wave_frequency || 0,
+                    explosion_radius: data.explosion_radius || 0,
+                    explosion_damage: data.explosion_damage || 0,
+                    fade_over_time: data.fade_over_time || false
                 });
             }
         }
@@ -263,6 +269,19 @@ setInterval(() => {
                 }
                 proj.x += proj.velocity.x * dt;
                 proj.y += proj.velocity.y * dt;
+
+                if (proj.wave_amplitude > 0) {
+                    const elapsed = proj.maxLifetime - proj.lifetime;
+                    const offset = Math.sin(elapsed * proj.wave_frequency) * proj.wave_amplitude;
+                    const perpX = -proj.velocity.y, perpY = proj.velocity.x;
+                    const mag = Math.sqrt(perpX ** 2 + perpY ** 2) || 1;
+                    proj.renderX = proj.x + (perpX / mag) * offset;
+                    proj.renderY = proj.y + (perpY / mag) * offset;
+                } else {
+                    proj.renderX = proj.x;
+                    proj.renderY = proj.y;
+                }
+
                 if (proj.bounciness) {
                     if (proj.x < proj.radius || proj.x > 800 - proj.radius) proj.velocity.x *= -proj.bounciness;
                     if (proj.y < proj.radius || proj.y > 600 - proj.radius) proj.velocity.y *= -proj.bounciness;
@@ -272,9 +291,23 @@ setInterval(() => {
             let hitSomething = false;
             for (const ent of nearby) {
                 if (ent.id === proj.playerId || ent.type === 'projectile') continue;
-                if (Math.sqrt((ent.x - proj.x) ** 2 + (ent.y - proj.y) ** 2) < ent.radius + proj.radius) {
+                const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
+                if (dist < ent.radius + proj.radius) {
                     ent.hp -= (proj.damage || 10);
                     hitSomething = true;
+
+                    // CHAIN LOGIC
+                    if (proj.chain_count > 0 && proj.chain_range > 0) {
+                        const targets = nearby.filter(e => e.id !== ent.id && e.id !== proj.playerId && e.type !== 'projectile');
+                        targets.sort((a, b) => Math.sqrt((a.x - ent.x) ** 2 + (a.y - ent.y) ** 2) - Math.sqrt((b.x - ent.x) ** 2 + (b.y - ent.y) ** 2));
+                        for (let j = 0; j < Math.min(proj.chain_count, targets.length); j++) {
+                            const t = targets[j];
+                            if (Math.sqrt((t.x - ent.x) ** 2 + (t.y - ent.y) ** 2) < proj.chain_range) {
+                                t.hp -= (proj.damage || 10) * 0.5;
+                            }
+                        }
+                    }
+
                     if (ent.hp <= 0) {
                         ent.hp = ent.maxHp;
                         ent.x = Math.random() * 700 + 50;
@@ -289,19 +322,33 @@ setInterval(() => {
                 }
             }
 
-            if (hitSomething) {
+            if (hitSomething || proj.lifetime <= 0) {
+                // EXPLOSION LOGIC
+                if (proj.explosion_radius > 0) {
+                    const targets = nearby.filter(e => e.id !== proj.playerId && e.type !== 'projectile');
+                    targets.forEach(t => {
+                        const d = Math.sqrt((t.x - (proj.renderX || proj.x)) ** 2 + (t.y - (proj.renderY || proj.y)) ** 2);
+                        if (d < proj.explosion_radius) {
+                            t.hp -= proj.explosion_damage || proj.damage;
+                            if (t.hp <= 0) {
+                                t.hp = t.maxHp; t.x = Math.random() * 700 + 50; t.y = Math.random() * 500 + 50;
+                                t.deaths = (t.deaths || 0) + 1;
+                                if (room.players[proj.playerId]) room.players[proj.playerId].kills++;
+                            }
+                        }
+                    });
+                }
+
                 if (proj.split_on_death) spawnFragments(room, proj, proj.split_on_death);
+                room.projectiles.splice(i, 1);
+                removed = true;
+            } else if (proj.x < -100 || proj.x > 900 || proj.y < -100 || proj.y > 700) {
                 room.projectiles.splice(i, 1);
                 removed = true;
             } else {
                 proj.lifetime -= dt;
-                if (proj.lifetime <= 0 || proj.x < -100 || proj.x > 900 || proj.y < -100 || proj.y > 700) {
-                    if (proj.split_on_death) spawnFragments(room, proj, proj.split_on_death);
-                    room.projectiles.splice(i, 1);
-                }
             }
         }
-
         if (now - lastBroadcast > BROADCAST_INTERVAL) {
             const slim = {
                 players: {},

@@ -32,8 +32,14 @@ export interface Entity {
     bounciness?: number;
     spin?: number;
     chain_range?: number;
+    chain_count?: number;
     orbit_speed?: number;
     orbit_radius?: number;
+    wave_amplitude?: number;
+    wave_frequency?: number;
+    explosion_radius?: number;
+    explosion_damage?: number;
+    fade_over_time?: boolean;
     kills?: number;
     deaths?: number;
 }
@@ -105,6 +111,7 @@ export class GameEngine {
     // --- MULTIPLAYER PROPERTIES ---
     private isMultiplayer = false;
     private localPlayerId: string | null = null;
+    private lastHitInfo: any = null;
 
     constructor() {
         // Initialize default state with empty arrays
@@ -130,6 +137,20 @@ export class GameEngine {
 
     subscribe(callback: (state: GameState) => void) {
         this.onStateChange = callback;
+    }
+
+    getState() { return this.state; }
+    getPlayers() { return this.state.entities.filter(e => e.type === 'player'); }
+    getLastHitInfo() { return this.lastHitInfo; }
+
+    getClosestProjectile(x: number, y: number) {
+        let nearest: Entity | null = null;
+        let minDist = Infinity;
+        this.state.projectiles.forEach(p => {
+            const d = Math.sqrt((p.x - x) ** 2 + (p.y - y) ** 2);
+            if (d < minDist) { minDist = d; nearest = p; }
+        });
+        return nearest;
     }
 
     start() {
@@ -332,16 +353,20 @@ export class GameEngine {
                     if (proj.x < proj.radius) {
                         proj.x = proj.radius;
                         proj.velocity.x *= -proj.bounciness;
+                        if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
                     } else if (proj.x > bounds.width - proj.radius) {
                         proj.x = bounds.width - proj.radius;
                         proj.velocity.x *= -proj.bounciness;
+                        if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
                     }
                     if (proj.y < proj.radius) {
                         proj.y = proj.radius;
                         proj.velocity.y *= -proj.bounciness;
+                        if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
                     } else if (proj.y > bounds.height - proj.radius) {
                         proj.y = bounds.height - proj.radius;
                         proj.velocity.y *= -proj.bounciness;
+                        if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
                     }
                 }
             }
@@ -420,7 +445,10 @@ export class GameEngine {
                         }
 
                         if (this.weaponScript && this.weaponScript.on_hit) {
-                            try { this.weaponScript.on_hit(e.id); } catch (err) { console.error(err); }
+                            try {
+                                this.weaponScript.on_hit(e.id);
+                                this.lastHitInfo = { id: e.id, time: Date.now() };
+                            } catch (err) { console.error(err); }
                         }
 
                         hitSomething = true;
@@ -641,7 +669,18 @@ export class GameEngine {
                     // MUZZLE FLASH EFFECTS
                     this.spawnParticles(player.x, player.y, proj.color, 4);
                     this.addGridImpulse(player.x, player.y, 5, 50);
-                    return { ...proj, vx: proj.velocity.x, vy: proj.velocity.y };
+                    return {
+                        ...proj,
+                        vx: proj.velocity.x,
+                        vy: proj.velocity.y,
+                        explosion_radius: proj.explosion_radius,
+                        explosion_damage: proj.explosion_damage,
+                        wave_amplitude: proj.wave_amplitude,
+                        wave_frequency: proj.wave_frequency,
+                        chain_count: proj.chain_count,
+                        chain_range: proj.chain_range,
+                        fade_over_time: proj.fade_over_time
+                    };
                 }
             }
         } catch (err) { console.error("Error firing weapon:", err); }
@@ -691,6 +730,11 @@ export class GameEngine {
                         color: serverEnt.id === this.localPlayerId ? '#ff0055' : '#fce83a',
                         life: 1.0
                     });
+
+                    // Trigger on_damaged callback if it's the local player
+                    if (serverEnt.id === this.localPlayerId && this.weaponScript?.on_damaged) {
+                        this.weaponScript.on_damaged("Enemy", diff);
+                    }
                 }
 
                 // KILL DETECTION: If kills count increased

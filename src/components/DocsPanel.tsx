@@ -39,6 +39,14 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
   def on_kill(self, target_id):
     # Triggered when enemy dies
     pass
+
+  def on_hit_wall(self, x, y):
+    # Triggered when bullet hits bounds
+    pass
+
+  def on_damaged(self, attacker_id, amount):
+    # Triggered when you take damage
+    pass
     
   def update(self, dt):
     # Called every frame
@@ -70,6 +78,13 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
                         <span className="text-blue-400">bounciness</span> <span>(number) Bounce mult (0.0 - 1.0)</span>
                         <span className="text-blue-400">spin</span> <span>(number) Rotation in degrees/sec</span>
                         <span className="text-green-400">chain_range</span> <span>(number) Jump to next enemy hit</span>
+                        <span className="text-green-400">chain_count</span> <span>(number) Max chain jumps</span>
+
+                        <span className="text-yellow-400 font-bold">explosion_radius</span> <span>(number) AOE blast range</span>
+                        <span className="text-yellow-400">explosion_damage</span> <span>(number) Damage of AOE</span>
+                        <span className="text-cyan-400">wave_amplitude</span> <span>(number) Oscillate size</span>
+                        <span className="text-cyan-400">wave_frequency</span> <span>(number) Oscillate speed</span>
+                        <span className="text-white/50">fade_over_time</span> <span>(bool) Visual alpha decay</span>
                     </div>
                 </section>
 
@@ -97,6 +112,18 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
                         <div>
                             <code className="text-cyber-accent block mb-1">api.get_arena_size()</code>
                             <p>Returns arena dimensions: <code>{`{"width": 800, "height": 600}`}</code></p>
+                        </div>
+                        <div>
+                            <code className="text-yellow-500 block mb-1">api.predict_position(id, speed)</code>
+                            <p>Returns <code>{`{"x", "y"}`}</code> projected interception point.</p>
+                        </div>
+                        <div>
+                            <code className="text-yellow-500 block mb-1">api.get_closest_projectile()</code>
+                            <p>Returns the projectile nearest to the player.</p>
+                        </div>
+                        <div>
+                            <code className="text-yellow-500 block mb-1">api.get_last_hit_info()</code>
+                            <p>Returns info on your last successful hit.</p>
                         </div>
                         <div>
                             <code className="text-cyber-accent block mb-1">api.get_nearest_enemy(x, y)</code>

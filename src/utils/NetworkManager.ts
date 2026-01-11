@@ -107,6 +107,13 @@ class NetworkManager {
         acceleration?: number;
         knockback?: number;
         pierce?: number;
+        explosion_radius?: number;
+        explosion_damage?: number;
+        wave_amplitude?: number;
+        wave_frequency?: number;
+        chain_count?: number;
+        chain_range?: number;
+        fade_over_time?: boolean;
     }) {
         if (this.socket && this.connected) {
             this.socket.emit('fire', data);

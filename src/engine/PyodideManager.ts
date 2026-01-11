@@ -4,6 +4,8 @@ export interface WeaponScript {
     on_fire: (target_x: number, target_y: number, my_x: number, my_y: number) => any;
     on_hit: (target_id: string) => any;
     on_kill?: (target_id: string) => any;
+    on_hit_wall?: (x: number, y: number) => void;
+    on_damaged?: (attacker_id: string, amount: number) => void;
     update: (dt: number) => void;
     init: () => void;
 }
