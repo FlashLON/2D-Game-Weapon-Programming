@@ -181,6 +181,7 @@ export const Arena: React.FC = () => {
 
                 ctx.fill();
                 ctx.shadowBlur = 0; // Reset shadow for other elements
+                ctx.globalAlpha = 1.0; // Reset alpha
 
                 // Draw HP bar for living entities (not projectiles)
                 if (ent.type !== 'projectile') {

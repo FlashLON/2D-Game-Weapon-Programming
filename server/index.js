@@ -308,6 +308,16 @@ setInterval(() => {
                         }
                     }
 
+                    // VISUAL EFFECTS: Grid impulse and particles on hit
+                    io.to(roomId).emit('visual_effect', {
+                        type: 'impact',
+                        x: ent.x,
+                        y: ent.y,
+                        color: ent.color,
+                        strength: 15,
+                        radius: 80
+                    });
+
                     if (ent.hp <= 0) {
                         ent.hp = ent.maxHp;
                         ent.x = Math.random() * 700 + 50;
@@ -336,6 +346,16 @@ setInterval(() => {
                                 if (room.players[proj.playerId]) room.players[proj.playerId].kills++;
                             }
                         }
+                    });
+
+                    // VISUAL EFFECTS: Explosion grid impulse and particles
+                    io.to(roomId).emit('visual_effect', {
+                        type: 'explosion',
+                        x: proj.renderX || proj.x,
+                        y: proj.renderY || proj.y,
+                        color: '#ff9f00',
+                        strength: 25,
+                        radius: proj.explosion_radius * 1.5
                     });
                 }
 

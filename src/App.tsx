@@ -206,6 +206,16 @@ function App() {
       }
       gameEngine.updateFromSnapshot(state);
     });
+
+    networkManager.setOnVisualEffect((effect) => {
+      if (effect.type === 'impact') {
+        gameEngine.spawnParticles(effect.x, effect.y, effect.color, 10);
+        gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
+      } else if (effect.type === 'explosion') {
+        gameEngine.spawnParticles(effect.x, effect.y, effect.color, 15);
+        gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
+      }
+    });
   }, []);
 
   return (

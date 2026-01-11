@@ -11,6 +11,7 @@ class NetworkManager {
     private onConnectionChange: ((connected: boolean) => void) | null = null;
     private onPlayerCountChange: ((count: number) => void) | null = null;
     private onKill: ((enemyId: string) => void) | null = null;
+    private onVisualEffect: ((effect: any) => void) | null = null;
 
     connect(serverUrl: string) {
         if (this.socket) {
@@ -69,6 +70,10 @@ class NetworkManager {
         this.socket.on('kill', (data: { enemyId: string }) => {
             console.log('You killed:', data.enemyId);
             this.onKill?.(data.enemyId);
+        });
+
+        this.socket.on('visual_effect', (effect: any) => {
+            this.onVisualEffect?.(effect);
         });
     }
 
@@ -144,6 +149,10 @@ class NetworkManager {
 
     getPlayerId(): string | null {
         return this.playerId;
+    }
+
+    setOnVisualEffect(callback: (effect: any) => void) {
+        this.onVisualEffect = callback;
     }
 }
 
