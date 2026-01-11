@@ -159,18 +159,18 @@ export const Arena: React.FC = () => {
 
                 // SPECIAL: Draw velocity trail for projectiles
                 if (ent.type === 'projectile' && ent.velocity) {
-                    ctx.beginPath();
-                    ctx.strokeStyle = drawColor;
+                    ctx.save();
                     const trailAlpha = (ctx.globalAlpha || 1.0) * 0.4;
                     ctx.globalAlpha = trailAlpha;
+                    ctx.strokeStyle = drawColor;
                     ctx.lineWidth = ent.radius * 0.8;
+                    ctx.beginPath();
                     const tx = ent.renderX ?? ent.x;
                     const ty = ent.renderY ?? ent.y;
                     ctx.moveTo(tx, ty);
                     ctx.lineTo(tx - ent.velocity.x * 0.05, ty - ent.velocity.y * 0.05);
                     ctx.stroke();
-                    // Reset alpha for the head
-                    ctx.globalAlpha = ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime ? Math.max(0.1, ent.lifetime / ent.maxLifetime) : 1.0;
+                    ctx.restore();
                 }
 
                 // ONLY apply glow to players and enemies (Projectiles are too numerous)
