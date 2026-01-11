@@ -70,22 +70,65 @@ export const Arena: React.FC = () => {
                 ctx.translate(ox, oy);
             }
 
-            // Draw Grid
+            // 2. Draw Reactive Grid
+            const gridSize = 40;
             ctx.strokeStyle = '#1a1a2e';
             ctx.lineWidth = 1;
-            const gridSize = 50;
-            for (let x = 0; x < canvas.width; x += gridSize) {
+
+            for (let x = 0; x <= canvas.width; x += gridSize) {
                 ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
+                for (let y = 0; y <= canvas.height; y += gridSize) {
+                    let dx = 0;
+                    let dy = 0;
+
+                    // Apply Distortions
+                    state.gridImpulses.forEach(imp => {
+                        const distSq = (x - imp.x) ** 2 + (y - imp.y) ** 2;
+                        if (distSq < imp.radius ** 2) {
+                            const dist = Math.sqrt(distSq);
+                            const force = (1 - dist / imp.radius) * imp.strength * imp.life;
+                            dx += (x - imp.x) / dist * force;
+                            dy += (y - imp.y) / dist * force;
+                        }
+                    });
+
+                    if (y === 0) ctx.moveTo(x + dx, y + dy);
+                    else ctx.lineTo(x + dx, y + dy);
+                }
                 ctx.stroke();
             }
-            for (let y = 0; y < canvas.height; y += gridSize) {
+
+            for (let y = 0; y <= canvas.height; y += gridSize) {
                 ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
+                for (let x = 0; x <= canvas.width; x += gridSize) {
+                    let dx = 0;
+                    let dy = 0;
+
+                    state.gridImpulses.forEach(imp => {
+                        const distSq = (x - imp.x) ** 2 + (y - imp.y) ** 2;
+                        if (distSq < imp.radius ** 2) {
+                            const dist = Math.sqrt(distSq);
+                            const force = (1 - dist / imp.radius) * imp.strength * imp.life;
+                            dx += (x - imp.x) / dist * force;
+                            dy += (y - imp.y) / dist * force;
+                        }
+                    });
+
+                    if (x === 0) ctx.moveTo(x + dx, y + dy);
+                    else ctx.lineTo(x + dx, y + dy);
+                }
                 ctx.stroke();
             }
+
+            // 3. Draw Particles (Background layer)
+            state.particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
 
             // 3. Draw all Entities (Players, Enemies, Projectiles)
             [...state.entities, ...state.projectiles].forEach(ent => {
@@ -105,6 +148,18 @@ export const Arena: React.FC = () => {
                 }
 
                 ctx.fillStyle = drawColor;
+
+                // SPECIAL: Draw velocity trail for projectiles
+                if (ent.type === 'projectile' && ent.velocity) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = drawColor;
+                    ctx.globalAlpha = 0.4;
+                    ctx.lineWidth = ent.radius * 0.8;
+                    ctx.moveTo(ent.x, ent.y);
+                    ctx.lineTo(ent.x - ent.velocity.x * 0.05, ent.y - ent.velocity.y * 0.05);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
 
                 // ONLY apply glow to players and enemies (Projectiles are too numerous)
                 if (ent.type !== 'projectile') {
@@ -257,6 +312,16 @@ export const Arena: React.FC = () => {
                 }
             }
 
+            // 9. Draw Vignette (Screen Space)
+            const vignette = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.3,
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.8
+            );
+            vignette.addColorStop(0, 'rgba(0,0,0,0)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.4)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
             if (state.gameOver) {
                 ctx.fillStyle = 'rgba(0,0,0,0.8)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -314,7 +379,10 @@ export const Arena: React.FC = () => {
                 width={800}
                 height={600}
                 onClick={handleClick}
-                className="border border-cyber-accent shadow-[0_0_20px_rgba(0,255,159,0.3)] bg-cyber-dark cursor-crosshair"
+                className="border border-cyber-accent/50 shadow-[0_0_50px_rgba(0,255,159,0.15)] bg-cyber-dark cursor-crosshair transition-all duration-300"
+                style={{
+                    filter: 'contrast(1.1) brightness(1.1)',
+                }}
             />
             <div className="absolute top-4 right-4 text-cyber-muted text-xs space-y-1">
                 <div>WASD to Move</div>

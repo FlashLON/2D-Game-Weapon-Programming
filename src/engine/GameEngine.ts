@@ -54,6 +54,25 @@ export interface KillNotification {
     life: number;
 }
 
+export interface Particle {
+    id: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    color: string;
+    life: number; // 0 to 1
+    size: number;
+}
+
+export interface GridImpulse {
+    x: number;
+    y: number;
+    strength: number;
+    radius: number;
+    life: number;
+}
+
 /**
  * The global state of the game.
  * Contains all active entities, score, and status.
@@ -67,6 +86,8 @@ export interface GameState {
     damageNumbers: DamageNumber[];
     notifications: KillNotification[];
     screenshake: number; // 0 to 1
+    particles: Particle[];
+    gridImpulses: GridImpulse[];
 }
 
 /**
@@ -94,7 +115,9 @@ export class GameEngine {
             gameOver: false,
             damageNumbers: [],
             notifications: [],
-            screenshake: 0
+            screenshake: 0,
+            particles: [],
+            gridImpulses: []
         };
     }
 
@@ -135,7 +158,9 @@ export class GameEngine {
             gameOver: false,
             damageNumbers: [],
             notifications: [],
-            screenshake: 0
+            screenshake: 0,
+            particles: [],
+            gridImpulses: []
         };
         this.notify();
     }
@@ -170,6 +195,22 @@ export class GameEngine {
             n.life -= dt * 0.5;
         });
         this.state.notifications = this.state.notifications.filter(n => n.life > 0);
+
+        // Update Particles
+        this.state.particles.forEach(p => {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.98; // Friction
+            p.vy *= 0.98;
+            p.life -= dt * 1.5;
+        });
+        this.state.particles = this.state.particles.filter(p => p.life > 0);
+
+        // Update Grid Impulses
+        this.state.gridImpulses.forEach(gi => {
+            gi.life -= dt * 2.0;
+        });
+        this.state.gridImpulses = this.state.gridImpulses.filter(gi => gi.life > 0);
 
         if (this.isMultiplayer) {
             // CLIENT-SIDE EXTRAPOLATION
@@ -597,6 +638,9 @@ export class GameEngine {
                 params.y = player.y;
                 const proj = this.spawnProjectile(params);
                 if (proj) {
+                    // MUZZLE FLASH EFFECTS
+                    this.spawnParticles(player.x, player.y, proj.color, 4);
+                    this.addGridImpulse(player.x, player.y, 5, 50);
                     return { ...proj, vx: proj.velocity.x, vy: proj.velocity.y };
                 }
             }
@@ -634,6 +678,10 @@ export class GameEngine {
                     if (serverEnt.id === this.localPlayerId) {
                         this.state.screenshake = 0.5;
                     }
+
+                    // IMPACT EFFECTS
+                    this.spawnParticles(serverEnt.x, serverEnt.y, serverEnt.color, 10);
+                    this.addGridImpulse(serverEnt.x, serverEnt.y, 15, 80);
 
                     this.state.damageNumbers.push({
                         id: Math.random().toString(36).substr(2, 9),
@@ -715,6 +763,25 @@ export class GameEngine {
         this.state.leaderboard = leaderboard;
         this.state.gameOver = false;
         this.notify();
+    }
+    spawnParticles(x: number, y: number, color: string, count: number = 8) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 100 + 50;
+            this.state.particles.push({
+                id: Math.random().toString(36).substr(2, 9),
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color,
+                life: 1.0,
+                size: Math.random() * 2 + 1
+            });
+        }
+    }
+
+    addGridImpulse(x: number, y: number, strength: number = 20, radius: number = 100) {
+        this.state.gridImpulses.push({ x, y, strength, radius, life: 1.0 });
     }
 }
 
