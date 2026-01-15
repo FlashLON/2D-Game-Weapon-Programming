@@ -75,6 +75,10 @@ class NetworkManager {
         this.socket.on('visual_effect', (effect: any) => {
             this.onVisualEffect?.(effect);
         });
+
+        this.socket.on('login_response', (response: any) => {
+            this.onLoginResponse?.(response);
+        });
     }
 
     joinRoom(roomId: string, settings?: any, profile?: any) {
@@ -90,9 +94,14 @@ class NetworkManager {
         }
     }
 
+    // Callback storage
+    private onLoginResponse: ((response: any) => void) | null = null;
+
     setOnLoginResponse(callback: (response: any) => void) {
+        this.onLoginResponse = callback;
+        // If socket exists, update listener immediately
         if (this.socket) {
-            this.socket.off('login_response'); // Remove old listener
+            this.socket.off('login_response');
             this.socket.on('login_response', callback);
         }
     }
