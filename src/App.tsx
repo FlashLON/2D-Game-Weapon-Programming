@@ -260,15 +260,29 @@ function App() {
     });
   }, []);
 
-  const handleLogin = (name: string) => {
+  const handleLogin = async (name: string) => {
     if (!name) return;
     if (!isConnected) {
-      addLog("Please connect to server first!", "error");
-      return;
+      addLog("Connecting to server...", "info");
+      await handleConnect();
+      // Wait a short moment for socket to be ready (handleConnect is async but state update is not instant)
+      // Actually handleConnect awaits makeConnection which calls networkManager.connect.
+      // networkManager.connected becomes true.
+      // But react state `isConnected` might delay.
+      // Let's rely on networkManager state directly? 
+      // networkManager.isConnected()
     }
-    setUsername(name);
-    networkManager.login(name);
-    addLog(`Logging in as ${name}...`, "info");
+
+    // Small delay to ensure socket is ready if we just connected
+    setTimeout(() => {
+      if (networkManager.isConnected()) {
+        setUsername(name);
+        networkManager.login(name);
+        addLog(`Logging in as ${name}...`, "info");
+      } else {
+        addLog("Connection failed. Please try again.", "error");
+      }
+    }, 500);
   };
 
   return (
