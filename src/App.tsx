@@ -239,13 +239,15 @@ function App() {
         gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
         addLog(`LEVEL UP! You reached Level ${effect.level}`, 'success');
 
-        // SYNC PROFILE BACK TO CLIENT
-        handleProfileUpdate({
-          level: effect.level,
-          xp: effect.xp,
-          maxXp: effect.maxXp,
-          money: effect.money
-        });
+        // SYNC PROFILE BACK TO CLIENT (Only if it's me)
+        if (effect.playerId === networkManager.getPlayerId()) {
+          handleProfileUpdate({
+            level: effect.level,
+            xp: effect.xp,
+            maxXp: effect.maxXp,
+            money: effect.money
+          });
+        }
       }
     });
 

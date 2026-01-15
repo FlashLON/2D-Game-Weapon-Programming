@@ -448,7 +448,10 @@ setInterval(() => {
                                     strength: 50,
                                     radius: 120,
                                     playerId: killer.id,
-                                    level: killer.level
+                                    level: killer.level,
+                                    xp: killer.xp,
+                                    maxXp: killer.maxXp,
+                                    money: killer.money
                                 });
                             }
                         }
