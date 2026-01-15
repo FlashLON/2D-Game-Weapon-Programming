@@ -103,7 +103,7 @@ io.on('connection', (socket) => {
         }
     };
 
-    socket.on('join_room', ({ roomId }) => {
+    socket.on('join_room', ({ roomId, settings }) => {
         // CLEANUP: Always leave old room before joining new one
         leaveRoom(socket.id);
         if (currentRoomId) socket.leave(currentRoomId);
@@ -119,6 +119,9 @@ io.on('connection', (socket) => {
 
         if (!rooms[currentRoomId]) {
             rooms[currentRoomId] = createGameState();
+            // Store room settings (e.g., visibility)
+            rooms[currentRoomId].settings = settings || { public: true };
+            console.log(`Room ${roomId} created with settings:`, rooms[currentRoomId].settings);
         }
 
         const room = rooms[currentRoomId];

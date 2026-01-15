@@ -140,14 +140,14 @@ function App() {
     addLog("Weapon logic updated!", "success");
   };
 
-  const handleJoinRoom = (roomId: string) => {
+  const handleJoinRoom = (roomId: string, settings?: any) => {
     if (roomId === 'offline') {
       setCurrentRoom('offline');
       gameEngine.setMultiplayerMode(false);
       if (isConnected) networkManager.disconnect();
       addLog("Starting Solo Sandbox", "info");
     } else {
-      networkManager.joinRoom(roomId);
+      networkManager.joinRoom(roomId, settings);
       setCurrentRoom(roomId);
       addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
     }
