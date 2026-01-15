@@ -134,7 +134,12 @@ io.on('connection', (socket) => {
             hp: 100, maxHp: 100,
             type: 'player',
             velocity: { x: 0, y: 0 },
-            kills: 0, deaths: 0
+            kills: 0, deaths: 0,
+            // Progression
+            level: 1,
+            xp: 0,
+            maxXp: 100,
+            money: 0
         };
 
         socket.emit('init', { playerId: socket.id, gameState: room });
@@ -327,7 +332,32 @@ setInterval(() => {
                         ent.y = Math.random() * 500 + 50;
                         ent.deaths = (ent.deaths || 0) + 1;
                         if (room.players[proj.playerId]) {
-                            room.players[proj.playerId].kills = (room.players[proj.playerId].kills || 0) + 1;
+                            const killer = room.players[proj.playerId];
+                            killer.kills = (killer.kills || 0) + 1;
+
+                            // LEVELING LOGIC
+                            killer.xp += 50; // Base XP for kill
+                            if (killer.xp >= killer.maxXp) {
+                                killer.xp -= killer.maxXp;
+                                killer.level++;
+                                killer.maxXp = Math.floor(killer.maxXp * 1.2);
+
+                                const moneyParams = [100, 250, 500, 1000];
+                                const reward = 100 + (killer.level * 50);
+                                killer.money += reward;
+
+                                // Notify user (optional, can just use state sync)
+                                io.to(roomId).emit('visual_effect', {
+                                    type: 'levelup',
+                                    x: killer.x,
+                                    y: killer.y,
+                                    color: '#ffd700', // Gold
+                                    strength: 50,
+                                    radius: 120,
+                                    playerId: killer.id,
+                                    level: killer.level
+                                });
+                            }
                         }
                     }
                     if (proj.pierce > 1) { proj.pierce--; hitSomething = false; }
@@ -387,7 +417,8 @@ setInterval(() => {
                 slim.players[p.id] = {
                     id: p.id, x: p.x, y: p.y, vx: p.velocity.x, vy: p.velocity.y,
                     hp: p.hp, maxHp: p.maxHp, color: p.color, radius: p.radius,
-                    kills: p.kills || 0, deaths: p.deaths || 0
+                    kills: p.kills || 0, deaths: p.deaths || 0,
+                    level: p.level || 1, xp: p.xp || 0, maxXp: p.maxXp || 100, money: p.money || 0
                 };
             });
             io.to(roomId).emit('state', slim);

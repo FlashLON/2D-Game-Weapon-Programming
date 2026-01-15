@@ -291,17 +291,17 @@ export const Arena: React.FC = () => {
 
             // 8. Draw Neural HUD (Local Stats - Screen Space)
             const myPlayer = state.entities.find(e => e.id === networkManager.getPlayerId());
+
             if (myPlayer) {
                 const hudX = 30;
-                const hudY = canvas.height - 50;
+                const hudY = canvas.height - 70; // Moved up slightly
 
-                // Health Bar Container
+                // --- HEALTH BAR ---
                 ctx.fillStyle = 'rgba(0,0,0,0.6)';
                 ctx.fillRect(hudX, hudY, 200, 12);
                 ctx.strokeStyle = 'rgba(255,255,255,0.1)';
                 ctx.strokeRect(hudX - 1, hudY - 1, 202, 14);
 
-                // Health Fill
                 const hpPct = myPlayer.hp / myPlayer.maxHp;
                 const fillGrad = ctx.createLinearGradient(hudX, 0, hudX + 200, 0);
                 fillGrad.addColorStop(0, hpPct < 0.3 ? '#ff0055' : '#00ff9f');
@@ -310,13 +310,43 @@ export const Arena: React.FC = () => {
                 ctx.fillStyle = fillGrad;
                 ctx.fillRect(hudX, hudY, 200 * hpPct, 12);
 
-                // HUD Text
                 ctx.fillStyle = '#fff';
                 ctx.font = 'bold 10px "Outfit", sans-serif';
                 ctx.fillText(`SYSTEM HP: ${Math.round(myPlayer.hp)}%`, hudX, hudY - 10);
 
-                // Segment lines
+                // --- XP BAR ---
+                const xpY = hudY + 25;
+                const xp = myPlayer.xp || 0;
+                const maxXp = myPlayer.maxXp || 100;
+                const xpPct = Math.min(1, xp / maxXp);
+
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(hudX, xpY, 200, 6); // Thinner bar
+
+                ctx.fillStyle = '#3a86ff'; // Blue/Azure for XP
+                ctx.fillRect(hudX, xpY, 200 * xpPct, 6);
+
+                ctx.fillStyle = '#8ecae6';
+                ctx.font = '10px "Outfit", sans-serif';
+                ctx.fillText(`LVL ${myPlayer.level || 1}  •  ${Math.floor(xp)} / ${maxXp} XP`, hudX, xpY - 5);
+
+                // --- MONEY INDICATOR ---
+                // Draw Coin Icon (Yellow Circle)
+                ctx.beginPath();
+                ctx.arc(hudX + 260, hudY + 5, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffd700'; // Gold
+                ctx.fill();
+                ctx.strokeStyle = '#b8860b';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffd700';
+                ctx.font = 'bold 16px "Outfit", sans-serif';
+                ctx.fillText(`${(myPlayer.money || 0).toLocaleString()}`, hudX + 275, hudY + 11);
+
+                // Segment lines for Health Bar only
                 ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.lineWidth = 1;
                 for (let i = 1; i < 10; i++) {
                     ctx.beginPath();
                     ctx.moveTo(hudX + i * 20, hudY);

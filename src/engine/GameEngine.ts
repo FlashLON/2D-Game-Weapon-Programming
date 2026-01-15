@@ -42,6 +42,10 @@ export interface Entity {
     fade_over_time?: boolean;
     kills?: number;
     deaths?: number;
+    level?: number;
+    xp?: number;
+    maxXp?: number;
+    money?: number;
     renderX?: number; // Visual X for waves
     renderY?: number; // Visual Y for waves
 }
