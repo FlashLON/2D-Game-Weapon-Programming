@@ -50,6 +50,23 @@ function App() {
     }].slice(-200));
   };
 
+  // User Profile State (Persisted)
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = localStorage.getItem('user_profile');
+    return saved ? JSON.parse(saved) : { level: 1, xp: 0, maxXp: 100, money: 0 };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('user_profile', JSON.stringify(userProfile));
+  }, [userProfile]);
+
+  const handleProfileUpdate = (newProfile: any) => {
+    setUserProfile((prev: any) => ({
+      ...prev,
+      ...newProfile
+    }));
+  };
+
   // Define API for Python environment
   const api = {
     get_enemies: () => {
@@ -147,13 +164,14 @@ function App() {
       if (isConnected) networkManager.disconnect();
       addLog("Starting Solo Sandbox", "info");
     } else {
-      networkManager.joinRoom(roomId, settings);
+      networkManager.joinRoom(roomId, settings, userProfile);
       setCurrentRoom(roomId);
       addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
     }
   };
 
   const handleLeaveRoom = () => {
+
     setCurrentRoom(null);
     networkManager.joinRoom('');
     addLog("Returned to lobby", "info");
@@ -215,9 +233,17 @@ function App() {
         gameEngine.spawnParticles(effect.x, effect.y, effect.color, 15);
         gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
       } else if (effect.type === 'levelup') {
-        gameEngine.spawnParticles(effect.x, effect.y, effect.color, 30); // Lots of gold particles
+        gameEngine.spawnParticles(effect.x, effect.y, effect.color, 30);
         gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
         addLog(`LEVEL UP! You reached Level ${effect.level}`, 'success');
+
+        // SYNC PROFILE BACK TO CLIENT
+        handleProfileUpdate({
+          level: effect.level,
+          xp: effect.xp,
+          maxXp: effect.maxXp,
+          money: effect.money
+        });
       }
     });
   }, []);
@@ -234,6 +260,15 @@ function App() {
         </div>
 
         <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 mr-4 px-3 py-1 rounded bg-[#0a0a0c] border border-cyber-muted/50">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-xs font-bold text-blue-400">LVL {userProfile.level}</span>
+            <span className="text-cyber-muted text-[10px] mx-1">|</span>
+            <span className="text-xs font-bold text-yellow-400">XP {Math.floor(userProfile.xp)}</span>
+            <span className="text-cyber-muted text-[10px] mx-1">|</span>
+            <span className="text-xs font-bold text-emerald-400">${userProfile.money.toLocaleString()}</span>
+          </div>
+
           <div className={`text-xs px-3 py-1 rounded-full border ${status.includes("Failed") ? "border-cyber-danger text-cyber-danger" :
             status.includes("Ready") ? "border-cyber-accent text-cyber-accent" : "border-cyber-warning text-cyber-warning"
             }`}>
@@ -282,6 +317,7 @@ function App() {
             onConnect={handleConnect}
             serverUrl={serverUrl}
             setServerUrl={setServerUrl}
+            userProfile={userProfile}
           />
         ) : (
           <>

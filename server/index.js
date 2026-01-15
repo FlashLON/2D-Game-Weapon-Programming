@@ -103,7 +103,7 @@ io.on('connection', (socket) => {
         }
     };
 
-    socket.on('join_room', ({ roomId, settings }) => {
+    socket.on('join_room', ({ roomId, settings, profile }) => {
         // CLEANUP: Always leave old room before joining new one
         leaveRoom(socket.id);
         if (currentRoomId) socket.leave(currentRoomId);
@@ -135,11 +135,11 @@ io.on('connection', (socket) => {
             type: 'player',
             velocity: { x: 0, y: 0 },
             kills: 0, deaths: 0,
-            // Progression
-            level: 1,
-            xp: 0,
-            maxXp: 100,
-            money: 0
+            // Progression (Sync from client if available)
+            level: (settings?.profile?.level) || (profile?.level) || 1,
+            xp: (settings?.profile?.xp) || (profile?.xp) || 0,
+            maxXp: (settings?.profile?.maxXp) || (profile?.maxXp) || 100,
+            money: (settings?.profile?.money) || (profile?.money) || 0
         };
 
         socket.emit('init', { playerId: socket.id, gameState: room });

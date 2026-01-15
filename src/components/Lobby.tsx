@@ -8,6 +8,7 @@ interface LobbyProps {
     isConnected: boolean;
     serverUrl: string;
     setServerUrl: (url: string) => void;
+    userProfile?: { level: number; xp: number; money: number; maxXp: number };
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -15,7 +16,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     onConnect,
     isConnected,
     serverUrl,
-    setServerUrl
+    setServerUrl,
+    userProfile
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [showSettings, setShowSettings] = useState(false);
@@ -60,6 +62,19 @@ export const Lobby: React.FC<LobbyProps> = ({
                     <h1 className="text-7xl font-black text-white tracking-tighter">
                         CYBER<span className="text-cyber-accent">CORE</span>
                     </h1>
+
+                    {userProfile && (
+                        <div className="flex items-center justify-center gap-4 my-2">
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/40 border border-cyber-muted/50">
+                                <span className="text-sm font-bold text-blue-400">LVL {userProfile.level}</span>
+                                <span className="text-cyber-muted text-xs mx-1">|</span>
+                                <span className="text-sm font-bold text-yellow-500">XP {Math.floor(userProfile.xp)}/{userProfile.maxXp}</span>
+                                <span className="text-cyber-muted text-xs mx-1">|</span>
+                                <span className="text-sm font-bold text-emerald-400">${userProfile.money.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    )}
+
                     <p className="text-cyber-muted text-xl max-w-2xl mx-auto">
                         Design your weapon logic in Python. Test in the sandbox. Dominate the multiplayer arena.
                     </p>

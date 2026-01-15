@@ -77,10 +77,10 @@ class NetworkManager {
         });
     }
 
-    joinRoom(roomId: string, settings?: any) {
+    joinRoom(roomId: string, settings?: any, profile?: any) {
         if (this.socket && this.connected) {
-            console.log('Joining room:', roomId, settings);
-            this.socket.emit('join_room', { roomId, settings });
+            console.log('Joining room:', roomId, settings, profile);
+            this.socket.emit('join_room', { roomId, settings, profile });
         }
     }
 
