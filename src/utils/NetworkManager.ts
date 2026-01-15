@@ -84,6 +84,19 @@ class NetworkManager {
         }
     }
 
+    login(username: string) {
+        if (this.socket && this.connected) {
+            this.socket.emit('login', { username });
+        }
+    }
+
+    setOnLoginResponse(callback: (response: any) => void) {
+        if (this.socket) {
+            this.socket.off('login_response'); // Remove old listener
+            this.socket.on('login_response', callback);
+        }
+    }
+
     disconnect() {
         if (this.socket) {
             this.socket.disconnect();

@@ -9,6 +9,9 @@ interface LobbyProps {
     serverUrl: string;
     setServerUrl: (url: string) => void;
     userProfile?: { level: number; xp: number; money: number; maxXp: number };
+    onLogin?: (username: string) => void;
+    isLoggedIn?: boolean;
+    username?: string;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -17,9 +20,13 @@ export const Lobby: React.FC<LobbyProps> = ({
     isConnected,
     serverUrl,
     setServerUrl,
-    userProfile
+    userProfile,
+    onLogin,
+    isLoggedIn,
+    username
 }) => {
     const [roomCode, setRoomCode] = useState('');
+    const [loginName, setLoginName] = useState('');
     const [showSettings, setShowSettings] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
 
@@ -63,14 +70,37 @@ export const Lobby: React.FC<LobbyProps> = ({
                         CYBER<span className="text-cyber-accent">CORE</span>
                     </h1>
 
-                    {userProfile && (
-                        <div className="flex items-center justify-center gap-4 my-2">
+                    {userProfile && isLoggedIn ? (
+                        <div className="flex flex-col items-center justify-center gap-2 my-2 animate-in fade-in slide-in-from-top-4">
+                            <div className="text-cyber-accent text-xs font-bold uppercase tracking-widest mb-1">
+                                WELCOME BACK, {username?.toUpperCase()}
+                            </div>
                             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/40 border border-cyber-muted/50">
                                 <span className="text-sm font-bold text-blue-400">LVL {userProfile.level}</span>
                                 <span className="text-cyber-muted text-xs mx-1">|</span>
                                 <span className="text-sm font-bold text-yellow-500">XP {Math.floor(userProfile.xp)}/{userProfile.maxXp}</span>
                                 <span className="text-cyber-muted text-xs mx-1">|</span>
                                 <span className="text-sm font-bold text-emerald-400">${userProfile.money.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center gap-4 my-2">
+                            <div className="flex gap-2">
+                                <input
+                                    value={loginName}
+                                    onChange={(e) => setLoginName(e.target.value)}
+                                    placeholder="ENTER USERNAME"
+                                    className="bg-black/40 border border-cyber-muted rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-cyber-accent font-mono uppercase"
+                                />
+                                <button
+                                    onClick={() => onLogin?.(loginName)}
+                                    className="bg-cyber-accent text-black font-bold px-4 py-2 rounded-lg hover:bg-emerald-400 transition-colors text-xs uppercase"
+                                >
+                                    Login / Signup
+                                </button>
+                            </div>
+                            <div className="text-[10px] text-cyber-muted uppercase tracking-widest">
+                                Connect to Cloud Database to Save Progress
                             </div>
                         </div>
                     )}

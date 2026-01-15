@@ -1,6 +1,22 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+require('dotenv').config();
+const { MongoClient } = require('mongodb');
+
+// DATABASE SETUP
+let db = null;
+if (process.env.MONGODB_URI) {
+    const client = new MongoClient(process.env.MONGODB_URI);
+    client.connect()
+        .then(() => {
+            db = client.db('CYBERCORE');
+            console.log("✅ Connected to MongoDB");
+        })
+        .catch(err => console.error("❌ MongoDB Connection Error:", err));
+} else {
+    console.warn("⚠️ MONGODB_URI not found. Persistence disabled.");
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -103,6 +119,57 @@ io.on('connection', (socket) => {
         }
     };
 
+    // --- DATABASE INTEGRATION ---
+    // Handle Login (Get/Create User)
+    socket.on('login', async ({ username }) => {
+        if (!process.env.MONGODB_URI) {
+            console.warn("No MONGODB_URI set. Using temporary local profile.");
+            // Mock response if no DB
+            socket.emit('login_response', {
+                success: true,
+                profile: { level: 1, xp: 0, maxXp: 100, money: 0 }
+            });
+            return;
+        }
+
+        try {
+            const users = db.collection('users');
+            let user = await users.findOne({ username });
+
+            if (!user) {
+                // Create new user
+                user = {
+                    username,
+                    level: 1,
+                    xp: 0,
+                    maxXp: 100,
+                    money: 0,
+                    createdAt: new Date()
+                };
+                await users.insertOne(user);
+                console.log(`New user created: ${username}`);
+            }
+
+            // Send profile back
+            socket.emit('login_response', {
+                success: true,
+                profile: {
+                    level: user.level,
+                    xp: user.xp,
+                    maxXp: user.maxXp,
+                    money: user.money
+                }
+            });
+
+            // Tag socket with username
+            socket.data.username = username;
+
+        } catch (err) {
+            console.error("Login error:", err);
+            socket.emit('login_response', { success: false, error: "Database error" });
+        }
+    });
+
     socket.on('join_room', ({ roomId, settings, profile }) => {
         // CLEANUP: Always leave old room before joining new one
         leaveRoom(socket.id);
@@ -135,6 +202,7 @@ io.on('connection', (socket) => {
             type: 'player',
             velocity: { x: 0, y: 0 },
             kills: 0, deaths: 0,
+            username: socket.data.username || null, // Attach username for DB saves
             // Progression (Sync from client if available)
             level: (settings?.profile?.level) || (profile?.level) || 1,
             xp: (settings?.profile?.xp) || (profile?.xp) || 0,
@@ -203,6 +271,26 @@ io.on('connection', (socket) => {
         leaveRoom(socket.id);
     });
 });
+
+async function saveProgress(username, stats) {
+    if (!username || !process.env.MONGODB_URI || !db) return;
+    try {
+        await db.collection('users').updateOne(
+            { username },
+            {
+                $set: {
+                    level: stats.level,
+                    xp: stats.xp,
+                    maxXp: stats.maxXp,
+                    money: stats.money,
+                    lastSeen: new Date()
+                }
+            }
+        );
+    } catch (err) {
+        console.error("Failed to save progress:", err);
+    }
+}
 
 const TICK_RATE = 45;
 const TICK_INTERVAL = 1000 / TICK_RATE;
@@ -345,6 +433,11 @@ setInterval(() => {
                                 const moneyParams = [100, 250, 500, 1000];
                                 const reward = 100 + (killer.level * 50);
                                 killer.money += reward;
+
+                                // SAVE PROGRESS TO DB
+                                if (killer.username) {
+                                    saveProgress(killer.username, killer);
+                                }
 
                                 // Notify user (optional, can just use state sync)
                                 io.to(roomId).emit('visual_effect', {

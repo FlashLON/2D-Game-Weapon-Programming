@@ -55,6 +55,8 @@ function App() {
     const saved = localStorage.getItem('user_profile');
     return saved ? JSON.parse(saved) : { level: 1, xp: 0, maxXp: 100, money: 0 };
   });
+  const [username, setUsername] = useState<string>('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
@@ -246,7 +248,28 @@ function App() {
         });
       }
     });
+
+    networkManager.setOnLoginResponse((res) => {
+      if (res.success) {
+        addLog("Cloud Login Successful!", "success");
+        setUserProfile(res.profile);
+        setIsLoggedIn(true);
+      } else {
+        addLog(`Login Failed: ${res.error}`, "error");
+      }
+    });
   }, []);
+
+  const handleLogin = (name: string) => {
+    if (!name) return;
+    if (!isConnected) {
+      addLog("Please connect to server first!", "error");
+      return;
+    }
+    setUsername(name);
+    networkManager.login(name);
+    addLog(`Logging in as ${name}...`, "info");
+  };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-cyber-dark text-white font-sans overflow-hidden">
@@ -318,6 +341,9 @@ function App() {
             serverUrl={serverUrl}
             setServerUrl={setServerUrl}
             userProfile={userProfile}
+            onLogin={handleLogin}
+            isLoggedIn={isLoggedIn}
+            username={username}
           />
         ) : (
           <>
