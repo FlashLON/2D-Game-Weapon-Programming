@@ -228,7 +228,9 @@ io.on('connection', (socket) => {
             level: (settings?.profile?.level) || (profile?.level) || 1,
             xp: (settings?.profile?.xp) || (profile?.xp) || 0,
             maxXp: (settings?.profile?.maxXp) || (profile?.maxXp) || 100,
-            money: (settings?.profile?.money) || (profile?.money) || 0
+            money: (settings?.profile?.money) || (profile?.money) || 0,
+            unlocks: (profile?.unlocks) || ['speed', 'damage'],
+            limits: (profile?.limits) || { speed: 200, damage: 5 }
         };
 
         socket.emit('init', { playerId: socket.id, gameState: room });
@@ -238,6 +240,24 @@ io.on('connection', (socket) => {
         });
 
         console.log(`Player ${socket.id} joined room ${currentRoomId}`);
+    });
+
+    socket.on('save_profile', ({ profile }) => {
+        if (socket.data.username && profile) {
+            saveProgress(socket.data.username, profile);
+
+            // Sync current room player if active
+            const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+            if (roomId && rooms[roomId] && rooms[roomId].players[socket.id]) {
+                const p = rooms[roomId].players[socket.id];
+                p.level = profile.level;
+                p.xp = profile.xp;
+                p.maxXp = profile.maxXp;
+                p.money = profile.money;
+                p.unlocks = profile.unlocks;
+                p.limits = profile.limits;
+            }
+        }
     });
 
     socket.on('move', (velocity) => {

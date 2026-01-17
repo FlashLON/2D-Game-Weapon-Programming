@@ -94,6 +94,12 @@ class NetworkManager {
         }
     }
 
+    saveProfile(profile: any) {
+        if (this.socket && this.connected) {
+            this.socket.emit('save_profile', { profile });
+        }
+    }
+
     // Callback storage
     private onLoginResponse: ((response: any) => void) | null = null;
 

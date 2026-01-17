@@ -70,7 +70,12 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
-  }, [userProfile]);
+
+    // Sync to server if logged in
+    if (isLoggedIn && networkManager.isConnected()) {
+      networkManager.saveProfile(userProfile);
+    }
+  }, [userProfile, isLoggedIn]);
 
   const handleProfileUpdate = (newProfile: any) => {
     setUserProfile((prev: any) => ({
@@ -170,46 +175,13 @@ function App() {
       // Clamp each attribute to user's current limit (0 if not unlocked)
       const enforcedParams = { ...jsParams };
 
-      if ('damage' in enforcedParams) {
-        const limit = unlocks.includes('damage') ? (limits.damage || 0) : 0;
-        enforcedParams.damage = Math.min(enforcedParams.damage, limit);
-      }
-      if ('speed' in enforcedParams) {
-        const limit = unlocks.includes('speed') ? (limits.speed || 0) : 0;
-        enforcedParams.speed = Math.min(enforcedParams.speed, limit);
-      }
-      if ('lifetime' in enforcedParams) {
-        const limit = unlocks.includes('lifetime') ? (limits.lifetime || 0) : 0;
-        enforcedParams.lifetime = Math.min(enforcedParams.lifetime, limit);
-      }
-      if ('radius' in enforcedParams) {
-        const limit = unlocks.includes('radius') ? (limits.radius || 0) : 0;
-        enforcedParams.radius = Math.min(enforcedParams.radius, limit);
-      }
-      if ('homing' in enforcedParams) {
-        const limit = unlocks.includes('homing') ? (limits.homing || 0) : 0;
-        enforcedParams.homing = Math.min(enforcedParams.homing, limit);
-      }
-      if ('pierce' in enforcedParams) {
-        const limit = unlocks.includes('pierce') ? (limits.pierce || 0) : 0;
-        enforcedParams.pierce = Math.min(enforcedParams.pierce, limit);
-      }
-      if ('knockback' in enforcedParams) {
-        const limit = unlocks.includes('knockback') ? (limits.knockback || 0) : 0;
-        enforcedParams.knockback = Math.min(enforcedParams.knockback, limit);
-      }
-      if ('explosion_radius' in enforcedParams) {
-        const limit = unlocks.includes('explosion_radius') ? (limits.explosion_radius || 0) : 0;
-        enforcedParams.explosion_radius = Math.min(enforcedParams.explosion_radius, limit);
-      }
-      if ('chain_count' in enforcedParams) {
-        const limit = unlocks.includes('chain_count') ? (limits.chain_count || 0) : 0;
-        enforcedParams.chain_count = Math.min(enforcedParams.chain_count, limit);
-      }
-      if ('wave_amplitude' in enforcedParams) {
-        const limit = unlocks.includes('wave_amplitude') ? (limits.wave_amplitude || 0) : 0;
-        enforcedParams.wave_amplitude = Math.min(enforcedParams.wave_amplitude, limit);
-      }
+      // Dynamically enforce all defined attributes
+      Object.keys(ATTRIBUTES).forEach(attrId => {
+        if (attrId in enforcedParams) {
+          const limit = unlocks.includes(attrId) ? (limits[attrId] || 0) : 0;
+          enforcedParams[attrId] = Math.min(enforcedParams[attrId], limit);
+        }
+      });
 
       const proj = gameEngine.spawnProjectile(enforcedParams);
       if (proj && isConnected && shouldNetwork) {
