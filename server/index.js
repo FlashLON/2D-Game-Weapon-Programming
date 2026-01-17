@@ -127,7 +127,14 @@ io.on('connection', (socket) => {
             // Mock response if no DB
             socket.emit('login_response', {
                 success: true,
-                profile: { level: 1, xp: 0, maxXp: 100, money: 0 }
+                profile: {
+                    level: 1,
+                    xp: 0,
+                    maxXp: 100,
+                    money: 0,
+                    unlocks: ['speed', 'damage'],
+                    limits: { speed: 200, damage: 5 }
+                }
             });
             return;
         }
@@ -137,17 +144,29 @@ io.on('connection', (socket) => {
             let user = await users.findOne({ username });
 
             if (!user) {
-                // Create new user
+                // Create new user with default unlocks and limits
                 user = {
                     username,
                     level: 1,
                     xp: 0,
                     maxXp: 100,
                     money: 0,
+                    unlocks: ['speed', 'damage'],
+                    limits: { speed: 200, damage: 5 },
                     createdAt: new Date()
                 };
                 await users.insertOne(user);
                 console.log(`New user created: ${username}`);
+            }
+
+            // Ensure existing users have unlocks/limits (migration)
+            if (!user.unlocks) {
+                user.unlocks = ['speed', 'damage'];
+                user.limits = { speed: 200, damage: 5 };
+                await users.updateOne(
+                    { username },
+                    { $set: { unlocks: user.unlocks, limits: user.limits } }
+                );
             }
 
             // Send profile back
@@ -157,7 +176,9 @@ io.on('connection', (socket) => {
                     level: user.level,
                     xp: user.xp,
                     maxXp: user.maxXp,
-                    money: user.money
+                    money: user.money,
+                    unlocks: user.unlocks,
+                    limits: user.limits
                 }
             });
 
@@ -283,6 +304,8 @@ async function saveProgress(username, stats) {
                     xp: stats.xp,
                     maxXp: stats.maxXp,
                     money: stats.money,
+                    unlocks: stats.unlocks,
+                    limits: stats.limits,
                     lastSeen: new Date()
                 }
             }

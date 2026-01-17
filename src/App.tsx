@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { WeaponEditor } from './components/WeaponEditor';
 import { Arena } from './components/Arena';
 import { Lobby } from './components/Lobby';
+import { LevelUpModal } from './components/LevelUpModal';
 import { Console, type LogMessage, type LogType } from './components/Console';
 import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
 import { networkManager } from './utils/NetworkManager';
+import { ATTRIBUTES, getUpgradeCost } from './utils/AttributeRegistry';
 import { Play, RotateCcw, Link as LinkIcon, CheckCircle2, LogOut } from 'lucide-react';
 import { DocsPanel } from './components/DocsPanel';
 
@@ -53,10 +55,18 @@ function App() {
   // User Profile State (Persisted)
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('user_profile');
-    return saved ? JSON.parse(saved) : { level: 1, xp: 0, maxXp: 100, money: 0 };
+    return saved ? JSON.parse(saved) : {
+      level: 1,
+      xp: 0,
+      maxXp: 100,
+      money: 0,
+      unlocks: ['speed', 'damage'],
+      limits: { speed: 200, damage: 5 }
+    };
   });
   const [username, setUsername] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
@@ -67,6 +77,56 @@ function App() {
       ...prev,
       ...newProfile
     }));
+  };
+
+  const handleCardSelect = (type: 'unlock' | 'upgrade', attributeId: string, value: number) => {
+    setUserProfile((prev: any) => {
+      const newUnlocks = type === 'unlock' && !prev.unlocks.includes(attributeId)
+        ? [...prev.unlocks, attributeId]
+        : prev.unlocks;
+
+      const newLimits = {
+        ...prev.limits,
+        [attributeId]: value
+      };
+
+      return {
+        ...prev,
+        unlocks: newUnlocks,
+        limits: newLimits
+      };
+    });
+
+    addLog(`${type === 'unlock' ? 'Unlocked' : 'Upgraded'} ${attributeId}!`, 'success');
+  };
+
+  const handleUpgrade = (attributeId: string) => {
+    const attr = ATTRIBUTES[attributeId];
+    const currentLimit = userProfile.limits[attributeId] || 0;
+    const cost = getUpgradeCost(attributeId, currentLimit);
+
+    if (userProfile.money < cost) {
+      addLog(`Not enough money! Need $${cost}`, 'error');
+      return;
+    }
+
+    if (currentLimit >= attr.maxLimit) {
+      addLog(`${attr.name} is already maxed out!`, 'warning');
+      return;
+    }
+
+    const newLimit = currentLimit + attr.upgradeStep;
+
+    setUserProfile((prev: any) => ({
+      ...prev,
+      money: prev.money - cost,
+      limits: {
+        ...prev.limits,
+        [attributeId]: newLimit
+      }
+    }));
+
+    addLog(`Upgraded ${attr.name} to ${newLimit}! (-$${cost})`, 'success');
   };
 
   // Define API for Python environment
@@ -102,7 +162,56 @@ function App() {
           raw.forEach((v: any, k: any) => { (jsParams as any)[k] = v; });
         } else { jsParams = raw; }
       }
-      const proj = gameEngine.spawnProjectile(jsParams);
+
+      // ENFORCE ATTRIBUTE LIMITS
+      const limits = userProfile.limits || {};
+      const unlocks = userProfile.unlocks || [];
+
+      // Clamp each attribute to user's current limit (0 if not unlocked)
+      const enforcedParams = { ...jsParams };
+
+      if ('damage' in enforcedParams) {
+        const limit = unlocks.includes('damage') ? (limits.damage || 0) : 0;
+        enforcedParams.damage = Math.min(enforcedParams.damage, limit);
+      }
+      if ('speed' in enforcedParams) {
+        const limit = unlocks.includes('speed') ? (limits.speed || 0) : 0;
+        enforcedParams.speed = Math.min(enforcedParams.speed, limit);
+      }
+      if ('lifetime' in enforcedParams) {
+        const limit = unlocks.includes('lifetime') ? (limits.lifetime || 0) : 0;
+        enforcedParams.lifetime = Math.min(enforcedParams.lifetime, limit);
+      }
+      if ('radius' in enforcedParams) {
+        const limit = unlocks.includes('radius') ? (limits.radius || 0) : 0;
+        enforcedParams.radius = Math.min(enforcedParams.radius, limit);
+      }
+      if ('homing' in enforcedParams) {
+        const limit = unlocks.includes('homing') ? (limits.homing || 0) : 0;
+        enforcedParams.homing = Math.min(enforcedParams.homing, limit);
+      }
+      if ('pierce' in enforcedParams) {
+        const limit = unlocks.includes('pierce') ? (limits.pierce || 0) : 0;
+        enforcedParams.pierce = Math.min(enforcedParams.pierce, limit);
+      }
+      if ('knockback' in enforcedParams) {
+        const limit = unlocks.includes('knockback') ? (limits.knockback || 0) : 0;
+        enforcedParams.knockback = Math.min(enforcedParams.knockback, limit);
+      }
+      if ('explosion_radius' in enforcedParams) {
+        const limit = unlocks.includes('explosion_radius') ? (limits.explosion_radius || 0) : 0;
+        enforcedParams.explosion_radius = Math.min(enforcedParams.explosion_radius, limit);
+      }
+      if ('chain_count' in enforcedParams) {
+        const limit = unlocks.includes('chain_count') ? (limits.chain_count || 0) : 0;
+        enforcedParams.chain_count = Math.min(enforcedParams.chain_count, limit);
+      }
+      if ('wave_amplitude' in enforcedParams) {
+        const limit = unlocks.includes('wave_amplitude') ? (limits.wave_amplitude || 0) : 0;
+        enforcedParams.wave_amplitude = Math.min(enforcedParams.wave_amplitude, limit);
+      }
+
+      const proj = gameEngine.spawnProjectile(enforcedParams);
       if (proj && isConnected && shouldNetwork) {
         networkManager.sendFire({ ...proj, vx: proj.velocity.x, vy: proj.velocity.y });
       }
@@ -247,6 +356,8 @@ function App() {
             maxXp: effect.maxXp,
             money: effect.money
           });
+          // Show level up modal for card selection
+          setShowLevelUpModal(true);
         }
       }
     });
@@ -360,6 +471,7 @@ function App() {
             onLogin={handleLogin}
             isLoggedIn={isLoggedIn}
             username={username}
+            onUpgrade={handleUpgrade}
           />
         ) : (
           <>
@@ -399,6 +511,15 @@ function App() {
           </>
         )}
       </div>
+
+      {/* Level Up Modal */}
+      {showLevelUpModal && (
+        <LevelUpModal
+          userProfile={userProfile}
+          onSelectCard={handleCardSelect}
+          onClose={() => setShowLevelUpModal(false)}
+        />
+      )}
     </div>
   );
 }
