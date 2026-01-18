@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
 
+let db = null;
 const MONGODB_URI = process.env.MONGODB_URI;
 const memoryUsers = new Map(); // Fallback for when DB is not connected
 
