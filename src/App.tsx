@@ -282,48 +282,6 @@ function App() {
     currentRoomRef.current = currentRoom;
   }, [currentRoom]);
 
-  const handleConnect = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if (networkManager.isConnected()) {
-        resolve(true);
-        return;
-      }
-
-      try {
-        setStatus("Establishing Link...");
-
-        // Listen for connection success once
-        const checkConn = (connected: boolean) => {
-          networkManager.removeConnectionListener(checkConn);
-          if (connected) {
-            setStatus("Link Established");
-            resolve(true);
-          } else {
-            setStatus("Link Failed");
-            resolve(false);
-          }
-        };
-
-        networkManager.addConnectionListener(checkConn);
-        networkManager.connect(serverUrl || "http://localhost:3000");
-
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          networkManager.removeConnectionListener(checkConn);
-          if (!networkManager.isConnected()) {
-            setStatus("Link Timeout");
-            addLog("Operational Timeout: Server did not respond.", "error");
-            resolve(false);
-          }
-        }, 10000);
-
-      } catch (err) {
-        setStatus("Link Error");
-        addLog("Connection system failure: " + String(err), "error");
-        resolve(false);
-      }
-    });
-  };
 
   useEffect(() => {
     const init = async () => {
@@ -393,17 +351,6 @@ function App() {
     networkManager.setOnVisualEffect(handleVisualEffect);
     gameEngine.onVisualEffect = handleVisualEffect;
 
-    networkManager.setOnLoginResponse((res) => {
-      if (res.success) {
-        const msg = res.isNew ? "Account Created! Welcome to CyberCore." : "Login Successful! Welcome back.";
-        addLog(msg, "success");
-        setUserProfile(res.profile);
-        setIsLoggedIn(true);
-      } else {
-        addLog(`Auth Error: ${res.error}`, "error");
-      }
-    });
-
     return () => {
       networkManager.removeConnectionListener(handleGlobalConn);
     };
@@ -411,43 +358,55 @@ function App() {
 
   const handleLogin = async (name: string) => {
     if (!name) return;
-    let currentlyConnected = networkManager.isConnected();
+    setStatus("Authenticating...");
 
-    if (!currentlyConnected) {
-      addLog("Establishing Login Link...", "info");
-      currentlyConnected = await handleConnect();
+    // Ensure we are connected
+    const connected = await networkManager.connect(serverUrl);
+    if (!connected) {
+      addLog("Network Link Failed. Please check Server URL.", "error");
+      setStatus("Link Failed");
+      return;
     }
 
-    if (currentlyConnected) {
-      // Small delay to ensure the socket is 'hot' and ready for emissions
-      setTimeout(() => {
-        setUsername(name);
-        networkManager.login(name);
-        addLog(`Initiating Login: ${name}...`, "info");
-      }, 200);
+    addLog(`Attempting Login for ${name}...`, "info");
+    const res = await networkManager.login(name);
+
+    if (res.success) {
+      addLog("Login Successful!", "success");
+      setUsername(name);
+      setUserProfile(res.profile);
+      setIsLoggedIn(true);
+      setStatus("Ready");
     } else {
-      addLog("Authentication Link Failed.", "error");
+      addLog(`Login Failed: ${res.error}`, "error");
+      setStatus("Auth Error");
     }
   };
 
   const handleSignup = async (name: string) => {
     if (!name) return;
-    let currentlyConnected = networkManager.isConnected();
+    setStatus("Registering...");
 
-    if (!currentlyConnected) {
-      addLog("Establishing Signup Link...", "info");
-      currentlyConnected = await handleConnect();
+    // Ensure we are connected
+    const connected = await networkManager.connect(serverUrl);
+    if (!connected) {
+      addLog("Network Link Failed. Please check Server URL.", "error");
+      setStatus("Link Failed");
+      return;
     }
 
-    if (currentlyConnected) {
-      // Small delay to ensure the socket is 'hot' and ready for emissions
-      setTimeout(() => {
-        setUsername(name);
-        networkManager.signup(name);
-        addLog(`Initiating Signup: ${name}...`, "info");
-      }, 200);
+    addLog(`Creating account for ${name}...`, "info");
+    const res = await networkManager.signup(name);
+
+    if (res.success) {
+      addLog("Account Created! Welcome.", "success");
+      setUsername(name);
+      setUserProfile(res.profile);
+      setIsLoggedIn(true);
+      setStatus("Ready");
     } else {
-      addLog("Authentication Link Failed.", "error");
+      addLog(`Signup Failed: ${res.error}`, "error");
+      setStatus("Auth Error");
     }
   };
 
@@ -515,7 +474,7 @@ function App() {
           <Lobby
             isConnected={isConnected}
             onJoinRoom={handleJoinRoom}
-            onConnect={handleConnect}
+            onConnect={() => networkManager.connect(serverUrl)}
             serverUrl={serverUrl}
             setServerUrl={setServerUrl}
             userProfile={userProfile}
