@@ -151,8 +151,17 @@ io.on('connection', (socket) => {
     });
 
     socket.on('signup', async ({ username }) => {
+        // Wait up to 3 seconds for DB if it's still connecting
         if (!db) {
-            socket.emit('login_response', { success: false, error: "Database not connected. Please try again." });
+            let retries = 0;
+            while (!db && retries < 6) {
+                await new Promise(r => setTimeout(r, 500));
+                retries++;
+            }
+        }
+
+        if (!db) {
+            socket.emit('login_response', { success: false, error: "Database not connected. Please try again in a moment." });
             return;
         }
 

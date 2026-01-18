@@ -6,12 +6,15 @@ class NetworkManager {
     private connected: boolean = false;
     private playerId: string | null = null;
 
-    // Callbacks
+    // Callbacks groups
+    private connectionListeners: Set<(connected: boolean) => void> = new Set();
+
+    // Single-purpose Callbacks
     private onStateUpdate: ((state: GameState) => void) | null = null;
-    private onConnectionChange: ((connected: boolean) => void) | null = null;
     private onPlayerCountChange: ((count: number) => void) | null = null;
     private onKill: ((enemyId: string) => void) | null = null;
     private onVisualEffect: ((effect: any) => void) | null = null;
+    private onLoginResponse: ((response: any) => void) | null = null;
 
     connect(serverUrl: string) {
         if (this.socket) {
@@ -31,19 +34,19 @@ class NetworkManager {
         this.socket.on('connect', () => {
             console.log('✅ Connected to game server');
             this.connected = true;
-            this.onConnectionChange?.(true);
+            this.connectionListeners.forEach(fn => fn(true));
         });
 
         this.socket.on('disconnect', () => {
             console.log('❌ Disconnected from server');
             this.connected = false;
-            this.onConnectionChange?.(false);
+            this.connectionListeners.forEach(fn => fn(false));
         });
 
         this.socket.on('connect_error', (error) => {
             console.error('Connection error:', error);
             this.connected = false;
-            this.onConnectionChange?.(false);
+            this.connectionListeners.forEach(fn => fn(false));
         });
 
         // Game events
@@ -81,6 +84,15 @@ class NetworkManager {
         });
     }
 
+    // LISTENER MANAGEMENT
+    addConnectionListener(callback: (connected: boolean) => void) {
+        this.connectionListeners.add(callback);
+    }
+
+    removeConnectionListener(callback: (connected: boolean) => void) {
+        this.connectionListeners.delete(callback);
+    }
+
     joinRoom(roomId: string, settings?: any, profile?: any) {
         if (this.socket && this.connected) {
             console.log('Joining room:', roomId, settings, profile);
@@ -106,12 +118,8 @@ class NetworkManager {
         }
     }
 
-    // Callback storage
-    private onLoginResponse: ((response: any) => void) | null = null;
-
     setOnLoginResponse(callback: (response: any) => void) {
         this.onLoginResponse = callback;
-        // If socket exists, update listener immediately
         if (this.socket) {
             this.socket.off('login_response');
             this.socket.on('login_response', callback);
@@ -133,39 +141,15 @@ class NetworkManager {
         }
     }
 
-    sendFire(data: {
-        x: number;
-        y: number;
-        vx: number;
-        vy: number;
-        damage?: number;
-        color?: string;
-        radius?: number;
-        homing?: number;
-        lifetime?: number;
-        acceleration?: number;
-        knockback?: number;
-        pierce?: number;
-        explosion_radius?: number;
-        explosion_damage?: number;
-        wave_amplitude?: number;
-        wave_frequency?: number;
-        chain_count?: number;
-        chain_range?: number;
-        fade_over_time?: boolean;
-    }) {
+    sendFire(data: any) {
         if (this.socket && this.connected) {
             this.socket.emit('fire', data);
         }
     }
 
-    // Setters for callbacks
+    // Setters for single callbacks
     setOnStateUpdate(callback: (state: GameState) => void) {
         this.onStateUpdate = callback;
-    }
-
-    setOnConnectionChange(callback: (connected: boolean) => void) {
-        this.onConnectionChange = callback;
     }
 
     setOnPlayerCountChange(callback: (count: number) => void) {
@@ -176,6 +160,10 @@ class NetworkManager {
         this.onKill = callback;
     }
 
+    setOnVisualEffect(callback: (effect: any) => void) {
+        this.onVisualEffect = callback;
+    }
+
     // Getters
     isConnected(): boolean {
         return this.connected;
@@ -183,10 +171,6 @@ class NetworkManager {
 
     getPlayerId(): string | null {
         return this.playerId;
-    }
-
-    setOnVisualEffect(callback: (effect: any) => void) {
-        this.onVisualEffect = callback;
     }
 }
 

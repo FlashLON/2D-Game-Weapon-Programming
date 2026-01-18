@@ -292,24 +292,26 @@ function App() {
 
       try {
         setStatus("Connecting to server...");
-        networkManager.connect(serverUrl || "http://localhost:3000");
 
         // Listen for connection success once
         const checkConn = (connected: boolean) => {
           if (connected) {
+            networkManager.removeConnectionListener(checkConn);
             resolve(true);
           }
         };
 
-        networkManager.setOnConnectionChange(checkConn);
+        networkManager.addConnectionListener(checkConn);
+        networkManager.connect(serverUrl || "http://localhost:3000");
 
-        // Timeout after 5 seconds
+        // Timeout after 8 seconds (give more time for DB wakeup)
         setTimeout(() => {
+          networkManager.removeConnectionListener(checkConn);
           if (!networkManager.isConnected()) {
             addLog("Connection Timeout", "error");
             resolve(false);
           }
-        }, 5000);
+        }, 8000);
 
       } catch (err) {
         addLog("Connection failed: " + String(err), "error");
@@ -334,7 +336,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    networkManager.setOnConnectionChange((connected) => {
+    const handleGlobalConn = (connected: boolean) => {
       setIsConnected(connected);
       gameEngine.setMultiplayerMode(connected, networkManager.getPlayerId());
       if (connected) {
@@ -342,7 +344,9 @@ function App() {
       } else {
         addLog("Disconnected from Server", "warning");
       }
-    });
+    };
+
+    networkManager.addConnectionListener(handleGlobalConn);
 
     networkManager.setOnStateUpdate((state) => {
       const activeRoom = currentRoomRef.current;
@@ -394,7 +398,11 @@ function App() {
         addLog(`Auth Error: ${res.error}`, "error");
       }
     });
-  }, [isConnected]);
+
+    return () => {
+      networkManager.removeConnectionListener(handleGlobalConn);
+    };
+  }, []);
 
   const handleLogin = async (name: string) => {
     if (!name) return;
