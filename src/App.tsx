@@ -284,37 +284,42 @@ function App() {
 
   const handleConnect = (): Promise<boolean> => {
     return new Promise((resolve) => {
-      if (isConnected) {
-        networkManager.disconnect();
-        resolve(false);
+      if (networkManager.isConnected()) {
+        resolve(true);
         return;
       }
 
       try {
-        setStatus("Connecting to server...");
+        setStatus("Establishing Link...");
 
         // Listen for connection success once
         const checkConn = (connected: boolean) => {
+          networkManager.removeConnectionListener(checkConn);
           if (connected) {
-            networkManager.removeConnectionListener(checkConn);
+            setStatus("Link Established");
             resolve(true);
+          } else {
+            setStatus("Link Failed");
+            resolve(false);
           }
         };
 
         networkManager.addConnectionListener(checkConn);
         networkManager.connect(serverUrl || "http://localhost:3000");
 
-        // Timeout after 8 seconds (give more time for DB wakeup)
+        // Timeout after 10 seconds
         setTimeout(() => {
           networkManager.removeConnectionListener(checkConn);
           if (!networkManager.isConnected()) {
-            addLog("Connection Timeout", "error");
+            setStatus("Link Timeout");
+            addLog("Operational Timeout: Server did not respond.", "error");
             resolve(false);
           }
-        }, 8000);
+        }, 10000);
 
       } catch (err) {
-        addLog("Connection failed: " + String(err), "error");
+        setStatus("Link Error");
+        addLog("Connection system failure: " + String(err), "error");
         resolve(false);
       }
     });

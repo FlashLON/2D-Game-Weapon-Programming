@@ -17,9 +17,15 @@ class NetworkManager {
     private onLoginResponse: ((response: any) => void) | null = null;
 
     connect(serverUrl: string) {
-        if (this.socket) {
+        if (this.socket && this.connected) {
             console.warn('Already connected');
+            this.connectionListeners.forEach(fn => fn(true));
             return;
+        }
+
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
         }
 
         console.log('Connecting to server:', serverUrl);
@@ -27,7 +33,8 @@ class NetworkManager {
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionDelay: 1000,
-            reconnectionAttempts: 5
+            reconnectionAttempts: 3,
+            timeout: 8000
         });
 
         // Connection events
