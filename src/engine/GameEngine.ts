@@ -148,6 +148,10 @@ export class GameEngine {
         this.enforcer = callback;
     }
 
+    isMultiplayerMode() {
+        return this.isMultiplayer;
+    }
+
     subscribe(callback: (state: GameState) => void) {
         this.onStateChange = callback;
     }

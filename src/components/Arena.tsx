@@ -141,11 +141,10 @@ export const Arena: React.FC = () => {
                 // Determine Color
                 let drawColor = ent.color;
 
-                // If it's another player in multiplayer, assign them "Enemy Red" color
-                // We use NetworkManager to know our own ID
-                if (ent.type === 'player' && networkManager.isConnected()) {
+                // Color other players in Multiplayer matches
+                if (ent.type === 'player' && networkManager.isConnected() && gameEngine.isMultiplayerMode()) {
                     const myId = networkManager.getPlayerId();
-                    if (ent.id !== myId) {
+                    if (ent.id !== myId && ent.id !== 'player') {
                         drawColor = '#ff9f00'; // Vibrant Orange for Other Players
                     }
                 }
@@ -155,22 +154,6 @@ export const Arena: React.FC = () => {
                 // Apply fade for projectiles with fade_over_time
                 if (ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime) {
                     ctx.globalAlpha = Math.max(0.1, ent.lifetime / ent.maxLifetime);
-                }
-
-                // SPECIAL: Draw velocity trail for projectiles
-                if (ent.type === 'projectile' && ent.velocity) {
-                    ctx.save();
-                    const trailAlpha = (ctx.globalAlpha || 1.0) * 0.4;
-                    ctx.globalAlpha = trailAlpha;
-                    ctx.strokeStyle = drawColor;
-                    ctx.lineWidth = ent.radius * 0.8;
-                    ctx.beginPath();
-                    const tx = ent.renderX ?? ent.x;
-                    const ty = ent.renderY ?? ent.y;
-                    ctx.moveTo(tx, ty);
-                    ctx.lineTo(tx - ent.velocity.x * 0.05, ty - ent.velocity.y * 0.05);
-                    ctx.stroke();
-                    ctx.restore();
                 }
 
                 // ONLY apply glow to players and enemies (Projectiles are too numerous)

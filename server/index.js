@@ -171,8 +171,8 @@ io.on('connection', (socket) => {
                 score: 0
             };
 
-            // Spawn initial enemies
-            for (let i = 0; i < 5; i++) {
+            // Spawn single initial target
+            for (let i = 0; i < 1; i++) {
                 rooms[roomId].enemies.push({
                     id: `enemy_${Math.random().toString(36).substr(2, 5)}`,
                     type: 'enemy',

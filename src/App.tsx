@@ -313,11 +313,14 @@ function App() {
     });
 
     networkManager.setOnStateUpdate((state) => {
-      const myId = networkManager.getPlayerId();
-      if (myId) {
-        gameEngine.setMultiplayerMode(isConnected, myId);
+      // Only apply server state if we are actually in a multiplayer room
+      if (currentRoom && currentRoom !== 'offline') {
+        const myId = networkManager.getPlayerId();
+        if (myId) {
+          gameEngine.setMultiplayerMode(true, myId);
+        }
+        gameEngine.updateFromSnapshot(state);
       }
-      gameEngine.updateFromSnapshot(state);
     });
 
     const handleVisualEffect = (effect: any) => {
