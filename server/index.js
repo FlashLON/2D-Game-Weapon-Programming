@@ -4,43 +4,52 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
 
-// DATABASE SETUP (Vercel Optimized)
-let db = null;
 const MONGODB_URI = process.env.MONGODB_URI;
+const memoryUsers = new Map(); // Fallback for when DB is not connected
 
 if (MONGODB_URI) {
     const options = {
         appName: "devrel.vercel.integration",
         maxIdleTimeMS: 5000,
-        // Recommended for serverless/vercel environments
-        connectTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
+        connectTimeoutMS: 5000,
+        socketTimeoutMS: 30000,
     };
 
     const client = new MongoClient(MONGODB_URI, options);
 
-    // Dynamic handling for Vercel functions if available
-    try {
-        const vercelFunctions = require('@vercel/functions');
-        if (vercelFunctions && vercelFunctions.attachDatabasePool) {
-            vercelFunctions.attachDatabasePool(client);
-            console.log("🔗 Vercel Database Pool attached");
-        }
-    } catch (e) {
-        // Silently skip if the package is missing or not a CJS module
-    }
-
     client.connect()
         .then(() => {
             db = client.db('CYBERCORE');
-            console.log("✅ Connected to MongoDB: CYBERCORE (Vercel-Optimized)");
+            console.log("✅ Connected to MongoDB: CYBERCORE (Persistence Enabled)");
         })
         .catch(err => {
-            console.error("❌ MongoDB Connection Error:", err);
+            console.error("❌ MongoDB Connection Error:", err.message);
+            console.warn("⚠️ Persistence disabled. Server will use temporary In-Memory storage.");
             db = null;
         });
 } else {
-    console.warn("⚠️ MONGODB_URI not found. Persistence disabled.");
+    console.warn("⚠️ MONGODB_URI not found. Server running in temporary 'In-Memory' mode.");
+}
+
+// --- ACCOUNT HELPERS ---
+async function findUser(username) {
+    if (db) {
+        return await db.collection('users').findOne({ username });
+    }
+    return memoryUsers.get(username);
+}
+
+async function upsertUser(username, userData) {
+    if (db) {
+        await db.collection('users').updateOne(
+            { username },
+            { $set: { ...userData, lastSeen: new Date() } },
+            { upsert: true }
+        );
+    } else {
+        const existing = memoryUsers.get(username) || {};
+        memoryUsers.set(username, { ...existing, ...userData, lastSeen: new Date() });
+    }
 }
 
 const app = express();
@@ -108,86 +117,51 @@ io.on('connection', (socket) => {
     });
 
     socket.on('login', async ({ username }) => {
-        console.log(`[AUTH] login attempt for: ${username}`);
-        // Wait up to 3 seconds for DB if it's still connecting
-        if (!db) {
-            let retries = 0;
-            while (!db && retries < 10) {
-                await new Promise(r => setTimeout(r, 500));
-                retries++;
-            }
-        }
-
-        if (!db) {
-            socket.emit('login_response', { success: false, error: "Database not connected. Please try again in a moment." });
-            return;
-        }
+        console.log(`[AUTH] Login Request: ${username}`);
 
         try {
-            const users = db.collection('users');
-            let user = await users.findOne({ username });
+            const user = await findUser(username);
 
             if (!user) {
-                console.log(`[AUTH] User not found: ${username}`);
-                socket.emit('login_response', { success: false, error: "User not found. Please click signup if you are new." });
+                console.log(`[AUTH] Login Failed: ${username} not found`);
+                socket.emit('login_response', { success: false, error: "User not found. Please click Signup." });
                 return;
             }
-            console.log(`[AUTH] User logged in: ${username}`);
 
-            // Update last seen
-            await users.updateOne({ username }, { $set: { lastSeen: new Date() } });
-
-            // Sync tags
+            console.log(`[AUTH] Login Success: ${username}`);
             socket.data.username = username;
 
-            // Send profile back with all fields
             socket.emit('login_response', {
                 success: true,
                 isNew: false,
                 profile: {
                     username: user.username,
-                    level: user.level,
-                    xp: user.xp,
-                    maxXp: user.maxXp,
-                    money: user.money,
-                    unlocks: user.unlocks,
-                    limits: user.limits
+                    level: user.level || 1,
+                    xp: user.xp || 0,
+                    maxXp: user.maxXp || 100,
+                    money: user.money || 0,
+                    unlocks: user.unlocks || ['speed', 'damage'],
+                    limits: user.limits || { speed: 200, damage: 5 }
                 }
             });
-
         } catch (err) {
-            console.error("Login error:", err);
-            socket.emit('login_response', { success: false, error: "Database error" });
+            console.error("[AUTH] Login Error:", err.message);
+            socket.emit('login_response', { success: false, error: "Authentication system error" });
         }
     });
 
     socket.on('signup', async ({ username }) => {
-        console.log(`[AUTH] signup attempt for: ${username}`);
-        // Wait up to 3 seconds for DB if it's still connecting
-        if (!db) {
-            let retries = 0;
-            while (!db && retries < 10) {
-                await new Promise(r => setTimeout(r, 500));
-                retries++;
-            }
-        }
-
-        if (!db) {
-            socket.emit('login_response', { success: false, error: "Database not connected. Please try again in a moment." });
-            return;
-        }
+        console.log(`[AUTH] Signup Request: ${username}`);
 
         try {
-            const users = db.collection('users');
-            let existing = await users.findOne({ username });
+            const existing = await findUser(username);
 
             if (existing) {
-                console.log(`[AUTH] Signup failed: ${username} already exists`);
-                socket.emit('login_response', { success: false, error: "Username already exists. Please choose another or login." });
+                console.log(`[AUTH] Signup Failed: ${username} exists`);
+                socket.emit('login_response', { success: false, error: "Name taken. Use another or Login." });
                 return;
             }
 
-            // Create new user with default unlocks and limits
             const newUser = {
                 username,
                 level: 1,
@@ -196,31 +170,21 @@ io.on('connection', (socket) => {
                 money: 0,
                 unlocks: ['speed', 'damage'],
                 limits: { speed: 200, damage: 5 },
-                createdAt: new Date(),
-                lastSeen: new Date()
+                createdAt: new Date()
             };
 
-            await users.insertOne(newUser);
-            console.log(`[AUTH] New user signed up: ${username}`);
+            await upsertUser(username, newUser);
+            console.log(`[AUTH] Signup Success: ${username}`);
 
             socket.data.username = username;
-
             socket.emit('login_response', {
                 success: true,
                 isNew: true,
-                profile: {
-                    username: newUser.username,
-                    level: newUser.level,
-                    xp: newUser.xp,
-                    maxXp: newUser.maxXp,
-                    money: newUser.money,
-                    unlocks: newUser.unlocks,
-                    limits: newUser.limits
-                }
+                profile: newUser
             });
         } catch (err) {
-            console.error("Signup error:", err);
-            socket.emit('login_response', { success: false, error: "Signup failed" });
+            console.error("[AUTH] Signup Error:", err.message);
+            socket.emit('login_response', { success: false, error: "Registration failed" });
         }
     });
 
@@ -360,26 +324,12 @@ io.on('connection', (socket) => {
 });
 
 async function saveProgress(username, stats) {
-    if (!username || !MONGODB_URI || !db) {
-        return;
-    }
+    if (!username) return;
     try {
-        await db.collection('users').updateOne(
-            { username },
-            {
-                $set: {
-                    level: stats.level,
-                    xp: stats.xp,
-                    maxXp: stats.maxXp,
-                    money: stats.money,
-                    unlocks: stats.unlocks,
-                    limits: stats.limits,
-                    lastSeen: new Date()
-                }
-            }
-        );
+        await upsertUser(username, stats);
+        if (!db) console.log(`💾 [Memory] Saved ${username} (${stats.level}/${Math.floor(stats.xp)}xp)`);
     } catch (err) {
-        console.error(`❌ [Save] Failed to save progress for ${username}:`, err);
+        console.error(`❌ [Save] Failed to save for ${username}:`, err.message);
     }
 }
 
