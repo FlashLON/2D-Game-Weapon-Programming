@@ -3,7 +3,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
-const { attachDatabasePool } = require('@vercel/functions');
 
 // DATABASE SETUP (Vercel Optimized)
 let db = null;
@@ -20,11 +19,15 @@ if (MONGODB_URI) {
 
     const client = new MongoClient(MONGODB_URI, options);
 
-    // Attach for proper cleanup in Vercel/Serverless suspended states
+    // Dynamic handling for Vercel functions if available
     try {
-        attachDatabasePool(client);
+        const vercelFunctions = require('@vercel/functions');
+        if (vercelFunctions && vercelFunctions.attachDatabasePool) {
+            vercelFunctions.attachDatabasePool(client);
+            console.log("🔗 Vercel Database Pool attached");
+        }
     } catch (e) {
-        console.warn("⚠️ attachDatabasePool skipped (non-vercel environment or error):", e.message);
+        // Silently skip if the package is missing or not a CJS module
     }
 
     client.connect()
@@ -97,8 +100,17 @@ io.on('connection', (socket) => {
     let currentRoomId = null;
 
     socket.on('login', async ({ username }) => {
+        // Wait up to 3 seconds for DB if it's still connecting
         if (!db) {
-            socket.emit('login_response', { success: false, error: "Database not connected" });
+            let retries = 0;
+            while (!db && retries < 6) {
+                await new Promise(r => setTimeout(r, 500));
+                retries++;
+            }
+        }
+
+        if (!db) {
+            socket.emit('login_response', { success: false, error: "Database not connected. Please try again in a moment." });
             return;
         }
 

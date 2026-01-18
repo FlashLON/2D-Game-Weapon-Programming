@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { WeaponEditor } from './components/WeaponEditor';
 import { Arena } from './components/Arena';
 import { Lobby } from './components/Lobby';
@@ -255,23 +255,32 @@ function App() {
     addLog("Weapon logic updated!", "success");
   };
 
+  // Use a ref for the current room to avoid stale closures in socket callbacks
+  const currentRoomRef = useRef<string | null>(null);
+
   const handleJoinRoom = (roomId: string, settings?: any) => {
+    setCurrentRoom(roomId);
+    currentRoomRef.current = roomId;
     if (roomId === 'offline') {
-      setCurrentRoom('offline');
       gameEngine.setMultiplayerMode(false);
       addLog("Starting Solo Sandbox", "info");
     } else {
       networkManager.joinRoom(roomId, settings, userProfile);
-      setCurrentRoom(roomId);
       addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
     }
   };
 
   const handleLeaveRoom = () => {
     setCurrentRoom(null);
+    currentRoomRef.current = null;
     networkManager.joinRoom('');
     addLog("Returned to lobby", "info");
   };
+
+  // Sync ref with state
+  useEffect(() => {
+    currentRoomRef.current = currentRoom;
+  }, [currentRoom]);
 
   const handleConnect = async () => {
     if (isConnected) {
@@ -313,8 +322,9 @@ function App() {
     });
 
     networkManager.setOnStateUpdate((state) => {
+      const activeRoom = currentRoomRef.current;
       // Only apply server state if we are actually in a multiplayer room
-      if (currentRoom && currentRoom !== 'offline') {
+      if (activeRoom && activeRoom !== 'offline') {
         const myId = networkManager.getPlayerId();
         if (myId) {
           gameEngine.setMultiplayerMode(true, myId);
@@ -335,7 +345,8 @@ function App() {
         gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
         addLog(`LEVEL UP! You reached Level ${effect.level}`, 'success');
 
-        if (effect.playerId === networkManager.getPlayerId() || !isConnected) {
+        const activeRoom = currentRoomRef.current;
+        if (effect.playerId === networkManager.getPlayerId() || activeRoom === 'offline') {
           handleProfileUpdate({
             level: effect.level,
             xp: effect.xp,
