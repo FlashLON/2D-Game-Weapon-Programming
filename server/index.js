@@ -112,7 +112,7 @@ io.on('connection', (socket) => {
         // Wait up to 3 seconds for DB if it's still connecting
         if (!db) {
             let retries = 0;
-            while (!db && retries < 6) {
+            while (!db && retries < 10) {
                 await new Promise(r => setTimeout(r, 500));
                 retries++;
             }
@@ -166,7 +166,7 @@ io.on('connection', (socket) => {
         // Wait up to 3 seconds for DB if it's still connecting
         if (!db) {
             let retries = 0;
-            while (!db && retries < 6) {
+            while (!db && retries < 10) {
                 await new Promise(r => setTimeout(r, 500));
                 retries++;
             }

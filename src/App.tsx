@@ -379,7 +379,7 @@ function App() {
       setStatus("Ready");
     } else {
       addLog(`Login Failed: ${res.error}`, "error");
-      setStatus("Auth Error");
+      setStatus(res.error || "Auth Error");
     }
   };
 
@@ -406,7 +406,7 @@ function App() {
       setStatus("Ready");
     } else {
       addLog(`Signup Failed: ${res.error}`, "error");
-      setStatus("Auth Error");
+      setStatus(res.error || "Auth Error");
     }
   };
 

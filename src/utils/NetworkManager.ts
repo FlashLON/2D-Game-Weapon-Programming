@@ -96,8 +96,8 @@ class NetworkManager {
 
             this.socket.emit('login', { username });
 
-            // Timeout safety
-            setTimeout(() => resolve({ success: false, error: "Auth Timeout" }), 5000);
+            // Timeout safety (10 seconds for cold starts)
+            setTimeout(() => resolve({ success: false, error: "Auth Timeout (Server took too long)" }), 10000);
         });
     }
 
@@ -115,8 +115,8 @@ class NetworkManager {
 
             this.socket.emit('signup', { username });
 
-            // Timeout safety
-            setTimeout(() => resolve({ success: false, error: "Auth Timeout" }), 5000);
+            // Timeout safety (10 seconds for cold starts)
+            setTimeout(() => resolve({ success: false, error: "Auth Timeout (Server took too long)" }), 10000);
         });
     }
 
