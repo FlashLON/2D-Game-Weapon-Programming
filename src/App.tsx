@@ -282,17 +282,40 @@ function App() {
     currentRoomRef.current = currentRoom;
   }, [currentRoom]);
 
-  const handleConnect = async () => {
-    if (isConnected) {
-      networkManager.disconnect();
-    } else {
+  const handleConnect = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (isConnected) {
+        networkManager.disconnect();
+        resolve(false);
+        return;
+      }
+
       try {
         setStatus("Connecting to server...");
         networkManager.connect(serverUrl || "http://localhost:3000");
+
+        // Listen for connection success once
+        const checkConn = (connected: boolean) => {
+          if (connected) {
+            resolve(true);
+          }
+        };
+
+        networkManager.setOnConnectionChange(checkConn);
+
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          if (!networkManager.isConnected()) {
+            addLog("Connection Timeout", "error");
+            resolve(false);
+          }
+        }, 5000);
+
       } catch (err) {
         addLog("Connection failed: " + String(err), "error");
+        resolve(false);
       }
-    }
+    });
   };
 
   useEffect(() => {
@@ -375,38 +398,38 @@ function App() {
 
   const handleLogin = async (name: string) => {
     if (!name) return;
-    if (!isConnected) {
+    let currentlyConnected = isConnected;
+
+    if (!currentlyConnected) {
       addLog("Connecting to server...", "info");
-      await handleConnect();
+      currentlyConnected = await handleConnect();
     }
 
-    setTimeout(() => {
-      if (networkManager.isConnected()) {
-        setUsername(name);
-        networkManager.login(name);
-        addLog(`Logging in as ${name}...`, "info");
-      } else {
-        addLog("Connection failed. Please try again.", "error");
-      }
-    }, 500);
+    if (currentlyConnected) {
+      setUsername(name);
+      networkManager.login(name);
+      addLog(`Logging in as ${name}...`, "info");
+    } else {
+      addLog("Could not establish connection. Check your server URL.", "error");
+    }
   };
 
   const handleSignup = async (name: string) => {
     if (!name) return;
-    if (!isConnected) {
+    let currentlyConnected = isConnected;
+
+    if (!currentlyConnected) {
       addLog("Connecting to server...", "info");
-      await handleConnect();
+      currentlyConnected = await handleConnect();
     }
 
-    setTimeout(() => {
-      if (networkManager.isConnected()) {
-        setUsername(name);
-        networkManager.signup(name);
-        addLog(`Signing up as ${name}...`, "info");
-      } else {
-        addLog("Connection failed. Please try again.", "error");
-      }
-    }, 500);
+    if (currentlyConnected) {
+      setUsername(name);
+      networkManager.signup(name);
+      addLog(`Signing up as ${name}...`, "info");
+    } else {
+      addLog("Could not establish connection. Check your server URL.", "error");
+    }
   };
 
   return (
