@@ -119,24 +119,12 @@ io.on('connection', (socket) => {
             let user = await users.findOne({ username });
 
             if (!user) {
-                // Create new user with default unlocks and limits
-                user = {
-                    username,
-                    level: 1,
-                    xp: 0,
-                    maxXp: 100,
-                    money: 0,
-                    unlocks: ['speed', 'damage'],
-                    limits: { speed: 200, damage: 5 },
-                    createdAt: new Date(),
-                    lastSeen: new Date()
-                };
-                await users.insertOne(user);
-                console.log(`New user created: ${username}`);
-            } else {
-                // Update last seen
-                await users.updateOne({ username }, { $set: { lastSeen: new Date() } });
+                socket.emit('login_response', { success: false, error: "User not found. Please click signup if you are new." });
+                return;
             }
+
+            // Update last seen
+            await users.updateOne({ username }, { $set: { lastSeen: new Date() } });
 
             // Sync tags
             socket.data.username = username;
@@ -144,6 +132,7 @@ io.on('connection', (socket) => {
             // Send profile back with all fields
             socket.emit('login_response', {
                 success: true,
+                isNew: false,
                 profile: {
                     username: user.username,
                     level: user.level,
@@ -158,6 +147,58 @@ io.on('connection', (socket) => {
         } catch (err) {
             console.error("Login error:", err);
             socket.emit('login_response', { success: false, error: "Database error" });
+        }
+    });
+
+    socket.on('signup', async ({ username }) => {
+        if (!db) {
+            socket.emit('login_response', { success: false, error: "Database not connected. Please try again." });
+            return;
+        }
+
+        try {
+            const users = db.collection('users');
+            let existing = await users.findOne({ username });
+
+            if (existing) {
+                socket.emit('login_response', { success: false, error: "Username already exists. Please choose another or login." });
+                return;
+            }
+
+            // Create new user with default unlocks and limits
+            const newUser = {
+                username,
+                level: 1,
+                xp: 0,
+                maxXp: 100,
+                money: 0,
+                unlocks: ['speed', 'damage'],
+                limits: { speed: 200, damage: 5 },
+                createdAt: new Date(),
+                lastSeen: new Date()
+            };
+
+            await users.insertOne(newUser);
+            console.log(`New user signed up: ${username}`);
+
+            socket.data.username = username;
+
+            socket.emit('login_response', {
+                success: true,
+                isNew: true,
+                profile: {
+                    username: newUser.username,
+                    level: newUser.level,
+                    xp: newUser.xp,
+                    maxXp: newUser.maxXp,
+                    money: newUser.money,
+                    unlocks: newUser.unlocks,
+                    limits: newUser.limits
+                }
+            });
+        } catch (err) {
+            console.error("Signup error:", err);
+            socket.emit('login_response', { success: false, error: "Signup failed" });
         }
     });
 

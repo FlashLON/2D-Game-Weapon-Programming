@@ -363,11 +363,12 @@ function App() {
 
     networkManager.setOnLoginResponse((res) => {
       if (res.success) {
-        addLog("Cloud Login Successful!", "success");
+        const msg = res.isNew ? "Account Created! Welcome to CyberCore." : "Login Successful! Welcome back.";
+        addLog(msg, "success");
         setUserProfile(res.profile);
         setIsLoggedIn(true);
       } else {
-        addLog(`Login Failed: ${res.error}`, "error");
+        addLog(`Auth Error: ${res.error}`, "error");
       }
     });
   }, [isConnected]);
@@ -384,6 +385,24 @@ function App() {
         setUsername(name);
         networkManager.login(name);
         addLog(`Logging in as ${name}...`, "info");
+      } else {
+        addLog("Connection failed. Please try again.", "error");
+      }
+    }, 500);
+  };
+
+  const handleSignup = async (name: string) => {
+    if (!name) return;
+    if (!isConnected) {
+      addLog("Connecting to server...", "info");
+      await handleConnect();
+    }
+
+    setTimeout(() => {
+      if (networkManager.isConnected()) {
+        setUsername(name);
+        networkManager.signup(name);
+        addLog(`Signing up as ${name}...`, "info");
       } else {
         addLog("Connection failed. Please try again.", "error");
       }
@@ -459,6 +478,7 @@ function App() {
             setServerUrl={setServerUrl}
             userProfile={userProfile}
             onLogin={handleLogin}
+            onSignup={handleSignup}
             isLoggedIn={isLoggedIn}
             username={username}
             onUpgrade={handleUpgrade}

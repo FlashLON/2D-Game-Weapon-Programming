@@ -94,6 +94,12 @@ class NetworkManager {
         }
     }
 
+    signup(username: string) {
+        if (this.socket && this.connected) {
+            this.socket.emit('signup', { username });
+        }
+    }
+
     saveProfile(profile: any) {
         if (this.socket && this.connected) {
             this.socket.emit('save_profile', { profile });

@@ -14,6 +14,7 @@ interface LobbyProps {
     isLoggedIn?: boolean;
     username?: string;
     onUpgrade?: (attributeId: string) => void;
+    onSignup?: (username: string) => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -26,7 +27,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     onLogin,
     isLoggedIn,
     username,
-    onUpgrade
+    onUpgrade,
+    onSignup
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
@@ -86,7 +88,13 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     onClick={() => onLogin?.(loginName)}
                                     className="bg-cyber-accent text-black font-bold px-4 py-2 rounded-lg hover:bg-emerald-400 transition-colors text-xs uppercase"
                                 >
-                                    Login / Signup
+                                    Login
+                                </button>
+                                <button
+                                    onClick={() => onSignup?.(loginName)}
+                                    className="bg-blue-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-400 transition-colors text-xs uppercase"
+                                >
+                                    Signup
                                 </button>
                             </div>
                         </div>
