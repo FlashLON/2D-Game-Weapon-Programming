@@ -2,54 +2,55 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
-const { MongoClient } = require('mongodb');
+const admin = require('firebase-admin');
 
-let db = null;
-const MONGODB_URI = process.env.MONGODB_URI;
-const memoryUsers = new Map(); // Fallback for when DB is not connected
+// --- DATABASE SETUP (FIREBASE) ---
+let firebaseDb = null;
+const FIREBASE_DATABASE_URL = process.env.FIREBASE_DATABASE_URL || "https://cybercore-2124b-default-rtdb.firebaseio.com/";
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
+const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
+const FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined;
 
-if (MONGODB_URI) {
-    const options = {
-        appName: "devrel.vercel.integration",
-        maxIdleTimeMS: 5000,
-        connectTimeoutMS: 5000,
-        socketTimeoutMS: 30000,
-    };
+const memoryUsers = new Map(); // Fallback for when Firebase is not connected
 
-    const client = new MongoClient(MONGODB_URI, options);
-
-    client.connect()
-        .then(() => {
-            db = client.db('CYBERCORE');
-            console.log("✅ Connected to MongoDB: CYBERCORE (Persistence Enabled)");
-        })
-        .catch(err => {
-            console.error("❌ MongoDB Connection Error:", err.message);
-            console.warn("⚠️ Persistence disabled. Server will use temporary In-Memory storage.");
-            db = null;
+if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
+    try {
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: FIREBASE_PROJECT_ID,
+                clientEmail: FIREBASE_CLIENT_EMAIL,
+                privateKey: FIREBASE_PRIVATE_KEY,
+            }),
+            databaseURL: FIREBASE_DATABASE_URL
         });
+        firebaseDb = admin.database();
+        console.log("✅ Connected to Firebase: " + FIREBASE_PROJECT_ID);
+    } catch (err) {
+        console.error("❌ Firebase Initialization Error:", err.message);
+        console.warn("⚠️ Persistence disabled. Server will use temporary In-Memory storage.");
+    }
 } else {
-    console.warn("⚠️ MONGODB_URI not found. Server running in temporary 'In-Memory' mode.");
+    console.warn("⚠️ Firebase Credentials missing in .env. Server running in 'In-Memory' mode.");
 }
 
 // --- ACCOUNT HELPERS ---
 async function findUser(username) {
-    if (db) {
-        return await db.collection('users').findOne({ username });
+    if (firebaseDb) {
+        const snapshot = await firebaseDb.ref(`users/${username}`).once('value');
+        return snapshot.val();
     }
     return memoryUsers.get(username);
 }
 
 async function upsertUser(username, userData) {
-    if (db) {
-        await db.collection('users').updateOne(
-            { username },
-            { $set: { ...userData, lastSeen: new Date() } },
-            { upsert: true }
-        );
+    if (firebaseDb) {
+        await firebaseDb.ref(`users/${username}`).update({
+            ...userData,
+            lastSeen: new Date().toISOString()
+        });
     } else {
         const existing = memoryUsers.get(username) || {};
-        memoryUsers.set(username, { ...existing, ...userData, lastSeen: new Date() });
+        memoryUsers.set(username, { ...existing, ...userData, lastSeen: new Date().toISOString() });
     }
 }
 
