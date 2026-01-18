@@ -1,17 +1,22 @@
 import React from 'react';
-import { Book, X } from 'lucide-react';
+import { Book, X, Lock, CheckCircle2 } from 'lucide-react';
+import { ATTRIBUTES } from '../utils/AttributeRegistry';
 
 interface DocsPanelProps {
     onClose: () => void;
+    userProfile: any;
 }
 
-export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
+export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) => {
+    const unlocks = userProfile.unlocks || [];
+    const limits = userProfile.limits || {};
+
     return (
-        <div className="absolute top-0 right-0 h-full w-96 bg-gray-900/95 backdrop-blur shadow-2xl border-l border-cyber-accent z-20 overflow-y-auto text-sm text-gray-300 transform transition-transform duration-300">
-            <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 sticky top-0">
+        <div className="absolute top-0 right-0 h-full w-[450px] bg-gray-900/98 backdrop-blur shadow-2xl border-l border-cyber-accent z-[50] overflow-y-auto text-sm text-gray-300 transform transition-transform duration-300">
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 sticky top-0 z-10">
                 <div className="flex items-center gap-2 text-cyber-accent font-bold text-lg">
                     <Book size={20} />
-                    <span>Weapon Manual</span>
+                    <span>Weapon Systems Manual</span>
                 </div>
                 <button onClick={onClose} className="hover:text-white transition-colors">
                     <X size={20} />
@@ -20,135 +25,122 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose }) => {
 
             <div className="p-6 space-y-8 font-mono">
 
+                {/* 1. PROGRESSION STATUS */}
+                <section className="bg-cyber-accent/5 p-4 rounded-lg border border-cyber-accent/20">
+                    <h3 className="text-cyber-accent font-bold mb-3 flex items-center gap-2">
+                        <CheckCircle2 size={16} /> Progression Status
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-[10px]">
+                        <div>
+                            <span className="text-gray-500 block">LICENSE LEVEL</span>
+                            <span className="text-white font-bold text-lg">{userProfile.level}</span>
+                        </div>
+                        <div>
+                            <span className="text-gray-500 block">TOTAL CREDITS</span>
+                            <span className="text-emerald-400 font-bold text-lg">${userProfile.money.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </section>
+
                 <section>
-                    <h3 className="text-white font-bold mb-3 border-b border-gray-700 pb-1">1. Class Structure</h3>
-                    <p className="mb-2 text-xs text-gray-400">Your code must define a generic `Weapon` class.</p>
-                    <pre className="bg-black/50 p-3 rounded text-green-400 overflow-x-auto border border-gray-800">
+                    <h3 className="text-white font-bold mb-3 border-b border-gray-700 pb-1">1. Class Blueprint</h3>
+                    <p className="mb-2 text-xs text-gray-400">Your code MUST define a <code>Weapon</code> class with these methods:</p>
+                    <pre className="bg-black/50 p-3 rounded text-green-400 text-[11px] overflow-x-auto border border-gray-800">
                         {`class Weapon:
   def __init__(self):
-    self.damage = 10
+    self.counter = 0
     
   def on_fire(self, tx, ty, mx, my):
-    # Returns projectile info
-    pass
+    # Triggered automatically
+    return {"speed": 300, "angle": 0}
     
   def on_hit(self, target_id):
     # Triggered on impact
     pass
 
-  def on_kill(self, target_id):
-    # Triggered when enemy dies
-    pass
-
-  def on_hit_wall(self, x, y):
-    # Triggered when bullet hits bounds
-    pass
-
-  def on_damaged(self, attacker_id, amount):
-    # Triggered when you take damage
-    pass
-    
   def update(self, dt):
-    # Called every frame
+    # Every frame logic
     pass`}
                     </pre>
                 </section>
 
                 <section>
-                    <h3 className="text-white font-bold mb-3 border-b border-gray-700 pb-1">2. Firing Return Values</h3>
-                    <p className="mb-2 text-xs text-gray-400">Return a dictionary from <code>on_fire</code> to spawn a projectile.</p>
-                    <div className="grid grid-cols-[100px_1fr] gap-2 text-xs">
-                        <span className="text-cyber-warning">speed</span> <span>(number) Speed in pixels/sec</span>
-                        <span className="text-cyber-warning">angle</span> <span>(number) Direction in degrees</span>
-                        <span className="text-cyber-accent">damage</span> <span>(number) Damage on hit</span>
-                        <span className="text-cyber-accent">color</span> <span>(string) Hex code</span>
-                        <span className="text-cyber-accent">radius</span> <span>(number) Projectile size</span>
-                        <span className="text-pink-400">homing</span> <span>(number) Steering power (e.g. 2.0)</span>
-                        <span className="text-pink-400">lifetime</span> <span>(number) Seconds before despawn</span>
-                        <span className="text-pink-400">acceleration</span> <span>(number) Speed mult/sec</span>
-                        <span className="text-purple-400">knockback</span> <span>(number) Push force</span>
-                        <span className="text-purple-400">pierce</span> <span>(number) Targets to hit</span>
+                    <h3 className="text-white font-bold mb-3 border-b border-gray-700 pb-1 flex items-center gap-2">
+                        2. Projectile Parameters
+                    </h3>
+                    <p className="mb-4 text-xs text-gray-400">Values returned by <code>on_fire</code> or passed to <code>spawn_projectile</code>. Grayed items are locked.</p>
 
-                        <span className="text-orange-400">orbit_player</span> <span>(bool) Rotate around player</span>
-                        <span className="text-orange-400">orbit_speed</span> <span>(number) Rotation speed (Rad/s)</span>
-                        <span className="text-orange-400">orbit_radius</span> <span>(number) Distance from player</span>
-                        <span className="text-orange-400">vampirism</span> <span>(number) Heal % of damage dealt</span>
-                        <span className="text-red-500">split_on_death</span> <span>(number) Fragments upon expiry</span>
-                        <span className="text-red-500">attraction_force</span> <span>(number) Pull enemies (Grav)</span>
-                        <span className="text-blue-400">bounciness</span> <span>(number) Bounce mult (0.0 - 1.0)</span>
-                        <span className="text-blue-400">spin</span> <span>(number) Rotation in degrees/sec</span>
-                        <span className="text-green-400">chain_range</span> <span>(number) Jump to next enemy hit</span>
-                        <span className="text-green-400">chain_count</span> <span>(number) Max chain jumps</span>
+                    <div className="space-y-3">
+                        {Object.values(ATTRIBUTES).map(attr => {
+                            const isUnlocked = unlocks.includes(attr.id);
+                            const currentLimit = limits[attr.id] || 0;
 
-                        <span className="text-yellow-400 font-bold">explosion_radius</span> <span>(number) AOE blast range</span>
-                        <span className="text-yellow-400">explosion_damage</span> <span>(number) Damage of AOE</span>
-                        <span className="text-cyan-400">wave_amplitude</span> <span>(number) Oscillate size</span>
-                        <span className="text-cyan-400">wave_frequency</span> <span>(number) Oscillate speed</span>
-                        <span className="text-white/50">fade_over_time</span> <span>(bool) Visual alpha decay</span>
+                            return (
+                                <div key={attr.id} className={`p-2 rounded border ${isUnlocked ? 'border-gray-700 bg-gray-800/30' : 'border-red-900/30 bg-red-950/10 opacity-60'}`}>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <div className="flex items-center gap-2">
+                                            {isUnlocked ? <attr.icon size={14} className="text-cyber-accent" /> : <Lock size={14} className="text-red-500" />}
+                                            <span className={`font-bold ${isUnlocked ? 'text-white' : 'text-gray-500'}`}>{attr.id}</span>
+                                        </div>
+                                        {isUnlocked && <span className="text-[10px] text-cyber-accent">MAX: {currentLimit}</span>}
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 leading-tight">{attr.description}</p>
+                                </div>
+                            );
+                        })}
                     </div>
                 </section>
 
                 <section>
                     <h3 className="text-white font-bold mb-3 border-b border-gray-700 pb-1">3. World API</h3>
-                    <p className="mb-2 text-xs text-gray-400">Use the global <code>api</code> object to access game data.</p>
+                    <p className="mb-4 text-xs text-gray-400">Use the global <code>api</code> object inside your methods.</p>
 
                     <div className="space-y-4">
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.get_enemies()</code>
-                            <p>Returns a list of all active enemies.</p>
-                        </div>
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.get_projectiles()</code>
-                            <p>Returns a list of all active projectiles.</p>
-                        </div>
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.spawn_projectile(params)</code>
-                            <p>Manually spawn a projectile (params dict). Returns projectile info.</p>
-                        </div>
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.get_player()</code>
-                            <p>Returns player info: <code>{`{"x": 400, "y": 300, ...}`}</code></p>
-                        </div>
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.get_arena_size()</code>
-                            <p>Returns arena dimensions: <code>{`{"width": 800, "height": 600}`}</code></p>
-                        </div>
-                        <div>
-                            <code className="text-yellow-500 block mb-1">api.predict_position(id, speed)</code>
-                            <p>Returns <code>{`{"x", "y"}`}</code> projected interception point.</p>
-                        </div>
-                        <div>
-                            <code className="text-yellow-500 block mb-1">api.get_closest_projectile()</code>
-                            <p>Returns the projectile nearest to the player.</p>
-                        </div>
-                        <div>
-                            <code className="text-yellow-500 block mb-1">api.get_last_hit_info()</code>
-                            <p>Returns info on your last successful hit.</p>
-                        </div>
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.get_nearest_enemy(x, y)</code>
-                            <p>Returns the nearest enemy object (with <code>dist</code> property) or <code>null</code>.</p>
-                        </div>
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.get_entities_in_range(x, y, r)</code>
-                            <p>Returns a list of enemies within radius <code>r</code> of point <code>(x, y)</code>.</p>
-                        </div>
-                        <div>
-                            <code className="text-cyber-accent block mb-1">api.log(msg)</code>
-                            <p>Prints a message to the in-game debug console.</p>
-                        </div>
+                        <ApiMethod
+                            name="api.get_enemies()"
+                            desc="Returns list of Enemy dicts with {id, x, y, hp, maxHp}."
+                        />
+                        <ApiMethod
+                            name="api.get_players()"
+                            desc="Returns list of other Players in the room."
+                        />
+                        <ApiMethod
+                            name="api.get_self()"
+                            desc="Returns your own status: {id, x, y, hp}."
+                        />
+                        <ApiMethod
+                            name="api.spawn_projectile(params)"
+                            desc="Spawns a projectile. Validates against your limits."
+                        />
+                        <ApiMethod
+                            name="api.predict_position(target_id, speed)"
+                            desc="Calculates interception point. Returns {x, y}."
+                        />
+                        <ApiMethod
+                            name="api.get_nearest_enemy(x, y)"
+                            desc="Quick lookup for closest target."
+                        />
+                        <ApiMethod
+                            name="api.get_arena_size()"
+                            desc="Returns {width, height} dimensions."
+                        />
+                        <ApiMethod
+                            name="api.log(message)"
+                            desc="Prints to the System Console."
+                        />
                     </div>
                 </section>
 
-                <section>
-                    <h3 className="text-white font-bold mb-3 border-b border-gray-700 pb-1">Example: Homing</h3>
-                    <pre className="bg-black/50 p-3 rounded text-purple-300 text-xs border border-gray-800">
-                        {`import math
-
-enemies = api.get_enemies()
-if len(enemies) > 0:
-    e = enemies[0]
-    # Aim at first enemy...`}
+                <section className="pb-10">
+                    <h3 className="text-white font-bold mb-3 border-b border-gray-700 pb-1">Example: Pro Radar</h3>
+                    <pre className="bg-black/50 p-3 rounded text-cyber-accent text-[11px] border border-gray-800">
+                        {`enemies = api.get_enemies()
+if enemies:
+    nearest = api.get_nearest_enemy(mx, my)
+    target = api.predict_position(nearest['id'], 300)
+    if target:
+        # Fire at projected point
+        return {"angle": 45, "speed": 300}`}
                     </pre>
                 </section>
 
@@ -156,3 +148,10 @@ if len(enemies) > 0:
         </div>
     );
 };
+
+const ApiMethod: React.FC<{ name: string, desc: string }> = ({ name, desc }) => (
+    <div>
+        <code className="text-cyber-accent font-bold block mb-1 text-[12px]">{name}</code>
+        <p className="text-[11px] text-gray-400 leading-normal">{desc}</p>
+    </div>
+);

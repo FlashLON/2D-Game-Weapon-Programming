@@ -107,11 +107,13 @@ function App() {
 
   const handleUpgrade = (attributeId: string) => {
     const attr = ATTRIBUTES[attributeId];
+    if (!attr) return;
+
     const currentLimit = userProfile.limits[attributeId] || 0;
     const cost = getUpgradeCost(attributeId, currentLimit);
 
     if (userProfile.money < cost) {
-      addLog(`Not enough money! Need $${cost}`, 'error');
+      addLog(`Not enough money! Need $${cost.toLocaleString()}`, 'error');
       return;
     }
 
@@ -131,26 +133,48 @@ function App() {
       }
     }));
 
-    addLog(`Upgraded ${attr.name} to ${newLimit}! (-$${cost})`, 'success');
+    addLog(`Upgraded ${attr.name} to ${newLimit}!`, 'success');
   };
+
+  // ENFORCEMENT LOGIC (Shared for api.spawn_projectile and gameEngine.fireWeapon)
+  const enforceProjectileLimits = (params: any) => {
+    const profile = userProfile;
+    const limits = profile.limits || {};
+    const unlocks = profile.unlocks || [];
+    const p = { ...params };
+
+    // 1. Enforce Speed (Magnitude of velocity if speed isn't provided)
+    const speedLimit = unlocks.includes('speed') ? (limits['speed'] || 0) : 0;
+
+    if (p.vx !== undefined && p.vy !== undefined) {
+      const mag = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+      if (mag > speedLimit) {
+        const factor = speedLimit / mag;
+        p.vx *= factor;
+        p.vy *= factor;
+      }
+    } else if (p.speed !== undefined) {
+      p.speed = Math.min(p.speed, speedLimit);
+    }
+
+    // 2. Dynamically enforce all other attributes
+    Object.keys(ATTRIBUTES).forEach(attrId => {
+      if (attrId === 'speed') return; // Handled above
+      if (attrId in p) {
+        const limit = unlocks.includes(attrId) ? (limits[attrId] || 0) : 0;
+        p[attrId] = Math.min(p[attrId], limit);
+      }
+    });
+
+    return p;
+  };
+
+  useEffect(() => {
+    gameEngine.setEnforcer(enforceProjectileLimits);
+  }, [userProfile]); // Update enforcer whenever profile changes
 
   // Define API for Python environment
   const api = {
-    get_enemies: () => {
-      return gameEngine.getEnemies().map(e => ({
-        ...e,
-        toString: () => `Enemy(id=${e.id}, x=${Math.round(e.x)}, y=${Math.round(e.y)}, hp=${e.hp})`
-      }));
-    },
-    get_player: () => {
-      const p = gameEngine.getPlayer();
-      if (!p) return null;
-      return {
-        ...p,
-        toString: () => `Player(id=${p.id}, x=${Math.round(p.x)}, y=${Math.round(p.y)}, hp=${p.hp})`
-      };
-    },
-    get_arena_size: () => gameEngine.getArenaBounds(),
     log: (msg: string) => {
       console.log("PY:", msg);
       addLog(msg, 'info');
@@ -158,6 +182,10 @@ function App() {
     get_nearest_enemy: (x: number, y: number) => gameEngine.getNearestEnemy(x, y),
     get_entities_in_range: (x: number, y: number, range: number) => gameEngine.getEntitiesInRange(x, y, range),
     get_projectiles: () => gameEngine.getAllProjectiles(),
+    get_enemies: () => gameEngine.getEnemies().map(e => ({ id: e.id, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp })),
+    get_players: () => gameEngine.getPlayers().map(p => ({ id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp })),
+    get_self: () => gameEngine.getPlayer(),
+    get_arena_size: () => gameEngine.getArenaBounds(),
     spawn_projectile: (params: any, shouldNetwork: boolean = true) => {
       let jsParams = params;
       if (params && typeof params.toJs === 'function') {
@@ -168,22 +196,7 @@ function App() {
         } else { jsParams = raw; }
       }
 
-      // ENFORCE ATTRIBUTE LIMITS
-      const limits = userProfile.limits || {};
-      const unlocks = userProfile.unlocks || [];
-
-      // Clamp each attribute to user's current limit (0 if not unlocked)
-      const enforcedParams = { ...jsParams };
-
-      // Dynamically enforce all defined attributes
-      Object.keys(ATTRIBUTES).forEach(attrId => {
-        if (attrId in enforcedParams) {
-          const limit = unlocks.includes(attrId) ? (limits[attrId] || 0) : 0;
-          enforcedParams[attrId] = Math.min(enforcedParams[attrId], limit);
-        }
-      });
-
-      const proj = gameEngine.spawnProjectile(enforcedParams);
+      const proj = gameEngine.spawnProjectile(jsParams);
       if (proj && isConnected && shouldNetwork) {
         networkManager.sendFire({ ...proj, vx: proj.velocity.x, vy: proj.velocity.y });
       }
@@ -202,8 +215,11 @@ function App() {
       const dx = target.x - player.x;
       const dy = target.y - player.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const timeToHit = dist / (bulletSpeed || 1);
 
+      const speedLimit = userProfile.unlocks.includes('speed') ? (userProfile.limits['speed'] || 0) : 0;
+      const effectiveSpeed = Math.min(bulletSpeed || 0, speedLimit);
+
+      const timeToHit = dist / (effectiveSpeed || 1);
       const vel = (target as any).velocity || { x: 0, y: 0 };
 
       return {
@@ -244,7 +260,6 @@ function App() {
     if (roomId === 'offline') {
       setCurrentRoom('offline');
       gameEngine.setMultiplayerMode(false);
-      if (isConnected) networkManager.disconnect();
       addLog("Starting Solo Sandbox", "info");
     } else {
       networkManager.joinRoom(roomId, settings, userProfile);
@@ -254,7 +269,6 @@ function App() {
   };
 
   const handleLeaveRoom = () => {
-
     setCurrentRoom(null);
     networkManager.joinRoom('');
     addLog("Returned to lobby", "info");
@@ -300,7 +314,6 @@ function App() {
     });
 
     networkManager.setOnStateUpdate((state) => {
-      // CRITICAL: Ensure engine knows our ID (arrives via init packet)
       const myId = networkManager.getPlayerId();
       if (myId) {
         gameEngine.setMultiplayerMode(isConnected, myId);
@@ -308,7 +321,7 @@ function App() {
       gameEngine.updateFromSnapshot(state);
     });
 
-    networkManager.setOnVisualEffect((effect) => {
+    const handleVisualEffect = (effect: any) => {
       if (effect.type === 'impact') {
         gameEngine.spawnParticles(effect.x, effect.y, effect.color, 10);
         gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
@@ -320,19 +333,20 @@ function App() {
         gameEngine.addGridImpulse(effect.x, effect.y, effect.strength, effect.radius);
         addLog(`LEVEL UP! You reached Level ${effect.level}`, 'success');
 
-        // SYNC PROFILE BACK TO CLIENT (Only if it's me)
-        if (effect.playerId === networkManager.getPlayerId()) {
+        if (effect.playerId === networkManager.getPlayerId() || !isConnected) {
           handleProfileUpdate({
             level: effect.level,
             xp: effect.xp,
             maxXp: effect.maxXp,
             money: effect.money
           });
-          // Show level up modal for card selection
           setShowLevelUpModal(true);
         }
       }
-    });
+    };
+
+    networkManager.setOnVisualEffect(handleVisualEffect);
+    gameEngine.onVisualEffect = handleVisualEffect;
 
     networkManager.setOnLoginResponse((res) => {
       if (res.success) {
@@ -343,22 +357,15 @@ function App() {
         addLog(`Login Failed: ${res.error}`, "error");
       }
     });
-  }, []);
+  }, [isConnected]);
 
   const handleLogin = async (name: string) => {
     if (!name) return;
     if (!isConnected) {
       addLog("Connecting to server...", "info");
       await handleConnect();
-      // Wait a short moment for socket to be ready (handleConnect is async but state update is not instant)
-      // Actually handleConnect awaits makeConnection which calls networkManager.connect.
-      // networkManager.connected becomes true.
-      // But react state `isConnected` might delay.
-      // Let's rely on networkManager state directly? 
-      // networkManager.isConnected()
     }
 
-    // Small delay to ensure socket is ready if we just connected
     setTimeout(() => {
       if (networkManager.isConnected()) {
         setUsername(name);
@@ -372,7 +379,6 @@ function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-cyber-dark text-white font-sans overflow-hidden">
-      {/* Dynamic Header */}
       <header className="h-14 border-b border-cyber-muted flex items-center px-6 justify-between bg-cyber-light shadow-md z-10 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded bg-gradient-to-tr from-cyber-accent to-blue-500 flex items-center justify-center font-bold text-black border border-white/20">
@@ -430,7 +436,6 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content Areas */}
       <div className="flex-1 flex overflow-hidden relative">
         {!currentRoom ? (
           <Lobby
@@ -447,23 +452,20 @@ function App() {
           />
         ) : (
           <>
-            {/* Editor Pane (Left) */}
             <div className="w-1/2 min-w-[400px] h-full shadow-xl z-0 overflow-hidden flex flex-col border-r border-cyber-muted">
               <WeaponEditor code={code} onChange={(val) => setCode(val || "")} />
             </div>
 
-            {/* Arena/Console Pane (Right) */}
             <div className="flex-1 h-full relative flex flex-col min-w-0">
               <div className="flex-1 relative bg-black/50 overflow-hidden">
                 <Arena />
-                {showDocs && <DocsPanel onClose={() => setShowDocs(false)} />}
+                {showDocs && <DocsPanel onClose={() => setShowDocs(false)} userProfile={userProfile} />}
               </div>
               <div className="h-48 shrink-0 border-t border-cyber-muted bg-cyber-dark/80">
                 <Console logs={logs} onClear={() => setLogs([])} />
               </div>
             </div>
 
-            {/* Contextual Actions (Floating) */}
             <div className="absolute top-4 right-4 flex gap-2 z-20">
               <button
                 onClick={() => gameEngine.reset()}
@@ -484,7 +486,6 @@ function App() {
         )}
       </div>
 
-      {/* Level Up Modal */}
       {showLevelUpModal && (
         <LevelUpModal
           userProfile={userProfile}

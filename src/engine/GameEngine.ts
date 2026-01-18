@@ -113,6 +113,7 @@ export class GameEngine {
     private lastTime: number = 0;
     private animationFrameId: number | null = null;
     private onStateChange: ((state: GameState) => void) | null = null;
+    public onVisualEffect: ((effect: any) => void) | null = null;
 
     // --- MULTIPLAYER PROPERTIES ---
     private isMultiplayer = false;
@@ -134,11 +135,17 @@ export class GameEngine {
         };
     }
 
+    private enforcer: ((params: any) => any) | null = null;
+
     setWeaponScript(script: WeaponScript) {
         this.weaponScript = script;
         if (this.weaponScript.init) {
             this.weaponScript.init();
         }
+    }
+
+    setEnforcer(callback: (params: any) => any) {
+        this.enforcer = callback;
     }
 
     subscribe(callback: (state: GameState) => void) {
@@ -502,6 +509,41 @@ export class GameEngine {
                             e.y = Math.random() * 500 + 50;
                             e.velocity = { x: 0, y: 0 };
                             this.state.score += 1;
+
+                            // SOLO PROGRESSION LOGIC
+                            if (!this.isMultiplayer) {
+                                const player = this.getLocalPlayer();
+                                if (player) {
+                                    if (player.xp === undefined) player.xp = 0;
+                                    if (player.level === undefined) player.level = 1;
+                                    if (player.maxXp === undefined) player.maxXp = 100;
+                                    if (player.money === undefined) player.money = 0;
+
+                                    player.xp += 25;
+                                    player.money += 15;
+
+                                    if (player.xp >= player.maxXp) {
+                                        player.level++;
+                                        player.xp -= player.maxXp;
+                                        player.maxXp = Math.floor(player.maxXp * 1.5);
+
+                                        if (this.onVisualEffect) {
+                                            this.onVisualEffect({
+                                                type: 'levelup',
+                                                x: player.x,
+                                                y: player.y,
+                                                color: '#00ff9f',
+                                                level: player.level,
+                                                xp: player.xp,
+                                                maxXp: player.maxXp,
+                                                money: player.money,
+                                                playerId: player.id
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+
                             if (this.weaponScript && this.weaponScript.on_kill) {
                                 try { this.weaponScript.on_kill(e.id); } catch (err) { console.error(err); }
                             }
@@ -577,6 +619,11 @@ export class GameEngine {
     }
 
     spawnProjectile(params: any): Entity | null {
+        // APPLY ENFORCEMENT IF REGISTERED
+        if (this.enforcer) {
+            params = this.enforcer(params);
+        }
+
         const player = this.getLocalPlayer();
         const x = params.x ?? (player ? player.x : 400);
         const y = params.y ?? (player ? player.y : 300);
