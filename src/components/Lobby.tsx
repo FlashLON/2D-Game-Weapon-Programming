@@ -279,8 +279,8 @@ export const Lobby: React.FC<LobbyProps> = ({
                                 <>
                                     <div className="grid grid-cols-1 gap-4 pb-4">
                                         {Object.values(ATTRIBUTES).map((attr) => {
-                                            const isUnlocked = userProfile.unlocks.includes(attr.id);
-                                            const currentLimit = userProfile.limits[attr.id] || 0;
+                                            const isUnlocked = attr.isBase || userProfile.unlocks.includes(attr.id);
+                                            const currentLimit = userProfile.limits[attr.id] || attr.startLimit;
                                             const isMaxed = currentLimit >= attr.maxLimit;
                                             const upgradeCost = getUpgradeCost(attr.id, currentLimit);
                                             const canAfford = userProfile.money >= upgradeCost;

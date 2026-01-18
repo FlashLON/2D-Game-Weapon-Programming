@@ -117,7 +117,7 @@ function App() {
     const attr = ATTRIBUTES[attributeId];
     if (!attr) return;
 
-    const currentLimit = userProfile.limits[attributeId] || 0;
+    const currentLimit = userProfile.limits[attributeId] || attr.startLimit;
     const cost = getUpgradeCost(attributeId, currentLimit);
 
     // LEVEL RESTRICTION: Once per level for HP/Cooldown
