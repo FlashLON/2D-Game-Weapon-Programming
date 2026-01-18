@@ -371,7 +371,8 @@ function App() {
     // Ensure we are connected
     const connected = await networkManager.connect(serverUrl);
     if (!connected) {
-      addLog("Network Link Failed. Please check Server URL.", "error");
+      console.error(`[Connection] Failed to reach Relay Server at: ${serverUrl}`);
+      addLog(`Failed to reach ${serverUrl}. Ensure 'node server' is running!`, "error");
       setStatus("Link Failed");
       return;
     }
@@ -398,7 +399,8 @@ function App() {
     // Ensure we are connected
     const connected = await networkManager.connect(serverUrl);
     if (!connected) {
-      addLog("Network Link Failed. Please check Server URL.", "error");
+      console.error(`[Connection] Failed to reach Relay Server at: ${serverUrl}`);
+      addLog(`Failed to reach ${serverUrl}. Ensure 'node server' is running!`, "error");
       setStatus("Link Failed");
       return;
     }

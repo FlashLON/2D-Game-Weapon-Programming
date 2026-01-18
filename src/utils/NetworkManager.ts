@@ -50,7 +50,7 @@ class NetworkManager {
             });
 
             this.socket.once('connect_error', (err) => {
-                console.error('[NetworkManager] ⚠️ Connection failed:', err.message);
+                console.error('[NetworkManager] ⚠️ Connection failed:', err.message, err);
                 this.connected = false;
                 this.connectionListeners.forEach(fn => fn(false));
                 resolve(false);
