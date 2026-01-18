@@ -4,7 +4,7 @@ import {
     Flame, Skull, Link,
     Compass, RefreshCw, Layers,
     Heart, Magnet, Repeat,
-    Wind, Wand2
+    Wind, Wand2, Clock
 } from 'lucide-react';
 
 export interface AttributeConfig {
@@ -44,6 +44,30 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         baseCost: 200,
         costMultiplier: 1.6,
         icon: Skull
+    },
+    hp: {
+        id: 'hp',
+        name: 'Life (Max HP)',
+        description: 'Maximum health points. (Once per Level)',
+        isBase: true,
+        startLimit: 100,
+        maxLimit: 2000,
+        upgradeStep: 50,
+        baseCost: 200,
+        costMultiplier: 1.7,
+        icon: Heart
+    },
+    cooldown: {
+        id: 'cooldown',
+        name: 'Fire Rate (Cooldown)',
+        description: 'Time between weapon fires. (Once per Level)',
+        isBase: true,
+        startLimit: 0.5,
+        maxLimit: 0.05,
+        upgradeStep: -0.05,
+        baseCost: 200,
+        costMultiplier: 1.8,
+        icon: Clock
     },
     lifetime: {
         id: 'lifetime',

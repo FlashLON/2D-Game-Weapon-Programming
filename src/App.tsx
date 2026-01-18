@@ -66,8 +66,9 @@ function App() {
       xp: 0,
       maxXp: 100,
       money: 0,
-      unlocks: ['speed', 'damage'],
-      limits: { speed: 200, damage: 5 }
+      unlocks: ['speed', 'damage', 'hp', 'cooldown'],
+      limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
+      lastUpgradeLevel: {}
     };
   });
   const [username, setUsername] = useState<string>('');
@@ -76,6 +77,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
+    gameEngine.setPlayerStats(userProfile);
 
     // Sync to server if logged in
     if (isLoggedIn && networkManager.isConnected()) {
@@ -118,6 +120,13 @@ function App() {
     const currentLimit = userProfile.limits[attributeId] || 0;
     const cost = getUpgradeCost(attributeId, currentLimit);
 
+    // LEVEL RESTRICTION: Once per level for HP/Cooldown
+    const lastLevel = userProfile.lastUpgradeLevel?.[attributeId] || 0;
+    if ((attributeId === 'hp' || attributeId === 'cooldown') && lastLevel >= userProfile.level) {
+      addLog(`You must Level Up before upgrading ${attr.name} again!`, 'warning');
+      return;
+    }
+
     if (userProfile.money < cost) {
       addLog(`Not enough money! Need $${cost.toLocaleString()}`, 'error');
       return;
@@ -136,6 +145,10 @@ function App() {
       limits: {
         ...prev.limits,
         [attributeId]: newLimit
+      },
+      lastUpgradeLevel: {
+        ...(prev.lastUpgradeLevel || {}),
+        [attributeId]: prev.level
       }
     }));
 

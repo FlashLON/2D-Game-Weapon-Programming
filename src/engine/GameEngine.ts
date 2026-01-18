@@ -119,6 +119,8 @@ export class GameEngine {
     private isMultiplayer = false;
     private localPlayerId: string | null = null;
     private lastHitInfo: any = null;
+    private lastFireTime: number = 0;
+    private playerStats = { hp: 100, cooldown: 0.5 };
 
     constructor() {
         // Initialize default state with empty arrays
@@ -146,6 +148,20 @@ export class GameEngine {
 
     setEnforcer(callback: (params: any) => any) {
         this.enforcer = callback;
+    }
+
+    setPlayerStats(profile: any) {
+        if (!profile) return;
+        this.playerStats = {
+            hp: profile.limits?.hp || 100,
+            cooldown: profile.limits?.cooldown || 0.5
+        };
+        // Update current player if exists
+        const player = this.getLocalPlayer();
+        if (player) {
+            player.maxHp = this.playerStats.hp;
+            if (player.hp > player.maxHp) player.hp = player.maxHp;
+        }
     }
 
     isMultiplayerMode() {
@@ -184,10 +200,11 @@ export class GameEngine {
     }
 
     reset() {
+        const initialHp = this.playerStats.hp;
         this.state = {
             entities: [
                 // Player
-                { id: 'player', x: 400, y: 300, radius: 20, color: '#00ff9f', hp: 100, maxHp: 100, type: 'player', velocity: { x: 0, y: 0 } },
+                { id: 'player', x: 400, y: 300, radius: 20, color: '#00ff9f', hp: initialHp, maxHp: initialHp, type: 'player', velocity: { x: 0, y: 0 } },
                 // Dummy Enemy
                 { id: 'enemy1', x: 600, y: 300, radius: 20, color: '#ff0055', hp: 50, maxHp: 50, type: 'enemy', velocity: { x: 0, y: 0 } }
             ],
@@ -776,12 +793,16 @@ export class GameEngine {
     }
 
     fireWeapon(targetX: number, targetY: number) {
+        const now = performance.now();
+        if (now - this.lastFireTime < this.playerStats.cooldown * 1000) return null;
+
         if (!this.weaponScript || !this.weaponScript.on_fire) return;
         const player = this.getLocalPlayer();
         if (!player) return;
         try {
             const result = this.weaponScript.on_fire(targetX, targetY, player.x, player.y);
             if (result) {
+                this.lastFireTime = now;
                 const rawParams = result.toJs ? result.toJs() : result;
                 let params: any = {};
                 if (rawParams instanceof Map || (rawParams && typeof rawParams.get === 'function')) {
@@ -806,7 +827,9 @@ export class GameEngine {
                         wave_frequency: proj.wave_frequency,
                         chain_count: proj.chain_count,
                         chain_range: proj.chain_range,
-                        fade_over_time: proj.fade_over_time
+                        fade_over_time: proj.fade_over_time,
+                        vampirism: proj.vampirism,
+                        attraction_force: proj.attraction_force
                     };
                 }
             }

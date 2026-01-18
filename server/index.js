@@ -170,9 +170,10 @@ io.on('connection', (socket) => {
                 xp: 0,
                 maxXp: 100,
                 money: 0,
-                unlocks: ['speed', 'damage'],
-                limits: { speed: 200, damage: 5 },
-                createdAt: new Date()
+                unlocks: ['speed', 'damage', 'hp', 'cooldown'],
+                limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
+                lastUpgradeLevel: {},
+                createdAt: new Date().toISOString()
             };
 
             await upsertUser(username, newUser);
