@@ -41,7 +41,13 @@ function App() {
   // Multiplayer State
   const [isConnected, setIsConnected] = useState(false);
   const [currentRoom, setCurrentRoom] = useState<string | null>(null);
-  const [serverUrl, setServerUrl] = useState("https://2d-game-weapon-programming-production.up.railway.app");
+  const [serverUrl, setServerUrl] = useState(() => {
+    return localStorage.getItem('relay_server_url') || "http://localhost:3000";
+  });
+
+  useEffect(() => {
+    localStorage.setItem('relay_server_url', serverUrl);
+  }, [serverUrl]);
 
   const addLog = (msg: string, type: LogType = 'info') => {
     setLogs(prev => [...prev, {
