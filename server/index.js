@@ -99,7 +99,16 @@ io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
     let currentRoomId = null;
 
+    socket.on('ping', () => {
+        socket.emit('pong', { time: Date.now() });
+    });
+
+    socket.onAny((eventName, ...args) => {
+        console.log(`[SERVER] Received: ${eventName}`, args);
+    });
+
     socket.on('login', async ({ username }) => {
+        console.log(`[AUTH] login attempt for: ${username}`);
         // Wait up to 3 seconds for DB if it's still connecting
         if (!db) {
             let retries = 0;
@@ -119,9 +128,11 @@ io.on('connection', (socket) => {
             let user = await users.findOne({ username });
 
             if (!user) {
+                console.log(`[AUTH] User not found: ${username}`);
                 socket.emit('login_response', { success: false, error: "User not found. Please click signup if you are new." });
                 return;
             }
+            console.log(`[AUTH] User logged in: ${username}`);
 
             // Update last seen
             await users.updateOne({ username }, { $set: { lastSeen: new Date() } });
@@ -151,6 +162,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('signup', async ({ username }) => {
+        console.log(`[AUTH] signup attempt for: ${username}`);
         // Wait up to 3 seconds for DB if it's still connecting
         if (!db) {
             let retries = 0;
@@ -170,6 +182,7 @@ io.on('connection', (socket) => {
             let existing = await users.findOne({ username });
 
             if (existing) {
+                console.log(`[AUTH] Signup failed: ${username} already exists`);
                 socket.emit('login_response', { success: false, error: "Username already exists. Please choose another or login." });
                 return;
             }
@@ -188,7 +201,7 @@ io.on('connection', (socket) => {
             };
 
             await users.insertOne(newUser);
-            console.log(`New user signed up: ${username}`);
+            console.log(`[AUTH] New user signed up: ${username}`);
 
             socket.data.username = username;
 

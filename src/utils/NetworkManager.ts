@@ -18,47 +18,50 @@ class NetworkManager {
 
     connect(serverUrl: string) {
         if (this.socket && this.connected) {
-            console.warn('[NetworkManager] Already connected, skipping init');
+            console.warn('[NetworkManager] Already connected to:', serverUrl);
             this.connectionListeners.forEach(fn => fn(true));
             return;
         }
 
         if (this.socket) {
-            console.log('[NetworkManager] Cleaning up existing socket before reconnect');
+            console.log('[NetworkManager] Disconnecting previous socket');
             this.socket.disconnect();
             this.socket = null;
         }
 
-        console.log('[NetworkManager] Initiating connection to:', serverUrl);
-        this.socket = io(serverUrl, {
+        const url = serverUrl || "http://localhost:3000";
+        console.log('[NetworkManager] 🔌 Connecting to:', url);
+
+        this.socket = io(url, {
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionDelay: 1000,
-            reconnectionAttempts: 5,
-            timeout: 10000
+            reconnectionAttempts: 10,
+            timeout: 20000
         });
 
         // Setup Relays
         this.socket.on('connect', () => {
-            console.log('[NetworkManager] ✅ Socket physically connected');
+            console.log('[NetworkManager] ✅ Connected! ID:', this.socket?.id);
             this.connected = true;
             this.connectionListeners.forEach(fn => fn(true));
         });
 
         this.socket.on('disconnect', (reason) => {
-            console.log('[NetworkManager] ❌ Socket disconnected:', reason);
+            console.log('[NetworkManager] ❌ Disconnected:', reason);
             this.connected = false;
             this.connectionListeners.forEach(fn => fn(false));
         });
 
         this.socket.on('connect_error', (error) => {
-            console.error('[NetworkManager] ⚠️ Connection Error:', error);
+            console.error('[NetworkManager] ⚠️ Connection Error:', error.message);
             this.connected = false;
             this.connectionListeners.forEach(fn => fn(false));
         });
 
         // Game State Relays
         this.socket.on('init', (data: { playerId: string; gameState: GameState }) => {
+            console.log('[NetworkManager] Initialized with ID:', data.playerId);
             this.playerId = data.playerId;
             this.onStateUpdate?.(data.gameState);
         });
@@ -84,11 +87,18 @@ class NetworkManager {
         });
 
         this.socket.on('login_response', (response: any) => {
-            console.log('[NetworkManager] 📧 Received login_response:', response);
+            console.log('[NetworkManager] 📧 LOGIN RESPONSE:', response);
             if (this.onLoginResponse) {
                 this.onLoginResponse(response);
             } else {
-                console.warn('[NetworkManager] ⚠️ No onLoginResponse handler registered in App.tsx!');
+                console.error('[NetworkManager] CRITICAL: No onLoginResponse handler found!');
+            }
+        });
+
+        // Debug: Log all incoming events
+        this.socket.onAny((eventName, ...args) => {
+            if (eventName !== 'state') { // Ignore high-frequency state updates
+                console.log(`[NetworkManager] 📥 Event: ${eventName}`, args);
             }
         });
     }
@@ -104,25 +114,26 @@ class NetworkManager {
 
     joinRoom(roomId: string, settings?: any, profile?: any) {
         if (this.socket && this.connected) {
+            console.log('[NetworkManager] Emit: join_room', roomId);
             this.socket.emit('join_room', { roomId, settings, profile });
         }
     }
 
     login(username: string) {
         if (this.socket && this.connected) {
-            console.log('[NetworkManager] 📤 Emitting login for:', username);
+            console.log('[NetworkManager] 📤 Emit: login', username);
             this.socket.emit('login', { username });
         } else {
-            console.error('[NetworkManager] ❌ Cannot login: not connected');
+            console.error('[NetworkManager] ❌ Emit failed: Not connected');
         }
     }
 
     signup(username: string) {
         if (this.socket && this.connected) {
-            console.log('[NetworkManager] 📤 Emitting signup for:', username);
+            console.log('[NetworkManager] 📤 Emit: signup', username);
             this.socket.emit('signup', { username });
         } else {
-            console.error('[NetworkManager] ❌ Cannot signup: not connected');
+            console.error('[NetworkManager] ❌ Emit failed: Not connected');
         }
     }
 
