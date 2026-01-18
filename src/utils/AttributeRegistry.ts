@@ -8,17 +8,16 @@ export interface AttributeConfig {
     id: string;
     name: string;
     description: string;
-    isBase: boolean; // True if unlocked by default
-    startLimit: number; // Value when first unlocked
-    maxLimit: number; // Absolute hard cap
-    upgradeStep: number; // Value added per upgrade
-    baseCost: number; // Money cost for first upgrade
-    costMultiplier: number; // How much cost increases per level
-    icon: any; // Lucide icon
+    isBase: boolean;
+    startLimit: number;
+    maxLimit: number;
+    upgradeStep: number;
+    baseCost: number;
+    costMultiplier: number;
+    icon: any;
 }
 
 export const ATTRIBUTES: Record<string, AttributeConfig> = {
-    // --- BASE STATS ---
     speed: {
         id: 'speed',
         name: 'Projectile Speed',
@@ -43,8 +42,6 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         costMultiplier: 1.5,
         icon: Skull
     },
-
-    // --- UNLOCKABLE STATS ---
     lifetime: {
         id: 'lifetime',
         name: 'Range / Lifetime',
@@ -91,7 +88,7 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         upgradeStep: 1,
         baseCost: 400,
         costMultiplier: 1.8,
-        icon: Shield // Using Shield as a metaphor for breaking through? Or Move.
+        icon: Shield
     },
     knockback: {
         id: 'knockback',
@@ -146,32 +143,21 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
 export function getUpgradeCost(attributeId: string, currentLimit: number): number {
     const attr = ATTRIBUTES[attributeId];
     if (!attr) return 999999;
-
-    // Calculate how many upgrades have been applied
-    // (Current - Start) / Step
     const upgrades = Math.max(0, Math.round((currentLimit - attr.startLimit) / attr.upgradeStep));
-
     return Math.floor(attr.baseCost * Math.pow(attr.costMultiplier, upgrades));
 }
 
-// Generate 3 random cards for drafting
-// 1. Upgrade existing stats (if not maxed)
-// 2. Unlock new stats (if locked)
 export function generateDraftOptions(
     unlocked: string[],
     limits: Record<string, number>
 ): Array<{ type: 'unlock' | 'upgrade', attributeId: string, value: number }> {
     const options: Array<{ type: 'unlock' | 'upgrade', attributeId: string, value: number }> = [];
-
     const allIds = Object.keys(ATTRIBUTES);
     const lockedIds = allIds.filter(id => !unlocked.includes(id));
     const upgradableIds = unlocked.filter(id => {
         const attr = ATTRIBUTES[id];
         return (limits[id] || 0) < attr.maxLimit;
     });
-
-    // Strategy: 1 New Unlock (if available) + 2 Upgrades (if available)
-    // Or pure random
 
     interface DraftPoolItem {
         type: 'unlock' | 'upgrade';
@@ -180,25 +166,14 @@ export function generateDraftOptions(
     }
 
     const pool: DraftPoolItem[] = [];
-
-    // Add potential unlocks
     lockedIds.forEach(id => pool.push({ type: 'unlock', attributeId: id, weight: 2 }));
-
-    // Add potential upgrades
     upgradableIds.forEach(id => pool.push({ type: 'upgrade', attributeId: id, weight: 5 }));
 
-    // Naive shuffle and pick 3 unique attributes
-    // Ensure we don't pick the same attribute twice if possible
-
     const pickedAttributes = new Set<string>();
-
     for (let i = 0; i < 3; i++) {
-        // Filter pool to exclude already picked attributes for this draft
         const validPool = pool.filter(p => !pickedAttributes.has(p.attributeId));
         if (validPool.length === 0) break;
-
         const pick = validPool[Math.floor(Math.random() * validPool.length)];
-
         let value = 0;
         if (pick.type === 'unlock') {
             value = ATTRIBUTES[pick.attributeId].startLimit;
@@ -206,14 +181,8 @@ export function generateDraftOptions(
             const current = limits[pick.attributeId] || ATTRIBUTES[pick.attributeId].startLimit;
             value = current + ATTRIBUTES[pick.attributeId].upgradeStep;
         }
-
-        options.push({
-            type: pick.type,
-            attributeId: pick.attributeId,
-            value: value
-        });
+        options.push({ type: pick.type, attributeId: pick.attributeId, value: value });
         pickedAttributes.add(pick.attributeId);
     }
-
     return options;
 }
