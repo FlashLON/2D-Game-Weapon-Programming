@@ -338,6 +338,24 @@ setInterval(() => {
         room.projectiles.forEach((proj, i) => {
             proj.lifetime -= dt;
             if (proj.lifetime <= 0) {
+                // Split on Death
+                if (proj.split_on_death > 0) {
+                    for (let s = 0; s < proj.split_on_death; s++) {
+                        const angle = (Math.PI * 2 / proj.split_on_death) * s;
+                        room.projectiles.push({
+                            id: Math.random().toString(36).substr(2, 9),
+                            playerId: proj.playerId,
+                            type: 'projectile',
+                            x: proj.x, y: proj.y,
+                            velocity: { x: Math.cos(angle) * 300, y: Math.sin(angle) * 300 },
+                            lifetime: 2,
+                            maxLifetime: 2,
+                            radius: (proj.radius || 5) * 0.6,
+                            damage: (proj.damage || 10) * 0.5,
+                            color: proj.color
+                        });
+                    }
+                }
                 room.projectiles.splice(i, 1);
                 return;
             }
@@ -408,6 +426,22 @@ setInterval(() => {
                     if (proj.x < proj.radius || proj.x > 800 - proj.radius) proj.velocity.x *= -proj.bounciness;
                     if (proj.y < proj.radius || proj.y > 600 - proj.radius) proj.velocity.y *= -proj.bounciness;
                 }
+
+                // Attraction Force
+                if (proj.attraction_force > 0) {
+                    nearby.forEach(ent => {
+                        if (ent.id === proj.playerId || ent.type === 'projectile') return;
+                        const dx = proj.x - ent.x;
+                        const dy = proj.y - ent.y;
+                        const dSq = dx * dx + dy * dy;
+                        if (dSq < 200 * 200) {
+                            const mag = Math.sqrt(dSq) || 1;
+                            const force = (proj.attraction_force * 100) / (mag + 1);
+                            ent.velocity.x += (dx / mag) * force * dt;
+                            ent.velocity.y += (dy / mag) * force * dt;
+                        }
+                    });
+                }
             }
 
             // Collisions
@@ -415,7 +449,14 @@ setInterval(() => {
                 if (ent.id === proj.playerId || ent.type === 'projectile') return;
                 const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
                 if (dist < ent.radius + proj.radius) {
-                    ent.hp -= (proj.damage || 10);
+                    const dmg = (proj.damage || 10);
+                    ent.hp -= dmg;
+
+                    // Vampirism
+                    if (proj.vampirism > 0 && room.players[proj.playerId]) {
+                        const shooter = room.players[proj.playerId];
+                        shooter.hp = Math.min(shooter.maxHp, shooter.hp + (dmg * proj.vampirism));
+                    }
 
                     // Knockback
                     if (proj.knockback > 0) {
