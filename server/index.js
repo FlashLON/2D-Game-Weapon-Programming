@@ -3,15 +3,34 @@ const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
+const { attachDatabasePool } = require('@vercel/functions');
 
-// DATABASE SETUP
+// DATABASE SETUP (Vercel Optimized)
 let db = null;
-if (process.env.MONGODB_URI) {
-    const client = new MongoClient(process.env.MONGODB_URI);
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (MONGODB_URI) {
+    const options = {
+        appName: "devrel.vercel.integration",
+        maxIdleTimeMS: 5000,
+        // Recommended for serverless/vercel environments
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+    };
+
+    const client = new MongoClient(MONGODB_URI, options);
+
+    // Attach for proper cleanup in Vercel/Serverless suspended states
+    try {
+        attachDatabasePool(client);
+    } catch (e) {
+        console.warn("⚠️ attachDatabasePool skipped (non-vercel environment or error):", e.message);
+    }
+
     client.connect()
         .then(() => {
             db = client.db('CYBERCORE');
-            console.log("✅ Connected to MongoDB: CYBERCORE");
+            console.log("✅ Connected to MongoDB: CYBERCORE (Vercel-Optimized)");
         })
         .catch(err => {
             console.error("❌ MongoDB Connection Error:", err);
@@ -38,107 +57,48 @@ const rooms = {};
 // --- SPATIAL PARTITIONING CONFIG ---
 const PROJECTILE_CAP = 200;
 const CELL_SIZE = 100;
-const GRID_COLS = 8;
-const GRID_ROWS = 6;
 
-function createGameState() {
-    return {
-        players: {},
-        enemies: [],
-        projectiles: [],
-        spatialGrid: Array.from({ length: GRID_COLS * GRID_ROWS }, () => [])
-    };
+function getGridCell(x, y) {
+    return `${Math.floor(x / CELL_SIZE)},${Math.floor(y / CELL_SIZE)}`;
 }
 
-function getCellIndex(x, y) {
-    const col = Math.floor(Math.max(0, Math.min(x, 799)) / CELL_SIZE);
-    const row = Math.floor(Math.max(0, Math.min(y, 599)) / CELL_SIZE);
-    return row * GRID_COLS + col;
-}
+function updateRoomGrid(room) {
+    room.grid = {};
+    const allEntities = [
+        ...Object.values(room.players),
+        ...room.enemies,
+        ...room.projectiles
+    ];
 
-function updateRoomGrid(gameState) {
-    gameState.spatialGrid = Array.from({ length: GRID_COLS * GRID_ROWS }, () => []);
-    Object.values(gameState.players).forEach(p => {
-        const idx = getCellIndex(p.x, p.y);
-        gameState.spatialGrid[idx].push(p);
+    allEntities.forEach(ent => {
+        const cell = getGridCell(ent.x, ent.y);
+        if (!room.grid[cell]) room.grid[cell] = [];
+        room.grid[cell].push(ent);
     });
 }
 
-function getNearbyEntities(gameState, x, y) {
-    const col = Math.floor(Math.max(0, Math.min(x, 799)) / CELL_SIZE);
-    const row = Math.floor(Math.max(0, Math.min(y, 599)) / CELL_SIZE);
-    let nearby = [];
-    for (let r = row - 1; r <= row + 1; r++) {
-        for (let c = col - 1; c <= col + 1; c++) {
-            if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
-                nearby.push(...gameState.spatialGrid[r * GRID_COLS + c]);
-            }
+function getNearbyEntities(room, x, y, radius = CELL_SIZE) {
+    const cells = new Set();
+    for (let dx = -radius; dx <= radius; dx += CELL_SIZE) {
+        for (let dy = -radius; dy <= radius; dy += CELL_SIZE) {
+            cells.add(getGridCell(x + dx, y + dy));
         }
     }
+    const nearby = [];
+    cells.forEach(cell => {
+        if (room.grid[cell]) nearby.push(...room.grid[cell]);
+    });
     return nearby;
 }
 
-const spawnFragments = (room, parent, count) => {
-    for (let i = 0; i < count; i++) {
-        if (room.projectiles.length >= PROJECTILE_CAP) break;
-        const angle = (Math.PI * 2 / count) * i;
-        room.projectiles.push({
-            id: `frag_${parent.id}_${i}_${Math.random().toString(36).substr(2, 5)}`,
-            playerId: parent.playerId,
-            x: parent.x,
-            y: parent.y,
-            radius: parent.radius * 0.6,
-            color: parent.color,
-            damage: (parent.damage || 10) * 0.5,
-            type: 'projectile',
-            velocity: { x: Math.cos(angle) * 200, y: Math.sin(angle) * 200 },
-            lifetime: 1.0,
-            maxLifetime: 1.0,
-            pierce: 1
-        });
-    }
-};
-
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', activeRooms: Object.keys(rooms).length });
-});
-
+// Socket handler
 io.on('connection', (socket) => {
+    console.log(`User connected: ${socket.id}`);
     let currentRoomId = null;
 
-    const leaveRoom = (id) => {
-        if (currentRoomId && rooms[currentRoomId]) {
-            const room = rooms[currentRoomId];
-            delete room.players[id];
-
-            if (Object.keys(room.players).length === 0) {
-                delete rooms[currentRoomId];
-            } else {
-                io.to(currentRoomId).emit('playerLeft', {
-                    playerId: id,
-                    playerCount: Object.keys(room.players).length
-                });
-            }
-        }
-    };
-
-    // --- DATABASE INTEGRATION ---
-    // Handle Login (Get/Create User)
     socket.on('login', async ({ username }) => {
-        if (!process.env.MONGODB_URI) {
-            console.warn("No MONGODB_URI set. Using temporary local profile.");
-            // Mock response if no DB
-            socket.emit('login_response', {
-                success: true,
-                profile: {
-                    level: 1,
-                    xp: 0,
-                    maxXp: 100,
-                    money: 0,
-                    unlocks: ['speed', 'damage'],
-                    limits: { speed: 200, damage: 5 }
-                }
-            });
+        if (!db) {
+            socket.emit('login_response', { success: false, error: "Database not connected" });
             return;
         }
 
@@ -156,26 +116,24 @@ io.on('connection', (socket) => {
                     money: 0,
                     unlocks: ['speed', 'damage'],
                     limits: { speed: 200, damage: 5 },
-                    createdAt: new Date()
+                    createdAt: new Date(),
+                    lastSeen: new Date()
                 };
                 await users.insertOne(user);
                 console.log(`New user created: ${username}`);
+            } else {
+                // Update last seen
+                await users.updateOne({ username }, { $set: { lastSeen: new Date() } });
             }
 
-            // Ensure existing users have unlocks/limits (migration)
-            if (!user.unlocks) {
-                user.unlocks = ['speed', 'damage'];
-                user.limits = { speed: 200, damage: 5 };
-                await users.updateOne(
-                    { username },
-                    { $set: { unlocks: user.unlocks, limits: user.limits } }
-                );
-            }
+            // Sync tags
+            socket.data.username = username;
 
-            // Send profile back
+            // Send profile back with all fields
             socket.emit('login_response', {
                 success: true,
                 profile: {
+                    username: user.username,
                     level: user.level,
                     xp: user.xp,
                     maxXp: user.maxXp,
@@ -185,9 +143,6 @@ io.on('connection', (socket) => {
                 }
             });
 
-            // Tag socket with username
-            socket.data.username = username;
-
         } catch (err) {
             console.error("Login error:", err);
             socket.emit('login_response', { success: false, error: "Database error" });
@@ -195,11 +150,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('join_room', ({ roomId, settings, profile }) => {
-        // CLEANUP: Always leave old room before joining new one
         leaveRoom(socket.id);
         if (currentRoomId) socket.leave(currentRoomId);
 
-        // If no roomId (joining Home Page / Limbo), just exit
         if (!roomId) {
             currentRoomId = null;
             return;
@@ -208,38 +161,61 @@ io.on('connection', (socket) => {
         currentRoomId = roomId;
         socket.join(currentRoomId);
 
-        if (!rooms[currentRoomId]) {
-            rooms[currentRoomId] = createGameState();
-            // Store room settings (e.g., visibility)
-            rooms[currentRoomId].settings = settings || { public: true };
-            console.log(`Room ${roomId} created with settings:`, rooms[currentRoomId].settings);
+        if (!rooms[roomId]) {
+            rooms[roomId] = {
+                players: {},
+                projectiles: [],
+                enemies: [],
+                grid: {},
+                lastUpdate: Date.now(),
+                score: 0
+            };
+
+            // Spawn initial enemies
+            for (let i = 0; i < 5; i++) {
+                rooms[roomId].enemies.push({
+                    id: `enemy_${Math.random().toString(36).substr(2, 5)}`,
+                    type: 'enemy',
+                    x: Math.random() * 700 + 50,
+                    y: Math.random() * 500 + 50,
+                    radius: 20,
+                    hp: 50,
+                    maxHp: 50,
+                    color: '#ff0055',
+                    velocity: { x: 0, y: 0 }
+                });
+            }
         }
 
-        const room = rooms[currentRoomId];
+        const room = rooms[roomId];
         room.players[socket.id] = {
             id: socket.id,
-            x: Math.random() * 700 + 50,
-            y: Math.random() * 500 + 50,
+            username: socket.data.username || 'Guest',
+            x: 400,
+            y: 300,
             radius: 20,
+            hp: 100,
+            maxHp: 100,
             color: '#00ff9f',
-            hp: 100, maxHp: 100,
-            type: 'player',
             velocity: { x: 0, y: 0 },
-            kills: 0, deaths: 0,
-            username: socket.data.username || null, // Attach username for DB saves
-            // Progression (Sync from client if available)
-            level: (settings?.profile?.level) || (profile?.level) || 1,
-            xp: (settings?.profile?.xp) || (profile?.xp) || 0,
-            maxXp: (settings?.profile?.maxXp) || (profile?.maxXp) || 100,
-            money: (settings?.profile?.money) || (profile?.money) || 0,
-            unlocks: (profile?.unlocks) || ['speed', 'damage'],
-            limits: (profile?.limits) || { speed: 200, damage: 5 }
+            kills: 0,
+            deaths: 0,
+            // Sync progression values to room state
+            level: profile?.level || 1,
+            xp: profile?.xp || 0,
+            maxXp: profile?.maxXp || 100,
+            money: profile?.money || 0,
+            unlocks: profile?.unlocks || ['speed', 'damage'],
+            limits: profile?.limits || { speed: 200, damage: 5 }
         };
 
-        socket.emit('init', { playerId: socket.id, gameState: room });
-        io.to(currentRoomId).emit('playerJoined', {
+        socket.emit('init', {
             playerId: socket.id,
-            playerCount: Object.keys(room.players).length
+            gameState: {
+                entities: [...Object.values(room.players), ...room.enemies],
+                projectiles: room.projectiles,
+                score: room.score
+            }
         });
 
         console.log(`Player ${socket.id} joined room ${currentRoomId}`);
@@ -259,58 +235,49 @@ io.on('connection', (socket) => {
                 p.money = profile.money;
                 p.unlocks = profile.unlocks;
                 p.limits = profile.limits;
-                p.username = socket.data.username;
             }
         }
     });
 
-    socket.on('move', (velocity) => {
-        const room = rooms[currentRoomId];
-        if (room && room.players[socket.id]) {
-            room.players[socket.id].velocity = velocity;
+    socket.on('move', (data) => {
+        if (currentRoomId && rooms[currentRoomId]) {
+            const player = rooms[currentRoomId].players[socket.id];
+            if (player) {
+                player.velocity.x = data.x;
+                player.velocity.y = data.y;
+            }
         }
     });
 
     socket.on('fire', (data) => {
-        const room = rooms[currentRoomId];
-        if (room && room.players[socket.id]) {
-            const player = room.players[socket.id];
-            if (room.projectiles.length < PROJECTILE_CAP) {
-                room.projectiles.push({
-                    id: `proj_${Math.random().toString(36).substr(2, 9)}_${socket.id}`,
-                    playerId: socket.id,
-                    x: data.x ?? player.x,
-                    y: data.y ?? player.y,
-                    radius: data.radius || 5,
-                    color: data.color || '#fce83a',
-                    damage: data.damage || 25,
-                    type: 'projectile',
-                    velocity: { x: data.vx || 0, y: data.vy || 0 },
-                    homing: data.homing || 0,
-                    lifetime: data.lifetime || 5,
-                    maxLifetime: data.lifetime || 5,
-                    acceleration: data.acceleration || 0,
-                    knockback: data.knockback || 0,
-                    pierce: data.pierce || 1,
-                    orbit_player: data.orbit_player || false,
-                    vampirism: data.vampirism || 0,
-                    split_on_death: data.split_on_death || 0,
-                    attraction_force: data.attraction_force || 0,
-                    bounciness: data.bounciness || 0,
-                    spin: data.spin || 0,
-                    chain_count: data.chain_count || 0,
-                    chain_range: data.chain_range || 0,
-                    orbit_speed: data.orbit_speed || 3.0,
-                    orbit_radius: data.orbit_radius || 60,
-                    wave_amplitude: data.wave_amplitude || 0,
-                    wave_frequency: data.wave_frequency || 0,
-                    explosion_radius: data.explosion_radius || 0,
-                    explosion_damage: data.explosion_damage || 0,
-                    fade_over_time: data.fade_over_time || false
-                });
+        if (currentRoomId && rooms[currentRoomId]) {
+            const room = rooms[currentRoomId];
+            if (room.projectiles.length > PROJECTILE_CAP) {
+                room.projectiles.shift(); // Max projectile limit
             }
+            room.projectiles.push({
+                ...data,
+                id: Math.random().toString(36).substr(2, 9),
+                playerId: socket.id,
+                type: 'projectile',
+                velocity: { x: data.vx, y: data.vy },
+                lifetime: data.lifetime || 5,
+                maxLifetime: data.lifetime || 5,
+                radius: data.radius || 5
+            });
         }
     });
+
+    function leaveRoom(id) {
+        for (const roomId in rooms) {
+            if (rooms[roomId].players[id]) {
+                delete rooms[roomId].players[id];
+                if (Object.keys(rooms[roomId].players).length === 0) {
+                    delete rooms[roomId];
+                }
+            }
+        }
+    }
 
     socket.on('disconnect', () => {
         leaveRoom(socket.id);
@@ -318,12 +285,10 @@ io.on('connection', (socket) => {
 });
 
 async function saveProgress(username, stats) {
-    if (!username || !process.env.MONGODB_URI || !db) {
-        console.warn(`[Save] Early return: username=${username}, db=${!!db}`);
+    if (!username || !MONGODB_URI || !db) {
         return;
     }
     try {
-        console.log(`[Save] Updating profile for ${username}...`);
         await db.collection('users').updateOne(
             { username },
             {
@@ -338,7 +303,6 @@ async function saveProgress(username, stats) {
                 }
             }
         );
-        console.log(`[Save] Successfully saved profile for ${username}`);
     } catch (err) {
         console.error(`❌ [Save] Failed to save progress for ${username}:`, err);
     }
@@ -358,25 +322,23 @@ setInterval(() => {
     for (const [roomId, room] of Object.entries(rooms)) {
         updateRoomGrid(room);
 
-        Object.values(room.players).forEach(p => {
-            p.x += p.velocity.x * dt;
-            p.y += p.velocity.y * dt;
-            p.x = Math.max(p.radius, Math.min(800 - p.radius, p.x));
-            p.y = Math.max(p.radius, Math.min(600 - p.radius, p.y));
-        });
+        // Update Physics
+        room.projectiles.forEach((proj, i) => {
+            proj.lifetime -= dt;
+            if (proj.lifetime <= 0) {
+                room.projectiles.splice(i, 1);
+                return;
+            }
 
-        for (let i = room.projectiles.length - 1; i >= 0; i--) {
-            const proj = room.projectiles[i];
-            let removed = false;
-            const nearby = getNearbyEntities(room, proj.x, proj.y);
+            const nearby = getNearbyEntities(room, proj.x, proj.y, proj.radius + 50);
 
+            // Orbit logic
             if (proj.orbit_player) {
                 const owner = room.players[proj.playerId];
                 if (owner) {
                     if (proj.orbitAngle === undefined) {
-                        const dx = proj.x - owner.x, dy = proj.y - owner.y;
-                        proj.orbitRadius = proj.orbit_radius || Math.sqrt(dx * dx + dy * dy);
-                        proj.orbitAngle = Math.atan2(dy, dx);
+                        proj.orbitAngle = Math.atan2(proj.y - owner.y, proj.x - owner.x);
+                        proj.orbitRadius = Math.sqrt((proj.x - owner.x) ** 2 + (proj.y - owner.y) ** 2) || (proj.orbit_radius || 100);
                     }
                     proj.orbitAngle += (proj.orbit_speed || 4.0) * dt;
                     proj.x = owner.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
@@ -399,7 +361,7 @@ setInterval(() => {
                 if (proj.homing && proj.homing > 0) {
                     let nearest = null, minDistSq = Infinity;
                     nearby.forEach(ent => {
-                        if (ent.id === proj.playerId) return;
+                        if (ent.id === proj.playerId || ent.type === 'projectile') return;
                         const dSq = (ent.x - proj.x) ** 2 + (ent.y - proj.y) ** 2;
                         if (dSq < minDistSq) { minDistSq = dSq; nearest = ent; }
                     });
@@ -420,7 +382,7 @@ setInterval(() => {
 
                 if (proj.wave_amplitude > 0) {
                     const elapsed = proj.maxLifetime - proj.lifetime;
-                    const offset = Math.sin(elapsed * proj.wave_frequency) * proj.wave_amplitude;
+                    const offset = Math.sin(elapsed * (proj.wave_frequency || 10)) * proj.wave_amplitude;
                     const perpX = -proj.velocity.y, perpY = proj.velocity.x;
                     const mag = Math.sqrt(perpX ** 2 + perpY ** 2) || 1;
                     proj.renderX = proj.x + (perpX / mag) * offset;
@@ -436,143 +398,72 @@ setInterval(() => {
                 }
             }
 
-            let hitSomething = false;
-            for (const ent of nearby) {
-                if (ent.id === proj.playerId || ent.type === 'projectile') continue;
+            // Collisions
+            nearby.forEach(ent => {
+                if (ent.id === proj.playerId || ent.type === 'projectile') return;
                 const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
                 if (dist < ent.radius + proj.radius) {
                     ent.hp -= (proj.damage || 10);
-                    hitSomething = true;
 
-                    // CHAIN LOGIC
-                    if (proj.chain_count > 0 && proj.chain_range > 0) {
-                        const targets = nearby.filter(e => e.id !== ent.id && e.id !== proj.playerId && e.type !== 'projectile');
-                        targets.sort((a, b) => Math.sqrt((a.x - ent.x) ** 2 + (a.y - ent.y) ** 2) - Math.sqrt((b.x - ent.x) ** 2 + (b.y - ent.y) ** 2));
-                        for (let j = 0; j < Math.min(proj.chain_count, targets.length); j++) {
-                            const t = targets[j];
-                            if (Math.sqrt((t.x - ent.x) ** 2 + (t.y - ent.y) ** 2) < proj.chain_range) {
-                                t.hp -= (proj.damage || 10) * 0.5;
-                            }
-                        }
+                    // Cleanup projectile unless piercing
+                    if (proj.pierce && proj.pierce > 1) {
+                        proj.pierce--;
+                    } else {
+                        room.projectiles.splice(i, 1);
                     }
 
-                    // VISUAL EFFECTS: Grid impulse and particles on hit
+                    // Effects
                     io.to(roomId).emit('visual_effect', {
-                        type: 'impact',
-                        x: ent.x,
-                        y: ent.y,
-                        color: ent.color,
-                        strength: 15,
-                        radius: 80
+                        type: 'impact', x: ent.x, y: ent.y, color: ent.color, strength: 15, radius: 80
                     });
 
                     if (ent.hp <= 0) {
                         ent.hp = ent.maxHp;
                         ent.x = Math.random() * 700 + 50;
                         ent.y = Math.random() * 500 + 50;
-                        ent.deaths = (ent.deaths || 0) + 1;
                         if (room.players[proj.playerId]) {
                             const killer = room.players[proj.playerId];
-                            killer.kills = (killer.kills || 0) + 1;
-
-                            // LEVELING LOGIC
-                            killer.xp += 50; // Base XP for kill
+                            killer.kills++;
+                            killer.xp += 50;
+                            killer.money += 25;
                             if (killer.xp >= killer.maxXp) {
-                                killer.xp -= killer.maxXp;
                                 killer.level++;
-                                killer.maxXp = Math.floor(killer.maxXp * 1.2);
-
-                                const moneyParams = [100, 250, 500, 1000];
-                                const reward = 100 + (killer.level * 50);
-                                killer.money += reward;
-
-                                // SAVE PROGRESS TO DB
-                                if (killer.username) {
-                                    saveProgress(killer.username, killer);
-                                }
-
-                                // Notify user (optional, can just use state sync)
+                                killer.xp -= killer.maxXp;
+                                killer.maxXp = Math.floor(killer.maxXp * 1.5);
                                 io.to(roomId).emit('visual_effect', {
-                                    type: 'levelup',
-                                    x: killer.x,
-                                    y: killer.y,
-                                    color: '#ffd700', // Gold
-                                    strength: 50,
-                                    radius: 120,
-                                    playerId: killer.id,
-                                    level: killer.level,
-                                    xp: killer.xp,
-                                    maxXp: killer.maxXp,
-                                    money: killer.money
+                                    type: 'levelup', x: killer.x, y: killer.y, color: '#ffd700',
+                                    level: killer.level, xp: killer.xp, maxXp: killer.maxXp, money: killer.money, playerId: killer.id
                                 });
                             }
+                            saveProgress(killer.username, killer);
                         }
                     }
-                    if (proj.pierce > 1) { proj.pierce--; hitSomething = false; }
-                    if (hitSomething) break;
                 }
-            }
-
-            if (hitSomething || proj.lifetime <= 0) {
-                // EXPLOSION LOGIC
-                if (proj.explosion_radius > 0) {
-                    const targets = nearby.filter(e => e.id !== proj.playerId && e.type !== 'projectile');
-                    targets.forEach(t => {
-                        const d = Math.sqrt((t.x - (proj.renderX || proj.x)) ** 2 + (t.y - (proj.renderY || proj.y)) ** 2);
-                        if (d < proj.explosion_radius) {
-                            t.hp -= proj.explosion_damage || proj.damage;
-                            if (t.hp <= 0) {
-                                t.hp = t.maxHp; t.x = Math.random() * 700 + 50; t.y = Math.random() * 500 + 50;
-                                t.deaths = (t.deaths || 0) + 1;
-                                if (room.players[proj.playerId]) room.players[proj.playerId].kills++;
-                            }
-                        }
-                    });
-
-                    // VISUAL EFFECTS: Explosion grid impulse and particles
-                    io.to(roomId).emit('visual_effect', {
-                        type: 'explosion',
-                        x: proj.renderX || proj.x,
-                        y: proj.renderY || proj.y,
-                        color: '#ff9f00',
-                        strength: 25,
-                        radius: proj.explosion_radius * 1.5
-                    });
-                }
-
-                if (proj.split_on_death) spawnFragments(room, proj, proj.split_on_death);
-                room.projectiles.splice(i, 1);
-                removed = true;
-            } else if (proj.x < -100 || proj.x > 900 || proj.y < -100 || proj.y > 700) {
-                room.projectiles.splice(i, 1);
-                removed = true;
-            } else {
-                proj.lifetime -= dt;
-            }
-        }
-        if (now - lastBroadcast > BROADCAST_INTERVAL) {
-            const slim = {
-                players: {},
-                projectiles: room.projectiles.filter(p => !p.orbit_player).map(p => ({
-                    id: p.id, x: p.x, y: p.y, vx: p.velocity.x, vy: p.velocity.y,
-                    radius: p.radius, color: p.color, playerId: p.playerId,
-                    wave_amplitude: p.wave_amplitude, wave_frequency: p.wave_frequency,
-                    lifetime: p.lifetime, maxLifetime: p.maxLifetime,
-                    fade_over_time: p.fade_over_time
-                }))
-            };
-            Object.values(room.players).forEach(p => {
-                slim.players[p.id] = {
-                    id: p.id, x: p.x, y: p.y, vx: p.velocity.x, vy: p.velocity.y,
-                    hp: p.hp, maxHp: p.maxHp, color: p.color, radius: p.radius,
-                    kills: p.kills || 0, deaths: p.deaths || 0,
-                    level: p.level || 1, xp: p.xp || 0, maxXp: p.maxXp || 100, money: p.money || 0
-                };
             });
-            io.to(roomId).emit('state', slim);
+        });
+
+        // Player movement
+        Object.values(room.players).forEach(p => {
+            p.x += p.velocity.x * dt;
+            p.y += p.velocity.y * dt;
+            p.x = Math.max(p.radius, Math.min(800 - p.radius, p.x));
+            p.y = Math.max(p.radius, Math.min(600 - p.radius, p.y));
+        });
+    }
+
+    if (now - lastBroadcast > BROADCAST_INTERVAL) {
+        lastBroadcast = now;
+        for (const [roomId, room] of Object.entries(rooms)) {
+            io.to(roomId).emit('state', {
+                players: room.players,
+                enemies: room.enemies,
+                projectiles: room.projectiles,
+                score: room.score
+            });
         }
     }
-    if (now - lastBroadcast > BROADCAST_INTERVAL) lastBroadcast = now;
 }, TICK_INTERVAL);
 
-server.listen(PORT, () => console.log(`🎮 Game server running on port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+});

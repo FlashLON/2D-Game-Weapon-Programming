@@ -179,12 +179,10 @@ function App() {
       console.log("PY:", msg);
       addLog(msg, 'info');
     },
-    get_nearest_enemy: (x: number, y: number) => gameEngine.getNearestEnemy(x, y),
-    get_entities_in_range: (x: number, y: number, range: number) => gameEngine.getEntitiesInRange(x, y, range),
-    get_projectiles: () => gameEngine.getAllProjectiles(),
     get_enemies: () => gameEngine.getEnemies().map(e => ({ id: e.id, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp })),
     get_players: () => gameEngine.getPlayers().map(p => ({ id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp })),
     get_self: () => gameEngine.getPlayer(),
+    get_player: () => gameEngine.getPlayer(), // Alias for Python wrapper
     get_arena_size: () => gameEngine.getArenaBounds(),
     spawn_projectile: (params: any, shouldNetwork: boolean = true) => {
       let jsParams = params;
@@ -232,6 +230,7 @@ function App() {
       if (!player) return null;
       return gameEngine.getClosestProjectile(player.x, player.y);
     },
+    get_entities_in_range: (x: number, y: number, range: number) => gameEngine.getEntitiesInRange(x, y, range),
     get_last_hit_info: () => gameEngine.getLastHitInfo(),
     get_leaderboard: () => gameEngine.getState().leaderboard || [],
   };
