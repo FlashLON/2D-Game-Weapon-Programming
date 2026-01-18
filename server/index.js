@@ -11,9 +11,12 @@ if (process.env.MONGODB_URI) {
     client.connect()
         .then(() => {
             db = client.db('CYBERCORE');
-            console.log("✅ Connected to MongoDB");
+            console.log("✅ Connected to MongoDB: CYBERCORE");
         })
-        .catch(err => console.error("❌ MongoDB Connection Error:", err));
+        .catch(err => {
+            console.error("❌ MongoDB Connection Error:", err);
+            db = null;
+        });
 } else {
     console.warn("⚠️ MONGODB_URI not found. Persistence disabled.");
 }
@@ -256,6 +259,7 @@ io.on('connection', (socket) => {
                 p.money = profile.money;
                 p.unlocks = profile.unlocks;
                 p.limits = profile.limits;
+                p.username = socket.data.username;
             }
         }
     });
@@ -314,8 +318,12 @@ io.on('connection', (socket) => {
 });
 
 async function saveProgress(username, stats) {
-    if (!username || !process.env.MONGODB_URI || !db) return;
+    if (!username || !process.env.MONGODB_URI || !db) {
+        console.warn(`[Save] Early return: username=${username}, db=${!!db}`);
+        return;
+    }
     try {
+        console.log(`[Save] Updating profile for ${username}...`);
         await db.collection('users').updateOne(
             { username },
             {
@@ -330,8 +338,9 @@ async function saveProgress(username, stats) {
                 }
             }
         );
+        console.log(`[Save] Successfully saved profile for ${username}`);
     } catch (err) {
-        console.error("Failed to save progress:", err);
+        console.error(`❌ [Save] Failed to save progress for ${username}:`, err);
     }
 }
 

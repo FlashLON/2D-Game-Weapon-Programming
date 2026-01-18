@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Target, Users2, Shield, Sword, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Unlock, Zap, Play, Wrench } from 'lucide-react';
+import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2 } from 'lucide-react';
 import { Tutorial } from './Tutorial';
-import { Workshop } from './Workshop';
+import { ATTRIBUTES, getUpgradeCost } from '../utils/AttributeRegistry';
 
 interface LobbyProps {
     onJoinRoom: (roomId: string, settings?: any) => void;
@@ -32,12 +32,11 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [loginName, setLoginName] = useState('');
     const [showSettings, setShowSettings] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
-    const [viewMode, setViewMode] = useState<'arena' | 'workshop'>('arena');
 
     // Multiplayer Creation State
     const [activeTab, setActiveTab] = useState<'join' | 'create'>('join');
     const [createName, setCreateName] = useState('');
-    const [isPublic, setIsPublic] = useState(true);
+    const [isPublic] = useState(true);
 
     const handleJoin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,7 +52,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     };
 
     return (
-        <div className="flex-1 bg-[#0a0a0c] flex items-center justify-center p-8 relative overflow-hidden">
+        <div className="flex-1 bg-[#0a0a0c] flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
             {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
 
             {/* Dynamic Background */}
@@ -63,31 +62,18 @@ export const Lobby: React.FC<LobbyProps> = ({
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
             </div>
 
-            <div className="max-w-5xl w-full flex flex-col gap-12 z-10">
+            <div className="max-w-7xl w-full flex flex-col gap-8 z-10 h-full max-h-[90vh]">
                 {/* Header Section */}
-                <div className="text-center space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyber-accent/10 border border-cyber-accent/20 text-cyber-accent text-[10px] font-bold tracking-[0.2em] uppercase mb-4">
+                <div className="text-center shrink-0">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyber-accent/10 border border-cyber-accent/20 text-cyber-accent text-[10px] font-bold tracking-[0.2em] uppercase mb-2">
                         <Cpu size={12} />
                         Neural Combat v2.5
                     </div>
-                    <h1 className="text-7xl font-black text-white tracking-tighter">
+                    <h1 className="text-5xl lg:text-6xl font-black text-white tracking-tighter">
                         CYBER<span className="text-cyber-accent">CORE</span>
                     </h1>
 
-                    {userProfile && isLoggedIn ? (
-                        <div className="flex flex-col items-center justify-center gap-2 my-2 animate-in fade-in slide-in-from-top-4">
-                            <div className="text-cyber-accent text-xs font-bold uppercase tracking-widest mb-1">
-                                WELCOME BACK, {username?.toUpperCase()}
-                            </div>
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/40 border border-cyber-muted/50">
-                                <span className="text-sm font-bold text-blue-400">LVL {userProfile.level}</span>
-                                <span className="text-cyber-muted text-xs mx-1">|</span>
-                                <span className="text-sm font-bold text-yellow-500">XP {Math.floor(userProfile.xp)}/{userProfile.maxXp}</span>
-                                <span className="text-cyber-muted text-xs mx-1">|</span>
-                                <span className="text-sm font-bold text-emerald-400">${userProfile.money.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    ) : (
+                    {!isLoggedIn && (
                         <div className="flex flex-col items-center justify-center gap-4 my-2">
                             <div className="flex gap-2">
                                 <input
@@ -103,206 +89,110 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     Login / Signup
                                 </button>
                             </div>
-                            <div className="text-[10px] text-cyber-muted uppercase tracking-widest">
-                                Connect to Cloud Database to Save Progress
-                            </div>
                         </div>
                     )}
-
-                    <p className="text-cyber-muted text-xl max-w-2xl mx-auto">
-                        Design your weapon logic in Python. Test in the sandbox. Dominate the multiplayer arena.
-                    </p>
                 </div>
 
-                {/* Tab Navigation */}
-                <div className="flex items-center justify-center gap-4 mb-8">
-                    <button
-                        onClick={() => setViewMode('arena')}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${viewMode === 'arena'
-                                ? 'bg-cyber-accent text-black'
-                                : 'bg-cyber-dark border border-cyber-muted text-cyber-muted hover:border-cyber-accent hover:text-white'
-                            }`}
-                    >
-                        <Target size={20} />
-                        ARENA
-                    </button>
-                    <button
-                        onClick={() => setViewMode('workshop')}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${viewMode === 'workshop'
-                                ? 'bg-cyber-accent text-black'
-                                : 'bg-cyber-dark border border-cyber-muted text-cyber-muted hover:border-cyber-accent hover:text-white'
-                            }`}
-                    >
-                        <Wrench size={20} />
-                        WORKSHOP
-                    </button>
-                </div>
+                {/* Main Content: 2-Column Layout */}
+                <div className="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
 
-                {/* Conditional Content */}
-                {viewMode === 'workshop' ? (
-                    userProfile && onUpgrade ? (
-                        <Workshop userProfile={userProfile} onUpgrade={onUpgrade} />
-                    ) : (
-                        <div className="text-center text-cyber-muted py-12">
-                            Please log in to access the Workshop
-                        </div>
-                    )
-                ) : (
-                    <>
-                        {/* Main Selection Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-[500px]">
+                    {/* LEFT: Arena Selection (60% width) */}
+                    <div className="flex-[3] flex flex-col gap-6 overflow-y-auto pr-2">
+                        <h2 className="text-2xl font-black text-white flex items-center gap-2 uppercase tracking-widest">
+                            <Target className="text-cyber-accent" />
+                            Select Arena
+                        </h2>
 
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
                             {/* Solo Sandbox Card */}
-                            <div className="bg-cyber-light/30 border-2 border-cyber-muted/50 rounded-3xl p-8 flex flex-col items-start text-left relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-8 text-cyber-muted/20">
-                                    <Cpu size={160} />
+                            <div className="bg-cyber-light/40 border-2 border-cyber-muted/30 rounded-3xl p-6 flex flex-col relative overflow-hidden group hover:border-cyber-accent/50 transition-all">
+                                <div className="absolute top-0 right-0 p-4 text-cyber-muted/10 group-hover:text-cyber-accent/10 transition-colors">
+                                    <Cpu size={140} />
                                 </div>
+                                <div className="z-10">
+                                    <h3 className="text-2xl font-black text-white mb-2">SANDBOX</h3>
+                                    <p className="text-cyber-muted text-sm mb-6">Test your Python scripts offline with AI targets.</p>
 
-                                <div className="bg-cyber-accent/20 p-4 rounded-2xl mb-8 z-10">
-                                    <Target className="text-cyber-accent" size={32} />
+                                    <ul className="space-y-2 mb-8">
+                                        <li className="flex items-center gap-2 text-[10px] font-bold text-cyber-muted uppercase font-mono">
+                                            <CheckCircle2 size={12} className="text-emerald-500" /> No Connection Needed
+                                        </li>
+                                        <li className="flex items-center gap-2 text-[10px] font-bold text-cyber-muted uppercase font-mono">
+                                            <CheckCircle2 size={12} className="text-emerald-500" /> Unlimited Retries
+                                        </li>
+                                    </ul>
                                 </div>
-
-                                <h3 className="text-3xl font-black text-white mb-4 z-10">SOLO SANDBOX</h3>
-                                <p className="text-cyber-muted mb-6 max-w-[280px] z-10">
-                                    The ultimate testing ground. Battle AI dummies and refine your weapon logic locally.
-                                </p>
-
-                                <div className="mt-auto flex flex-col gap-4 w-full z-10">
-                                    <button
-                                        onClick={() => onJoinRoom('offline')}
-                                        className="w-full bg-cyber-accent text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-cyber-accent/20"
-                                    >
-                                        <Sword size={20} /> ENTER ARENA
-                                    </button>
-                                    <button
-                                        onClick={() => setShowTutorial(true)}
-                                        className="w-full bg-black/40 border border-cyber-muted text-cyber-muted font-bold py-3 rounded-2xl hover:text-white hover:bg-white/5 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider"
-                                    >
-                                        <BookOpen size={16} /> How to Play
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={() => onJoinRoom('offline')}
+                                    className="mt-auto w-full bg-cyber-accent text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition-all shadow-lg shadow-cyber-accent/20 flex items-center justify-center gap-3 z-10"
+                                >
+                                    <Play size={20} fill="currentColor" /> ENTER SANDBOX
+                                </button>
                             </div>
 
                             {/* Multiplayer Card */}
-                            <div className="bg-cyber-light/40 border-2 border-cyber-muted rounded-3xl p-8 flex flex-col relative">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="bg-blue-500/20 p-4 rounded-2xl">
-                                        <Globe className="text-blue-400" size={32} />
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest flex items-center gap-2 ${isConnected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-cyber-danger/10 text-cyber-danger'}`}>
-                                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-cyber-danger'} animate-ping`} />
-                                        {isConnected ? 'ONLINE' : 'OFFLINE'}
-                                    </div>
+                            <div className="bg-cyber-light/40 border-2 border-cyber-muted/30 rounded-3xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/50 transition-all">
+                                <div className="absolute top-0 right-0 p-4 text-cyber-muted/10 group-hover:text-blue-500/10 transition-colors">
+                                    <Globe size={140} />
                                 </div>
 
-                                <h3 className="text-3xl font-black text-white mb-2 uppercase">Multiplayer</h3>
-
-                                {!isConnected ? (
-                                    <div className="flex-1 flex flex-col justify-center gap-6">
-                                        <p className="text-cyber-muted">
-                                            Connect to the global mainframe to join parties and battle other engineers worldwide.
-                                        </p>
-                                        <div className="space-y-3">
-                                            <button
-                                                onClick={onConnect}
-                                                className="w-full bg-blue-500 text-white font-black py-5 rounded-2xl hover:bg-blue-400 transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-blue-500/20"
-                                            >
-                                                <LinkIcon size={20} />
-                                                INITIALIZE CONNECTION
-                                            </button>
-                                            <button
-                                                onClick={() => setShowSettings(!showSettings)}
-                                                className="w-full text-cyber-muted text-xs font-bold py-2 hover:text-white transition-colors flex items-center justify-center gap-1 uppercase"
-                                            >
-                                                <Settings size={12} /> Server Settings
-                                            </button>
-
-                                            {showSettings && (
-                                                <div className="p-4 bg-black/40 rounded-xl border border-cyber-muted/30 animate-in slide-in-from-top-2">
-                                                    <label className="text-[10px] text-cyber-muted uppercase block mb-2 font-bold tracking-widest">Network URL</label>
-                                                    <input
-                                                        type="text"
-                                                        value={serverUrl}
-                                                        onChange={(e) => setServerUrl(e.target.value)}
-                                                        className="w-full bg-black border border-cyber-muted rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-blue-400 font-mono"
-                                                    />
-                                                </div>
-                                            )}
+                                <div className="z-10">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="text-2xl font-black text-white">MULTIPLAYER</h3>
+                                        <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold tracking-widest flex items-center gap-1.5 ${isConnected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-cyber-danger/10 text-cyber-danger'}`}>
+                                            <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-cyber-danger'} ${isConnected ? 'animate-pulse' : ''}`} />
+                                            {isConnected ? 'ONLINE' : 'OFFLINE'}
                                         </div>
                                     </div>
+                                    <p className="text-cyber-muted text-sm mb-4">Compete against other engineers in real-time.</p>
+                                </div>
+
+                                {!isConnected ? (
+                                    <button
+                                        onClick={onConnect}
+                                        className="mt-auto w-full bg-blue-500 text-white font-black py-4 rounded-2xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-3 z-10"
+                                    >
+                                        <LinkIcon size={20} /> INITIALIZE LINK
+                                    </button>
                                 ) : (
-                                    <div className="flex-1 flex flex-col">
-                                        {/* Tabs */}
-                                        <div className="flex p-1 bg-black/40 rounded-xl mb-6">
+                                    <div className="mt-auto z-10 space-y-4">
+                                        <div className="flex p-1 bg-black/40 rounded-xl">
                                             <button
                                                 onClick={() => setActiveTab('join')}
-                                                className={`flex-1 py-3 px-4 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'join' ? 'bg-blue-600 text-white shadow-lg' : 'text-cyber-muted hover:text-white'}`}
+                                                className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${activeTab === 'join' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
                                             >
-                                                Join Party
+                                                Join Room
                                             </button>
                                             <button
                                                 onClick={() => setActiveTab('create')}
-                                                className={`flex-1 py-3 px-4 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'create' ? 'bg-blue-600 text-white shadow-lg' : 'text-cyber-muted hover:text-white'}`}
+                                                className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${activeTab === 'create' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
                                             >
-                                                Create Party
+                                                Create Room
                                             </button>
                                         </div>
 
                                         {activeTab === 'join' ? (
-                                            <form onSubmit={handleJoin} className="flex-1 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2">
-                                                <div className="relative">
-                                                    <input
-                                                        type="text"
-                                                        value={roomCode}
-                                                        onChange={(e) => setRoomCode(e.target.value)}
-                                                        placeholder="ENTER CODE..."
-                                                        className="w-full bg-black/40 border-2 border-cyber-muted/50 rounded-2xl px-6 py-4 text-white placeholder:text-gray-600 focus:border-blue-400 outline-none transition-all font-mono tracking-widest uppercase"
-                                                    />
-                                                    <Zap className="absolute right-6 top-1/2 -translate-y-1/2 text-cyber-muted" size={20} />
-                                                </div>
-                                                <button
-                                                    type="submit"
-                                                    disabled={!roomCode}
-                                                    className="w-full bg-blue-500 text-white font-black py-4 rounded-2xl hover:bg-blue-400 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale shadow-lg shadow-blue-500/20 mt-auto"
-                                                >
-                                                    CONNECT
+                                            <form onSubmit={handleJoin} className="flex gap-2">
+                                                <input
+                                                    value={roomCode}
+                                                    onChange={(e) => setRoomCode(e.target.value)}
+                                                    placeholder="CODE"
+                                                    className="flex-1 bg-black/60 border border-cyber-muted/30 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-blue-400 transition-all font-mono"
+                                                />
+                                                <button type="submit" className="bg-blue-500 text-white font-black px-6 rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20">
+                                                    JOIN
                                                 </button>
                                             </form>
                                         ) : (
-                                            <form onSubmit={handleCreate} className="flex-1 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2">
-                                                <div>
-                                                    <label className="text-[10px] text-cyber-muted uppercase font-bold tracking-widest mb-2 block">Party Name (Optional)</label>
-                                                    <input
-                                                        type="text"
-                                                        value={createName}
-                                                        onChange={(e) => setCreateName(e.target.value)}
-                                                        placeholder="RANDOM"
-                                                        className="w-full bg-black/40 border-2 border-cyber-muted/50 rounded-2xl px-6 py-4 text-white placeholder:text-gray-600 focus:border-blue-400 outline-none transition-all font-mono tracking-widest uppercase text-sm"
-                                                    />
-                                                </div>
-
-                                                <div className="flex items-center justify-between bg-black/20 p-4 rounded-2xl border border-cyber-muted/30 cursor-pointer hover:bg-black/40 transition-colors" onClick={() => setIsPublic(!isPublic)}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`p-2 rounded-lg ${isPublic ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}`}>
-                                                            {isPublic ? <Unlock size={20} /> : <Lock size={20} />}
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm font-bold text-white uppercase">{isPublic ? 'Public Party' : 'Private Party'}</span>
-                                                            <span className="text-[10px] text-cyber-muted uppercase tracking-wider">{isPublic ? 'Visible to everyone' : 'Invitation Code only'}</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isPublic ? 'bg-emerald-500' : 'bg-cyber-muted/50'}`}>
-                                                        <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-0'}`} />
-                                                    </div>
-                                                </div>
-
-                                                <button
-                                                    type="submit"
-                                                    className="w-full bg-cyber-accent text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition-all active:scale-95 shadow-lg shadow-cyber-accent/20 mt-auto"
-                                                >
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <Play size={16} fill="currentColor" /> HOST MATCH
-                                                    </div>
+                                            <form onSubmit={handleCreate} className="space-y-2">
+                                                <input
+                                                    value={createName}
+                                                    onChange={(e) => setCreateName(e.target.value)}
+                                                    placeholder="NAME (OPTIONAL)"
+                                                    className="w-full bg-black/60 border border-cyber-muted/30 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-blue-400 transition-all font-mono"
+                                                />
+                                                <button type="submit" className="w-full bg-blue-500 text-white font-black py-3 rounded-xl hover:bg-blue-400 transition-all">
+                                                    CREATE PARTY
                                                 </button>
                                             </form>
                                         )}
@@ -311,17 +201,179 @@ export const Lobby: React.FC<LobbyProps> = ({
                             </div>
                         </div>
 
-                        {/* Footer info */}
-                        <div className="flex justify-center gap-12 border-t border-cyber-muted/20 pt-8 opacity-50">
-                            <div className="flex items-center gap-2 text-xs font-bold text-cyber-muted uppercase tracking-widest">
-                                <Users2 size={16} /> 24 ACTIVE SINCE BOOT
+                        {/* Tutorial Links */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => setShowTutorial(true)}
+                                className="bg-cyber-light/20 border border-cyber-muted/20 rounded-2xl p-4 flex items-center gap-3 hover:bg-cyber-light/40 transition-all text-left"
+                            >
+                                <div className="bg-cyber-accent/10 p-2 rounded-lg text-cyber-accent">
+                                    <BookOpen size={20} />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-black text-white uppercase">Operational Guide</div>
+                                    <div className="text-[10px] text-cyber-muted uppercase">Learn the basics</div>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setShowSettings(!showSettings)}
+                                className="bg-cyber-light/20 border border-cyber-muted/20 rounded-2xl p-4 flex items-center gap-3 hover:bg-cyber-light/40 transition-all text-left"
+                            >
+                                <div className="bg-blue-500/10 p-2 rounded-lg text-blue-400">
+                                    <Settings size={20} />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-black text-white uppercase">Network Config</div>
+                                    <div className="text-[10px] text-cyber-muted uppercase">Server settings</div>
+                                </div>
+                            </button>
+                        </div>
+
+                        {showSettings && (
+                            <div className="p-4 bg-black/60 rounded-2xl border border-cyber-muted/30 animate-in fade-in slide-in-from-top-2">
+                                <label className="text-[10px] text-cyber-muted uppercase font-black mb-2 block">Relay Server URL</label>
+                                <input
+                                    type="text"
+                                    value={serverUrl}
+                                    onChange={(e) => setServerUrl(e.target.value)}
+                                    className="w-full bg-black border border-cyber-muted/50 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-cyber-accent font-mono"
+                                />
                             </div>
-                            <div className="flex items-center gap-2 text-xs font-bold text-cyber-muted uppercase tracking-widest">
-                                <Shield size={16} /> SECURE NEURAL LINK
+                        )}
+                    </div>
+
+                    {/* RIGHT: Inventory & Upgrades (40% width) */}
+                    <div className="flex-[2] bg-cyber-dark/80 border-2 border-cyber-accent/20 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl backdrop-blur-xl">
+                        <div className="p-6 border-b border-cyber-accent/10 flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-tighter">
+                                    <Wrench className="text-cyber-accent" size={20} />
+                                    Inventory
+                                </h2>
+                                <div className="text-[10px] text-cyber-muted uppercase font-bold tracking-widest">Global Assets</div>
+                            </div>
+                            {userProfile && (
+                                <div className="bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                                    <DollarSign className="text-emerald-400" size={16} />
+                                    <span className="text-xl font-black text-emerald-400">{userProfile.money.toLocaleString()}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            {!isLoggedIn ? (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40 grayscale">
+                                    <Lock size={48} className="mb-4 text-cyber-muted" />
+                                    <div className="text-sm font-black text-white uppercase mb-2">Systems Locked</div>
+                                    <div className="text-[10px] text-cyber-muted uppercase">Login to access inventory & upgrades</div>
+                                </div>
+                            ) : userProfile && (
+                                <>
+                                    <div className="grid grid-cols-1 gap-4 pb-4">
+                                        {Object.values(ATTRIBUTES).map((attr) => {
+                                            const isUnlocked = userProfile.unlocks.includes(attr.id);
+                                            const currentLimit = userProfile.limits[attr.id] || 0;
+                                            const isMaxed = currentLimit >= attr.maxLimit;
+                                            const upgradeCost = getUpgradeCost(attr.id, currentLimit);
+                                            const canAfford = userProfile.money >= upgradeCost;
+                                            const Icon = attr.icon;
+
+                                            if (!isUnlocked) return (
+                                                <div key={attr.id} className="bg-black/20 border border-cyber-muted/10 rounded-2xl p-4 opacity-50 flex items-center gap-4">
+                                                    <div className="bg-cyber-muted/10 p-3 rounded-xl grayscale">
+                                                        <Icon size={24} className="text-cyber-muted" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="text-xs font-bold text-cyber-muted uppercase tracking-wider">{attr.name}</div>
+                                                        <div className="text-[8px] text-cyber-muted uppercase">Locked (Level {userProfile.level + 1}+)</div>
+                                                    </div>
+                                                    <Lock size={16} className="text-cyber-muted" />
+                                                </div>
+                                            );
+
+                                            return (
+                                                <div key={attr.id} className="bg-cyber-light/30 border border-cyber-accent/20 rounded-2xl p-4 hover:border-cyber-accent/40 transition-all group">
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="bg-cyber-accent/10 p-2.5 rounded-xl text-cyber-accent group-hover:bg-cyber-accent/20 transition-all">
+                                                            <Icon size={20} />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="flex justify-between items-center mb-0.5">
+                                                                <h3 className="text-sm font-black text-white uppercase tracking-tight">{attr.name}</h3>
+                                                                <div className="text-[8px] font-bold text-cyber-accent border border-cyber-accent/20 px-1.5 py-0.5 rounded uppercase">LVL MAX: {attr.maxLimit}</div>
+                                                            </div>
+                                                            <div className="flex justify-between items-end">
+                                                                <div className="text-[8px] text-cyber-muted uppercase max-w-[140px] leading-tight line-clamp-1">{attr.description}</div>
+                                                                <div className="text-xs font-black text-white">{currentLimit}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="w-full bg-black/40 rounded-full h-1 mb-4 overflow-hidden">
+                                                        <div
+                                                            className="bg-cyber-accent h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,255,159,0.5)]"
+                                                            style={{ width: `${(currentLimit / attr.maxLimit) * 100}%` }}
+                                                        />
+                                                    </div>
+
+                                                    {!isMaxed ? (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onUpgrade?.(attr.id);
+                                                            }}
+                                                            disabled={!canAfford}
+                                                            className={`w-full py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-cyber-accent text-black hover:bg-emerald-400 active:scale-[0.98]' : 'bg-white/5 text-cyber-muted cursor-not-allowed grayscale'}`}
+                                                        >
+                                                            <TrendingUp size={14} />
+                                                            Upgrade Limit
+                                                            <span className="ml-auto opacity-70 tracking-widest">${upgradeCost.toLocaleString()}</span>
+                                                        </button>
+                                                    ) : (
+                                                        <div className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-black text-[10px] uppercase text-center flex items-center justify-center gap-2">
+                                                            <CheckCircle2 size={14} /> Neural Overload Reached
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-start gap-3">
+                                        <Info className="text-blue-400 shrink-0" size={16} />
+                                        <p className="text-[9px] text-blue-100 uppercase tracking-wider leading-relaxed font-bold">
+                                            Level up to receive <span className="text-cyber-accent">Draft Cards</span>. Choose new attributes to expand your logic capabilities. Use money to increase execution limits.
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Section */}
+                <div className="flex justify-between items-center shrink-0 border-t border-cyber-muted/10 pt-4">
+                    <div className="flex gap-8">
+                        <div className="flex items-center gap-2 opacity-50">
+                            <Users2 size={14} className="text-cyber-muted" />
+                            <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">24 Online</span>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-50">
+                            <Shield size={14} className="text-cyber-muted" />
+                            <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">Neural Link Secure</span>
+                        </div>
+                    </div>
+                    {isLoggedIn && (
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyber-accent/20 to-blue-500/20 border border-white/10 flex items-center justify-center font-black text-white text-[10px] uppercase">
+                                {username?.slice(0, 2)}
+                            </div>
+                            <div className="text-right">
+                                <div className="text-[10px] font-black text-white uppercase leading-none">{username}</div>
+                                <div className="text-[8px] font-bold text-cyber-accent uppercase tracking-tighter">Status: Active</div>
                             </div>
                         </div>
-                    </>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );
