@@ -210,6 +210,56 @@ export const Arena: React.FC = () => {
                     ctx.fillText(`DEATHS: ${me.deaths || 0}`, 20, 95);
                 }
             }
+
+            // --- BOSS HEALTH BAR (Top Center) ---
+            const boss = state.entities.find(e => (e as any).isBoss);
+            if (boss) {
+                const barWidth = 400;
+                const barHeight = 20;
+                const barX = (canvas.width - barWidth) / 2;
+                const barY = 30;
+
+                // Border/Shadow
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff00ff';
+                ctx.fillStyle = 'rgba(255, 0, 255, 0.1)';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+                ctx.strokeStyle = '#ff00ff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+                // Fill
+                const hpPct = boss.hp / boss.maxHp;
+                const grad = ctx.createLinearGradient(barX, 0, barX + barWidth, 0);
+                grad.addColorStop(0, '#ff00ff');
+                grad.addColorStop(1, '#770077');
+                ctx.fillStyle = grad;
+                ctx.fillRect(barX, barY, barWidth * hpPct, barHeight);
+
+                // Label
+                ctx.fillStyle = '#fff';
+                ctx.font = 'black 14px "Outfit", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`BOSS DETECTED: ${Math.ceil(boss.hp)} AP`, canvas.width / 2, barY + barHeight + 20);
+                ctx.textAlign = 'left';
+                ctx.shadowBlur = 0;
+            }
+
+            // --- WAVE STATUS (Bottom Center) ---
+            if (state.wave && state.wave > 0) {
+                ctx.fillStyle = 'rgba(0, 255, 159, 0.1)';
+                ctx.fillRect(canvas.width / 2 - 100, canvas.height - 40, 200, 30);
+                ctx.strokeStyle = '#00ff9f';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(canvas.width / 2 - 100, canvas.height - 40, 200, 30);
+
+                ctx.fillStyle = '#00ff9f';
+                ctx.font = 'bold 12px "Outfit", sans-serif';
+                ctx.textAlign = 'center';
+                const status = state.waveState === 'boss' ? 'CRITICAL: BOSS' : (state.waveState === 'spawning' ? 'INCOMING WAVE' : 'SECTOR STABLE');
+                ctx.fillText(`WAVE ${state.wave} | ${status}`, canvas.width / 2, canvas.height - 21);
+                ctx.textAlign = 'left';
+            }
             ctx.shadowBlur = 0;
 
             // 5. Draw Feedback: Damage Numbers

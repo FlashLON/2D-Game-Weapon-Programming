@@ -41,6 +41,8 @@ function App() {
   // Multiplayer State
   const [isConnected, setIsConnected] = useState(false);
   const [currentRoom, setCurrentRoom] = useState<string | null>(null);
+  const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
+  const [waveInfo, setWaveInfo] = useState<{ wave: number; status: string } | null>(null);
   const [serverUrl, setServerUrl] = useState(() => {
     return localStorage.getItem('relay_server_url') || "http://localhost:3000";
   });
@@ -366,11 +368,30 @@ function App() {
           });
           setShowLevelUpModal(true);
         }
+      } else if (effect.type === 'boss_fire') {
+        gameEngine.spawnParticles(effect.x, effect.y, '#ff00ff', 10);
+        gameEngine.addGridImpulse(effect.x, effect.y, 10, 100);
       }
     };
 
     networkManager.setOnVisualEffect(handleVisualEffect);
     gameEngine.onVisualEffect = handleVisualEffect;
+
+    networkManager.setOnLeaderboardUpdate((data) => {
+      setGlobalLeaderboard(data);
+    });
+
+    networkManager.setOnWaveEvent((event) => {
+      if (event.type === 'wave_start') {
+        addLog(`⚠️ WAVE ${event.wave} INITIALIZING...`, 'warning');
+        setWaveInfo({ wave: event.wave, status: 'INCOMING' });
+        setTimeout(() => setWaveInfo(null), 3000);
+      } else if (event.type === 'boss_spawn') {
+        addLog(`🚨 BOSS DETECTED! WAVE ${event.wave}`, 'error');
+        setWaveInfo({ wave: event.wave, status: 'BOSS DETECTED' });
+        setTimeout(() => setWaveInfo(null), 4000);
+      }
+    });
 
     return () => {
       networkManager.removeConnectionListener(handleGlobalConn);
@@ -506,6 +527,7 @@ function App() {
             isLoggedIn={isLoggedIn}
             username={username}
             onUpgrade={handleUpgrade}
+            leaderboard={globalLeaderboard}
           />
         ) : (
           <>
@@ -516,6 +538,21 @@ function App() {
             <div className="flex-1 h-full relative flex flex-col min-w-0">
               <div className="flex-1 relative bg-black/50 overflow-hidden">
                 <Arena />
+
+                {/* Wave Overlay */}
+                {waveInfo && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 animate-in fade-in zoom-in duration-500">
+                    <div className="text-center">
+                      <div className="text-6xl font-black italic text-white tracking-[0.2em] uppercase drop-shadow-[0_0_20px_rgba(255,255,255,0.5)] mb-2 animate-pulse">
+                        {waveInfo.status === 'INCOMING' ? `WAVE ${waveInfo.wave}` : 'BOSS FIGHT'}
+                      </div>
+                      <div className={`text-xl font-bold uppercase tracking-[0.5em] ${waveInfo.status === 'INCOMING' ? 'text-cyber-accent' : 'text-cyber-danger'}`}>
+                        {waveInfo.status}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {showDocs && <DocsPanel onClose={() => setShowDocs(false)} userProfile={userProfile} />}
               </div>
               <div className="h-48 shrink-0 border-t border-cyber-muted bg-cyber-dark/80">

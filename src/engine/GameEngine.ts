@@ -100,6 +100,8 @@ export interface GameState {
     screenshake: number; // 0 to 1
     particles: Particle[];
     gridImpulses: GridImpulse[];
+    wave?: number;
+    waveState?: string;
 }
 
 /**
@@ -133,7 +135,9 @@ export class GameEngine {
             notifications: [],
             screenshake: 0,
             particles: [],
-            gridImpulses: []
+            gridImpulses: [],
+            wave: 0,
+            waveState: 'idle'
         };
     }
 
@@ -946,6 +950,8 @@ export class GameEngine {
         }));
 
         this.state.score = snapshot.score || 0;
+        this.state.wave = snapshot.wave || 0;
+        this.state.waveState = snapshot.waveState || 'idle';
 
         // 4. Leaderboard
         const leaderboard = Object.values(snapshot.players || {}).map((p: any) => ({

@@ -18,6 +18,8 @@ class NetworkManager {
     private onStateUpdate: ((state: GameState) => void) | null = null;
     private onKill: ((enemyId: string) => void) | null = null;
     private onVisualEffect: ((effect: any) => void) | null = null;
+    private onLeaderboardUpdate: ((data: any[]) => void) | null = null;
+    private onWaveEvent: ((event: any) => void) | null = null;
 
     connect(serverUrl: string): Promise<boolean> {
         return new Promise((resolve) => {
@@ -74,6 +76,9 @@ class NetworkManager {
 
             this.socket.on('kill', (data: { enemyId: string }) => this.onKill?.(data.enemyId));
             this.socket.on('visual_effect', (effect: any) => this.onVisualEffect?.(effect));
+            this.socket.on('global_leaderboard', (data: any[]) => this.onLeaderboardUpdate?.(data));
+            this.socket.on('wave_start', (data: any) => this.onWaveEvent?.({ type: 'wave_start', ...data }));
+            this.socket.on('boss_spawn', (data: any) => this.onWaveEvent?.({ type: 'boss_spawn', ...data }));
 
             // Debug: Log all incoming events
             this.socket.onAny((ev, ...args) => {
@@ -132,6 +137,8 @@ class NetworkManager {
     setOnStateUpdate(cb: (state: GameState) => void) { this.onStateUpdate = cb; }
     setOnKill(cb: (enemyId: string) => void) { this.onKill = cb; }
     setOnVisualEffect(cb: (effect: any) => void) { this.onVisualEffect = cb; }
+    setOnLeaderboardUpdate(cb: (data: any[]) => void) { this.onLeaderboardUpdate = cb; }
+    setOnWaveEvent(cb: (event: any) => void) { this.onWaveEvent = cb; }
 
     // Emitters
     joinRoom(roomId: string, settings?: any, profile?: any) {

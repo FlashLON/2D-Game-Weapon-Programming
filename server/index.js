@@ -54,6 +54,37 @@ async function upsertUser(username, userData) {
     }
 }
 
+async function getGlobalLeaderboard() {
+    if (firebaseDb) {
+        try {
+            const snapshot = await firebaseDb.ref('users')
+                .orderByChild('level')
+                .limitToLast(10)
+                .once('value');
+
+            const data = snapshot.val();
+            if (!data) return [];
+
+            return Object.values(data)
+                .sort((a, b) => b.level - a.level)
+                .map(u => ({ username: u.username, level: u.level, money: u.money }));
+        } catch (e) {
+            console.error("Leaderboard Fetch Error:", e);
+        }
+    }
+    // Memory fallback
+    return Array.from(memoryUsers.values())
+        .sort((a, b) => (b.level || 1) - (a.level || 1))
+        .slice(0, 10)
+        .map(u => ({ username: u.username, level: u.level, money: u.money }));
+}
+
+// Global leaderboard update every 30 seconds
+setInterval(async () => {
+    const leaderboard = await getGlobalLeaderboard();
+    io.emit('global_leaderboard', leaderboard);
+}, 30000);
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -146,6 +177,10 @@ io.on('connection', (socket) => {
                     limits: user.limits || { speed: 200, damage: 5 }
                 }
             });
+
+            // Immediately send leaderboard
+            const leaderboard = await getGlobalLeaderboard();
+            socket.emit('global_leaderboard', leaderboard);
         } catch (err) {
             console.error("[AUTH] Login Error:", err.message);
             socket.emit('login_response', { success: false, error: "Authentication system error" });
@@ -185,6 +220,10 @@ io.on('connection', (socket) => {
                 isNew: true,
                 profile: newUser
             });
+
+            // Immediately send leaderboard
+            const leaderboard = await getGlobalLeaderboard();
+            socket.emit('global_leaderboard', leaderboard);
         } catch (err) {
             console.error("[AUTH] Signup Error:", err.message);
             socket.emit('login_response', { success: false, error: "Registration failed" });
@@ -205,12 +244,17 @@ io.on('connection', (socket) => {
 
         if (!rooms[roomId]) {
             rooms[roomId] = {
+                id: roomId,
+                mode: settings?.mode || 'pvp', // 'pvp' or 'coop'
                 players: {},
                 projectiles: [],
                 enemies: [],
                 grid: {},
                 lastUpdate: Date.now(),
-                score: 0
+                score: 0,
+                wave: 0,
+                waveState: 'idle', // 'idle', 'spawning', 'fight', 'boss'
+                waveTimer: 0
             };
         }
 
@@ -333,6 +377,66 @@ setInterval(() => {
     lastTick = now;
 
     for (const [roomId, room] of Object.entries(rooms)) {
+        // --- WAVE MODE LOGIC ---
+        if (room.mode === 'coop') {
+            room.waveTimer += dt;
+
+            if (room.waveState === 'idle' && Object.keys(room.players).length > 0) {
+                room.wave = (room.wave || 0) + 1;
+                room.waveState = 'spawning';
+                room.waveTimer = 0;
+                io.to(roomId).emit('wave_start', { wave: room.wave });
+            }
+
+            if (room.waveState === 'spawning') {
+                const maxEnemies = 5 + (room.wave * 2);
+                if (room.enemies.length < maxEnemies && Math.random() < 0.1) {
+                    const side = Math.floor(Math.random() * 4);
+                    let ex = 0, ey = 0;
+                    if (side === 0) { ex = Math.random() * 800; ey = -50; }
+                    else if (side === 1) { ex = 850; ey = Math.random() * 600; }
+                    else if (side === 2) { ex = Math.random() * 800; ey = 650; }
+                    else { ex = -50; ey = Math.random() * 600; }
+
+                    room.enemies.push({
+                        id: 'enemy_' + Math.random().toString(36).substr(2, 5),
+                        type: 'enemy',
+                        x: ex, y: ey,
+                        radius: 20,
+                        hp: 30 + (room.wave * 15),
+                        maxHp: 30 + (room.wave * 15),
+                        color: room.wave % 5 === 0 ? '#ff00ff' : '#ff0055',
+                        velocity: { x: 0, y: 0 },
+                        speed: 80 + (room.wave * 5)
+                    });
+                }
+                if (room.waveTimer > 5) room.waveState = 'fight';
+            }
+
+            // Boss Spawn every 5 waves
+            if (room.wave > 0 && room.wave % 5 === 0 && room.waveState === 'fight' && !room.enemies.some(e => e.isBoss)) {
+                room.enemies.push({
+                    id: 'boss_' + room.wave,
+                    type: 'enemy',
+                    isBoss: true,
+                    x: 400, y: -100,
+                    radius: 60,
+                    hp: 500 * (room.wave / 5),
+                    maxHp: 500 * (room.wave / 5),
+                    color: '#ff00ff',
+                    velocity: { x: 0, y: 0 },
+                    speed: 40,
+                    bossPhase: 0
+                });
+                io.to(roomId).emit('boss_spawn', { wave: room.wave, hp: 500 * (room.wave / 5) });
+            }
+
+            if (room.waveState === 'fight' && room.enemies.length === 0) {
+                room.waveState = 'idle';
+                room.waveTimer = 0;
+            }
+        }
+
         updateRoomGrid(room);
 
         // Update Physics
@@ -500,9 +604,13 @@ setInterval(() => {
                     }
 
                     if (ent.hp <= 0) {
-                        ent.hp = ent.maxHp;
-                        ent.x = Math.random() * 700 + 50;
-                        ent.y = Math.random() * 500 + 50;
+                        if (room.mode === 'coop') {
+                            room.enemies.splice(room.enemies.indexOf(ent), 1);
+                        } else {
+                            ent.hp = ent.maxHp;
+                            ent.x = Math.random() * 700 + 50;
+                            ent.y = Math.random() * 500 + 50;
+                        }
                         if (room.players[proj.playerId]) {
                             const killer = room.players[proj.playerId];
                             killer.kills++;
@@ -524,6 +632,45 @@ setInterval(() => {
             });
         });
 
+        // Standalone Enemy AI & Movement
+        room.enemies.forEach(ent => {
+            let nearestPlayer = null;
+            let minDist = Infinity;
+            Object.values(room.players).forEach(p => {
+                const d = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);
+                if (d < minDist) { minDist = d; nearestPlayer = p; }
+            });
+
+            if (nearestPlayer) {
+                const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                const force = ent.isBoss ? ent.speed : ent.speed;
+                ent.velocity.x += Math.cos(angle) * force * dt;
+                ent.velocity.y += Math.sin(angle) * force * dt;
+
+                if (ent.isBoss && Math.random() < 0.05) {
+                    io.to(roomId).emit('visual_effect', { type: 'boss_fire', x: ent.x, y: ent.y, angle });
+                }
+            }
+
+            ent.velocity.x *= 0.95;
+            ent.velocity.y *= 0.95;
+            ent.x += ent.velocity.x * dt;
+            ent.y += ent.velocity.y * dt;
+
+            // Player Damage on Touch
+            Object.values(room.players).forEach(p => {
+                const dist = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);
+                if (dist < p.radius + ent.radius) {
+                    p.hp -= ent.isBoss ? 1 : 0.5;
+                    if (p.hp <= 0) {
+                        p.hp = p.maxHp;
+                        p.deaths = (p.deaths || 0) + 1;
+                        p.x = 400; p.y = 300;
+                    }
+                }
+            });
+        });
+
         // Player movement
         Object.values(room.players).forEach(p => {
             p.x += p.velocity.x * dt;
@@ -540,7 +687,9 @@ setInterval(() => {
                 players: room.players,
                 enemies: room.enemies,
                 projectiles: room.projectiles,
-                score: room.score
+                score: room.score,
+                wave: room.wave,
+                waveState: room.waveState
             });
         }
     }

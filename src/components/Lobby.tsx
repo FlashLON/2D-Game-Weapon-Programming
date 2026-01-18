@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2 } from 'lucide-react';
+import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords } from 'lucide-react';
 import { Tutorial } from './Tutorial';
 import { ATTRIBUTES, getUpgradeCost } from '../utils/AttributeRegistry';
 
@@ -15,6 +15,7 @@ interface LobbyProps {
     username?: string;
     onUpgrade?: (attributeId: string) => void;
     onSignup?: (username: string) => void;
+    leaderboard?: any[];
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -28,7 +29,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     isLoggedIn,
     username,
     onUpgrade,
-    onSignup
+    onSignup,
+    leaderboard = []
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
@@ -135,6 +137,36 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     className="mt-auto w-full bg-cyber-accent text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition-all shadow-lg shadow-cyber-accent/20 flex items-center justify-center gap-3 z-10"
                                 >
                                     <Play size={20} fill="currentColor" /> ENTER SANDBOX
+                                </button>
+                            </div>
+
+                            {/* Co-op Mode Card */}
+                            <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/10 border-2 border-purple-500/30 rounded-3xl p-6 flex flex-col relative overflow-hidden group hover:border-purple-400/50 transition-all">
+                                <div className="absolute top-0 right-0 p-4 text-purple-500/10 group-hover:text-purple-400/10 transition-colors">
+                                    <Swords size={120} />
+                                </div>
+                                <div className="z-10">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <h3 className="text-2xl font-black text-white">CO-OP SURVIVAL</h3>
+                                        <span className="bg-purple-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded animate-pulse">NEW MOD</span>
+                                    </div>
+                                    <p className="text-cyber-muted text-sm mb-6">Team up with friends to survive endless waves and massive bosses.</p>
+
+                                    <ul className="space-y-2 mb-8">
+                                        <li className="flex items-center gap-2 text-[10px] font-bold text-purple-300 uppercase font-mono">
+                                            <Users2 size={12} /> Mutual Defense
+                                        </li>
+                                        <li className="flex items-center gap-2 text-[10px] font-bold text-purple-300 uppercase font-mono">
+                                            <Shield size={12} /> Shared Objectives
+                                        </li>
+                                    </ul>
+                                </div>
+                                <button
+                                    onClick={() => onJoinRoom('coop-main', { mode: 'coop' })}
+                                    disabled={!isConnected}
+                                    className={`mt-auto w-full font-black py-4 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3 z-10 ${isConnected ? 'bg-purple-600 text-white hover:bg-purple-500' : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'}`}
+                                >
+                                    <Users2 size={20} /> START CO-OP
                                 </button>
                             </div>
 
@@ -358,29 +390,55 @@ export const Lobby: React.FC<LobbyProps> = ({
                     </div>
                 </div>
 
-                {/* Footer Section */}
-                <div className="flex justify-between items-center shrink-0 border-t border-cyber-muted/10 pt-4">
-                    <div className="flex gap-8">
-                        <div className="flex items-center gap-2 opacity-50">
-                            <Users2 size={14} className="text-cyber-muted" />
-                            <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">24 Online</span>
+                {/* Footer Section & Leaderboard */}
+                <div className="flex flex-col lg:flex-row justify-between items-start gap-8 shrink-0 border-t border-cyber-muted/10 pt-6">
+                    <div className="flex-1 w-full lg:w-auto">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Trophy size={18} className="text-cyber-accent" />
+                            <h2 className="text-sm font-black text-white uppercase tracking-widest">Global Top Seekers</h2>
                         </div>
-                        <div className="flex items-center gap-2 opacity-50">
-                            <Shield size={14} className="text-cyber-muted" />
-                            <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">Neural Link Secure</span>
+                        <div className="bg-black/40 border border-cyber-accent/10 rounded-2xl p-4 overflow-x-auto">
+                            <div className="flex gap-6">
+                                {leaderboard.length > 0 ? leaderboard.map((player: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-3 shrink-0 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
+                                        <span className="text-cyber-accent font-black text-xs">#{i + 1}</span>
+                                        <div>
+                                            <div className="text-[10px] font-black text-white uppercase">{player.username}</div>
+                                            <div className="text-[8px] font-bold text-cyber-muted uppercase">Level {player.level}</div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest py-2">
+                                        Establishing Satellite Uplink... 📡
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    {isLoggedIn && (
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyber-accent/20 to-blue-500/20 border border-white/10 flex items-center justify-center font-black text-white text-[10px] uppercase">
-                                {username?.slice(0, 2)}
+
+                    <div className="flex flex-col items-end gap-4 min-w-[200px]">
+                        <div className="flex gap-8">
+                            <div className="flex items-center gap-2 opacity-50">
+                                <Users2 size={14} className="text-cyber-muted" />
+                                <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">{leaderboard.length * 7 + 12} Nodes Active</span>
                             </div>
-                            <div className="text-right">
-                                <div className="text-[10px] font-black text-white uppercase leading-none">{username}</div>
-                                <div className="text-[8px] font-bold text-cyber-accent uppercase tracking-tighter">Status: Active</div>
+                            <div className="flex items-center gap-2 opacity-50">
+                                <Shield size={14} className="text-cyber-muted" />
+                                <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">Neural Link Secure</span>
                             </div>
                         </div>
-                    )}
+                        {isLoggedIn && (
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyber-accent/20 to-blue-500/20 border border-white/10 flex items-center justify-center font-black text-white text-[10px] uppercase">
+                                    {username?.slice(0, 2)}
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[10px] font-black text-white uppercase leading-none">{username}</div>
+                                    <div className="text-[8px] font-bold text-cyber-accent uppercase tracking-tighter">Status: Active</div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
