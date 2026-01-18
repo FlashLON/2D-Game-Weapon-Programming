@@ -233,6 +233,8 @@ function App() {
     get_entities_in_range: (x: number, y: number, range: number) => gameEngine.getEntitiesInRange(x, y, range),
     get_last_hit_info: () => gameEngine.getLastHitInfo(),
     get_leaderboard: () => gameEngine.getState().leaderboard || [],
+    get_level: () => userProfile.level,
+    get_stats: () => ({ ...userProfile }),
   };
 
   const handleCompile = async (sourceCode: string) => {

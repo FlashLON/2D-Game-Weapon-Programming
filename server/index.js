@@ -210,21 +210,6 @@ io.on('connection', (socket) => {
                 lastUpdate: Date.now(),
                 score: 0
             };
-
-            // Spawn single initial target
-            for (let i = 0; i < 1; i++) {
-                rooms[roomId].enemies.push({
-                    id: `enemy_${Math.random().toString(36).substr(2, 5)}`,
-                    type: 'enemy',
-                    x: Math.random() * 700 + 50,
-                    y: Math.random() * 500 + 50,
-                    radius: 20,
-                    hp: 50,
-                    maxHp: 50,
-                    color: '#ff0055',
-                    velocity: { x: 0, y: 0 }
-                });
-            }
         }
 
         const room = rooms[roomId];
@@ -431,6 +416,32 @@ setInterval(() => {
                 if (dist < ent.radius + proj.radius) {
                     ent.hp -= (proj.damage || 10);
 
+                    // Knockback
+                    if (proj.knockback > 0) {
+                        const angle = Math.atan2(ent.y - (proj.renderY || proj.y), ent.x - (proj.renderX || proj.x));
+                        ent.velocity.x += Math.cos(angle) * proj.knockback;
+                        ent.velocity.y += Math.sin(angle) * proj.knockback;
+                    }
+
+                    // Explosion
+                    if (proj.explosion_radius > 0) {
+                        const exRadius = proj.explosion_radius;
+                        const targets = getNearbyEntities(room, proj.x, proj.y, exRadius);
+                        targets.forEach(t => {
+                            if (t.id === proj.playerId || t.type === 'projectile') return;
+                            const dSq = (t.x - proj.x) ** 2 + (t.y - proj.y) ** 2;
+                            if (dSq < exRadius ** 2) {
+                                t.hp -= (proj.explosion_damage || 15);
+                                const exAngle = Math.atan2(t.y - proj.y, t.x - proj.x);
+                                t.velocity.x += Math.cos(exAngle) * 50;
+                                t.velocity.y += Math.sin(exAngle) * 50;
+                            }
+                        });
+                        io.to(roomId).emit('visual_effect', {
+                            type: 'explosion', x: proj.x, y: proj.y, color: proj.color || '#ff6e00', strength: 25, radius: exRadius
+                        });
+                    }
+
                     // Cleanup projectile unless piercing
                     if (proj.pierce && proj.pierce > 1) {
                         proj.pierce--;
@@ -438,10 +449,12 @@ setInterval(() => {
                         room.projectiles.splice(i, 1);
                     }
 
-                    // Effects
-                    io.to(roomId).emit('visual_effect', {
-                        type: 'impact', x: ent.x, y: ent.y, color: ent.color, strength: 15, radius: 80
-                    });
+                    // Impact FX (if not already handled by explosion)
+                    if (!(proj.explosion_radius > 0)) {
+                        io.to(roomId).emit('visual_effect', {
+                            type: 'impact', x: ent.x, y: ent.y, color: ent.color, strength: 15, radius: 80
+                        });
+                    }
 
                     if (ent.hp <= 0) {
                         ent.hp = ent.maxHp;

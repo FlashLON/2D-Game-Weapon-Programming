@@ -84,6 +84,16 @@ class APIWrapper:
         func = self._raw.get('get_arena_size')
         return func() if func else None
 
+    @property
+    def level(self):
+        func = self._raw.get('get_level')
+        return func() if func else 1
+
+    @property
+    def stats(self):
+        func = self._raw.get('get_stats')
+        return func() if func else {}
+
     # Forward everything else (like .log(), .get_time()) by looking up keys
     def __getattr__(self, name):
         if name in self._raw:
