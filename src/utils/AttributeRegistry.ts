@@ -1,7 +1,7 @@
 import {
-    Zap, Target, Shield, Crosshair,
-    Maximize, Repeat, Move, Activity,
-    Flame, Skull, Ghost, Link
+    Zap, Target, Shield,
+    Maximize, Move, Activity,
+    Flame, Skull, Link
 } from 'lucide-react';
 
 export interface AttributeConfig {
@@ -173,7 +173,13 @@ export function generateDraftOptions(
     // Strategy: 1 New Unlock (if available) + 2 Upgrades (if available)
     // Or pure random
 
-    const pool = [];
+    interface DraftPoolItem {
+        type: 'unlock' | 'upgrade';
+        attributeId: string;
+        weight: number;
+    }
+
+    const pool: DraftPoolItem[] = [];
 
     // Add potential unlocks
     lockedIds.forEach(id => pool.push({ type: 'unlock', attributeId: id, weight: 2 }));
@@ -202,7 +208,7 @@ export function generateDraftOptions(
         }
 
         options.push({
-            type: pick.type as 'unlock' | 'upgrade',
+            type: pick.type,
             attributeId: pick.attributeId,
             value: value
         });
