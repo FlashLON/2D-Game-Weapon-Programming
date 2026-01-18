@@ -411,37 +411,43 @@ function App() {
 
   const handleLogin = async (name: string) => {
     if (!name) return;
-    let currentlyConnected = isConnected;
+    let currentlyConnected = networkManager.isConnected();
 
     if (!currentlyConnected) {
-      addLog("Connecting to server...", "info");
+      addLog("Establishing Login Link...", "info");
       currentlyConnected = await handleConnect();
     }
 
     if (currentlyConnected) {
-      setUsername(name);
-      networkManager.login(name);
-      addLog(`Logging in as ${name}...`, "info");
+      // Small delay to ensure the socket is 'hot' and ready for emissions
+      setTimeout(() => {
+        setUsername(name);
+        networkManager.login(name);
+        addLog(`Initiating Login: ${name}...`, "info");
+      }, 200);
     } else {
-      addLog("Could not establish connection. Check your server URL.", "error");
+      addLog("Authentication Link Failed.", "error");
     }
   };
 
   const handleSignup = async (name: string) => {
     if (!name) return;
-    let currentlyConnected = isConnected;
+    let currentlyConnected = networkManager.isConnected();
 
     if (!currentlyConnected) {
-      addLog("Connecting to server...", "info");
+      addLog("Establishing Signup Link...", "info");
       currentlyConnected = await handleConnect();
     }
 
     if (currentlyConnected) {
-      setUsername(name);
-      networkManager.signup(name);
-      addLog(`Signing up as ${name}...`, "info");
+      // Small delay to ensure the socket is 'hot' and ready for emissions
+      setTimeout(() => {
+        setUsername(name);
+        networkManager.signup(name);
+        addLog(`Initiating Signup: ${name}...`, "info");
+      }, 200);
     } else {
-      addLog("Could not establish connection. Check your server URL.", "error");
+      addLog("Authentication Link Failed.", "error");
     }
   };
 

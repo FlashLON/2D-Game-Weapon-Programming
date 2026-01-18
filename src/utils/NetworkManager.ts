@@ -9,7 +9,7 @@ class NetworkManager {
     // Callbacks groups
     private connectionListeners: Set<(connected: boolean) => void> = new Set();
 
-    // Single-purpose Callbacks
+    // Internal Callback Storage
     private onStateUpdate: ((state: GameState) => void) | null = null;
     private onPlayerCountChange: ((count: number) => void) | null = null;
     private onKill: ((enemyId: string) => void) | null = null;
@@ -18,47 +18,47 @@ class NetworkManager {
 
     connect(serverUrl: string) {
         if (this.socket && this.connected) {
-            console.warn('Already connected');
+            console.warn('[NetworkManager] Already connected, skipping init');
             this.connectionListeners.forEach(fn => fn(true));
             return;
         }
 
         if (this.socket) {
+            console.log('[NetworkManager] Cleaning up existing socket before reconnect');
             this.socket.disconnect();
             this.socket = null;
         }
 
-        console.log('Connecting to server:', serverUrl);
+        console.log('[NetworkManager] Initiating connection to:', serverUrl);
         this.socket = io(serverUrl, {
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionDelay: 1000,
-            reconnectionAttempts: 3,
-            timeout: 8000
+            reconnectionAttempts: 5,
+            timeout: 10000
         });
 
-        // Connection events
+        // Setup Relays
         this.socket.on('connect', () => {
-            console.log('✅ Connected to game server');
+            console.log('[NetworkManager] ✅ Socket physically connected');
             this.connected = true;
             this.connectionListeners.forEach(fn => fn(true));
         });
 
-        this.socket.on('disconnect', () => {
-            console.log('❌ Disconnected from server');
+        this.socket.on('disconnect', (reason) => {
+            console.log('[NetworkManager] ❌ Socket disconnected:', reason);
             this.connected = false;
             this.connectionListeners.forEach(fn => fn(false));
         });
 
         this.socket.on('connect_error', (error) => {
-            console.error('Connection error:', error);
+            console.error('[NetworkManager] ⚠️ Connection Error:', error);
             this.connected = false;
             this.connectionListeners.forEach(fn => fn(false));
         });
 
-        // Game events
+        // Game State Relays
         this.socket.on('init', (data: { playerId: string; gameState: GameState }) => {
-            console.log('Received initial state, player ID:', data.playerId);
             this.playerId = data.playerId;
             this.onStateUpdate?.(data.gameState);
         });
@@ -68,17 +68,14 @@ class NetworkManager {
         });
 
         this.socket.on('playerJoined', (data: { playerId: string; playerCount: number }) => {
-            console.log('Player joined:', data.playerId);
             this.onPlayerCountChange?.(data.playerCount);
         });
 
         this.socket.on('playerLeft', (data: { playerId: string; playerCount: number }) => {
-            console.log('Player left:', data.playerId);
             this.onPlayerCountChange?.(data.playerCount);
         });
 
         this.socket.on('kill', (data: { enemyId: string }) => {
-            console.log('You killed:', data.enemyId);
             this.onKill?.(data.enemyId);
         });
 
@@ -87,7 +84,12 @@ class NetworkManager {
         });
 
         this.socket.on('login_response', (response: any) => {
-            this.onLoginResponse?.(response);
+            console.log('[NetworkManager] 📧 Received login_response:', response);
+            if (this.onLoginResponse) {
+                this.onLoginResponse(response);
+            } else {
+                console.warn('[NetworkManager] ⚠️ No onLoginResponse handler registered in App.tsx!');
+            }
         });
     }
 
@@ -102,20 +104,25 @@ class NetworkManager {
 
     joinRoom(roomId: string, settings?: any, profile?: any) {
         if (this.socket && this.connected) {
-            console.log('Joining room:', roomId, settings, profile);
             this.socket.emit('join_room', { roomId, settings, profile });
         }
     }
 
     login(username: string) {
         if (this.socket && this.connected) {
+            console.log('[NetworkManager] 📤 Emitting login for:', username);
             this.socket.emit('login', { username });
+        } else {
+            console.error('[NetworkManager] ❌ Cannot login: not connected');
         }
     }
 
     signup(username: string) {
         if (this.socket && this.connected) {
+            console.log('[NetworkManager] 📤 Emitting signup for:', username);
             this.socket.emit('signup', { username });
+        } else {
+            console.error('[NetworkManager] ❌ Cannot signup: not connected');
         }
     }
 
@@ -125,12 +132,9 @@ class NetworkManager {
         }
     }
 
+    // Direct Relay Setters
     setOnLoginResponse(callback: (response: any) => void) {
         this.onLoginResponse = callback;
-        if (this.socket) {
-            this.socket.off('login_response');
-            this.socket.on('login_response', callback);
-        }
     }
 
     disconnect() {
@@ -154,7 +158,6 @@ class NetworkManager {
         }
     }
 
-    // Setters for single callbacks
     setOnStateUpdate(callback: (state: GameState) => void) {
         this.onStateUpdate = callback;
     }
