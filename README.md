@@ -36,10 +36,10 @@ Open http://localhost:5173 in your browser.
 3. **Edit Weapon**: Modify the Python code in the editor
 4. **Deploy**: Click "DEPLOY WEAPON" to test your changes
 
-### Multiplayer Mode (Coming Soon)
+### Multiplayer Mode
 - Connect with friends online
-- See other players in real-time
-- Compete for the highest score
+- Compete for the highest score with unique scripted weapons
+- Real-time physics synchronization across all players
 
 ## 🐍 Weapon Scripting Guide
 
@@ -117,6 +117,8 @@ roblox-game/
 - **Code Editor**: Monaco Editor
 - **Python Runtime**: Pyodide (Python in WebAssembly)
 - **Game Loop**: RequestAnimationFrame
+- **Persistence**: Firebase Realtime Database
+- **Networking**: Socket.io (Node.js)
 
 ## 📚 Documentation
 
@@ -163,7 +165,8 @@ MIT License - feel free to use this project for learning or building your own ga
 - [x] Custom weapon scripting
 - [x] Advanced projectile physics
 - [x] WASD movement
-- [ ] Multiplayer support
+- [x] Multiplayer support
+- [x] Persistent Accounts (Firebase)
 - [ ] Matchmaking/lobbies
 - [ ] Leaderboards
 - [ ] More enemy types
