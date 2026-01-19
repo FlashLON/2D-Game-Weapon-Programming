@@ -15,39 +15,60 @@ const memoryUsers = new Map(); // Fallback for when Firebase is not connected
 
 if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
     try {
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: FIREBASE_PROJECT_ID,
-                clientEmail: FIREBASE_CLIENT_EMAIL,
-                privateKey: FIREBASE_PRIVATE_KEY,
-            }),
-            databaseURL: FIREBASE_DATABASE_URL
-        });
+        // Check if Firebase is already initialized
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: FIREBASE_PROJECT_ID,
+                    clientEmail: FIREBASE_CLIENT_EMAIL,
+                    privateKey: FIREBASE_PRIVATE_KEY,
+                }),
+                databaseURL: FIREBASE_DATABASE_URL
+            });
+        }
         firebaseDb = admin.database();
         console.log("✅ Connected to Firebase: " + FIREBASE_PROJECT_ID);
     } catch (err) {
         console.error("❌ Firebase Initialization Error:", err.message);
         console.warn("⚠️ Persistence disabled. Server will use temporary In-Memory storage.");
+        firebaseDb = null;
     }
 } else {
     console.warn("⚠️ Firebase Credentials missing in .env. Server running in 'In-Memory' mode.");
+    console.warn("Required env variables: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_DATABASE_URL");
 }
 
 // --- ACCOUNT HELPERS ---
 async function findUser(username) {
+    if (!username || username.trim() === '') return null;
+    
     if (firebaseDb) {
-        const snapshot = await firebaseDb.ref(`users/${username}`).once('value');
-        return snapshot.val();
+        try {
+            const snapshot = await firebaseDb.ref(`users/${username}`).once('value');
+            return snapshot.val();
+        } catch (err) {
+            console.error(`❌ Firebase error reading user ${username}:`, err.message);
+            return memoryUsers.get(username) || null;
+        }
     }
-    return memoryUsers.get(username);
+    return memoryUsers.get(username) || null;
 }
 
 async function upsertUser(username, userData) {
+    if (!username || username.trim() === '') return;
+    
     if (firebaseDb) {
-        await firebaseDb.ref(`users/${username}`).update({
-            ...userData,
-            lastSeen: new Date().toISOString()
-        });
+        try {
+            await firebaseDb.ref(`users/${username}`).update({
+                ...userData,
+                lastSeen: new Date().toISOString()
+            });
+        } catch (err) {
+            console.error(`❌ Firebase error writing user ${username}:`, err.message);
+            // Fallback to memory
+            const existing = memoryUsers.get(username) || {};
+            memoryUsers.set(username, { ...existing, ...userData, lastSeen: new Date().toISOString() });
+        }
     } else {
         const existing = memoryUsers.get(username) || {};
         memoryUsers.set(username, { ...existing, ...userData, lastSeen: new Date().toISOString() });
@@ -63,20 +84,28 @@ async function getGlobalLeaderboard() {
                 .once('value');
 
             const data = snapshot.val();
-            if (!data) return [];
+            if (!data) return getMemoryLeaderboard();
 
             return Object.values(data)
-                .sort((a, b) => b.level - a.level)
-                .map(u => ({ username: u.username, level: u.level, money: u.money }));
+                .filter(u => u && u.username)
+                .sort((a, b) => (b.level || 0) - (a.level || 0))
+                .slice(0, 10)
+                .map(u => ({ username: u.username, level: u.level || 1, money: u.money || 0 }));
         } catch (e) {
-            console.error("Leaderboard Fetch Error:", e);
+            console.error("❌ Leaderboard Fetch Error:", e.message);
+            return getMemoryLeaderboard();
         }
     }
+    return getMemoryLeaderboard();
+}
+
+function getMemoryLeaderboard() {
     // Memory fallback
     return Array.from(memoryUsers.values())
+        .filter(u => u && u.username)
         .sort((a, b) => (b.level || 1) - (a.level || 1))
         .slice(0, 10)
-        .map(u => ({ username: u.username, level: u.level, money: u.money }));
+        .map(u => ({ username: u.username, level: u.level || 1, money: u.money || 0 }));
 }
 
 // Global leaderboard update every 30 seconds
@@ -98,6 +127,33 @@ const PORT = process.env.PORT || 3000;
 
 // Multiple Game Instances (Rooms/Parties)
 const rooms = {};
+
+// --- HEALTH CHECK ENDPOINT ---
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        firebase: firebaseDb ? 'connected' : 'disconnected',
+        mode: firebaseDb ? 'Firebase' : 'In-Memory',
+        activeRooms: Object.keys(rooms).length,
+        uptime: process.uptime()
+    });
+});
+
+app.get('/api/status', (req, res) => {
+    const totalPlayers = Object.values(rooms).reduce((sum, r) => sum + Object.keys(r.players).length, 0);
+    const totalProjectiles = Object.values(rooms).reduce((sum, r) => sum + r.projectiles.length, 0);
+    
+    res.json({
+        timestamp: new Date().toISOString(),
+        database: firebaseDb ? 'Firebase connected' : 'Memory storage (no persistence)',
+        activeRooms: Object.keys(rooms).length,
+        totalPlayers,
+        totalProjectiles,
+        memoryUsers: memoryUsers.size,
+        uptime: `${Math.floor(process.uptime() / 60)}m`
+    });
+});
 
 // --- SPATIAL PARTITIONING CONFIG ---
 const PROJECTILE_CAP = 200;
@@ -153,6 +209,11 @@ io.on('connection', (socket) => {
         console.log(`[AUTH] Login Request: ${username}`);
 
         try {
+            if (!username || username.trim().length === 0) {
+                socket.emit('login_response', { success: false, error: "Username cannot be empty" });
+                return;
+            }
+
             const user = await findUser(username);
 
             if (!user) {
@@ -183,7 +244,7 @@ io.on('connection', (socket) => {
             socket.emit('global_leaderboard', leaderboard);
         } catch (err) {
             console.error("[AUTH] Login Error:", err.message);
-            socket.emit('login_response', { success: false, error: "Authentication system error" });
+            socket.emit('login_response', { success: false, error: "Authentication system error: " + err.message });
         }
     });
 
@@ -191,6 +252,16 @@ io.on('connection', (socket) => {
         console.log(`[AUTH] Signup Request: ${username}`);
 
         try {
+            if (!username || username.trim().length === 0) {
+                socket.emit('login_response', { success: false, error: "Username cannot be empty" });
+                return;
+            }
+
+            if (username.length > 20) {
+                socket.emit('login_response', { success: false, error: "Username too long (max 20 chars)" });
+                return;
+            }
+
             const existing = await findUser(username);
 
             if (existing) {
@@ -226,7 +297,7 @@ io.on('connection', (socket) => {
             socket.emit('global_leaderboard', leaderboard);
         } catch (err) {
             console.error("[AUTH] Signup Error:", err.message);
-            socket.emit('login_response', { success: false, error: "Registration failed" });
+            socket.emit('login_response', { success: false, error: "Registration failed: " + err.message });
         }
     });
 
@@ -356,10 +427,11 @@ io.on('connection', (socket) => {
 });
 
 async function saveProgress(username, stats) {
-    if (!username) return;
+    if (!username || !stats) return;
     try {
         await upsertUser(username, stats);
-        if (!firebaseDb) console.log(`💾 [Memory] Saved ${username} (${stats.level}/${Math.floor(stats.xp)}xp)`);
+        const mode = firebaseDb ? '☁️ [Firebase]' : '💾 [Memory]';
+        console.log(`${mode} Saved ${username} (Level ${stats.level}/${Math.floor(stats.xp)}xp)`);
     } catch (err) {
         console.error(`❌ [Save] Failed to save for ${username}:`, err.message);
     }
