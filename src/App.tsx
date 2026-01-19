@@ -288,7 +288,6 @@ function App() {
       gameEngine.setMultiplayerMode(false);
       addLog("Starting Solo Sandbox", "info");
     } else {
-      gameEngine.setMultiplayerMode(true, networkManager.getPlayerId());
       networkManager.joinRoom(roomId, settings, userProfile);
       addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
     }

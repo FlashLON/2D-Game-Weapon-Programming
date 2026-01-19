@@ -79,6 +79,12 @@ async function getGlobalLeaderboard() {
         .map(u => ({ username: u.username, level: u.level, money: u.money }));
 }
 
+// Global leaderboard update every 30 seconds
+setInterval(async () => {
+    const leaderboard = await getGlobalLeaderboard();
+    io.emit('global_leaderboard', leaderboard);
+}, 30000);
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -87,12 +93,6 @@ const io = new Server(server, {
         methods: ['GET', 'POST']
     }
 });
-
-// Global leaderboard update every 30 seconds
-setInterval(async () => {
-    const leaderboard = await getGlobalLeaderboard();
-    if (io) io.emit('global_leaderboard', leaderboard);
-}, 30000);
 
 const PORT = process.env.PORT || 3000;
 
@@ -137,13 +137,9 @@ function getNearbyEntities(room, x, y, radius = CELL_SIZE) {
 }
 
 // Socket handler
-io.on('connection', async (socket) => {
+io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
     let currentRoomId = null;
-
-    // Send leaderboard immediately on connection
-    const initialLeaderboard = await getGlobalLeaderboard();
-    socket.emit('global_leaderboard', initialLeaderboard);
 
     socket.on('ping', () => {
         socket.emit('pong', { time: Date.now() });
