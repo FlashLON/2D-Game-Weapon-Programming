@@ -359,7 +359,7 @@ async function saveProgress(username, stats) {
     if (!username) return;
     try {
         await upsertUser(username, stats);
-        if (!db) console.log(`💾 [Memory] Saved ${username} (${stats.level}/${Math.floor(stats.xp)}xp)`);
+        if (!firebaseDb) console.log(`💾 [Memory] Saved ${username} (${stats.level}/${Math.floor(stats.xp)}xp)`);
     } catch (err) {
         console.error(`❌ [Save] Failed to save for ${username}:`, err.message);
     }
@@ -515,7 +515,7 @@ setInterval(() => {
                 proj.x += proj.velocity.x * dt;
                 proj.y += proj.velocity.y * dt;
 
-                if (proj.wave_amplitude > 0) {
+                if (proj.wave_amplitude && proj.wave_amplitude > 0) {
                     const elapsed = proj.maxLifetime - proj.lifetime;
                     const offset = Math.sin(elapsed * (proj.wave_frequency || 10)) * proj.wave_amplitude;
                     const perpX = -proj.velocity.y, perpY = proj.velocity.x;

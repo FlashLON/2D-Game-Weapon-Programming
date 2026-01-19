@@ -138,6 +138,9 @@ api = APIWrapper(_js_api)
                 on_kill: (tid) => {
                     if (weaponInstance.on_kill) return weaponInstance.on_kill(tid);
                 },
+                on_hit_wall: (x, y) => {
+                    if (weaponInstance.on_hit_wall) weaponInstance.on_hit_wall(x, y);
+                },
                 update: (dt) => {
                     if (weaponInstance.update) weaponInstance.update(dt);
                 },
