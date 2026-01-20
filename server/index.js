@@ -381,6 +381,216 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- SAVED CODE HANDLERS ---
+    socket.on('save_code', async ({ username, codeName, codeContent }) => {
+        console.log(`[CODES] Save Code Request: ${username} - "${codeName}"`);
+
+        try {
+            if (!socket.data.username || socket.data.username !== username) {
+                socket.emit('save_code_response', { success: false, error: "Authentication failed" });
+                return;
+            }
+
+            if (!codeName || codeName.trim().length === 0) {
+                socket.emit('save_code_response', { success: false, error: "Code name cannot be empty" });
+                return;
+            }
+
+            if (!codeContent || codeContent.trim().length === 0) {
+                socket.emit('save_code_response', { success: false, error: "Code content cannot be empty" });
+                return;
+            }
+
+            const codeId = 'code_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            const codeData = {
+                id: codeId,
+                name: codeName.trim(),
+                code: codeContent,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                isDefault: false
+            };
+
+            if (firebaseDb) {
+                try {
+                    await firebaseDb.ref(`users/${username}/saved_codes/${codeId}`).set(codeData);
+                    console.log(`✅ Code saved for ${username}: ${codeName}`);
+                } catch (err) {
+                    throw err;
+                }
+            } else {
+                // Memory fallback
+                const user = memoryUsers.get(username) || {};
+                if (!user.saved_codes) user.saved_codes = {};
+                user.saved_codes[codeId] = codeData;
+                memoryUsers.set(username, user);
+            }
+
+            socket.emit('save_code_response', { success: true, codeId, message: `Code saved as "${codeName}"` });
+        } catch (err) {
+            console.error("[CODES] Save Error:", err.message);
+            socket.emit('save_code_response', { success: false, error: "Failed to save code: " + err.message });
+        }
+    });
+
+    socket.on('fetch_saved_codes', async ({ username }) => {
+        console.log(`[CODES] Fetch Saved Codes Request: ${username}`);
+
+        try {
+            if (!socket.data.username || socket.data.username !== username) {
+                socket.emit('fetch_saved_codes_response', { success: false, error: "Authentication failed", codes: [] });
+                return;
+            }
+
+            let codes = [];
+
+            if (firebaseDb) {
+                try {
+                    const snapshot = await firebaseDb.ref(`users/${username}/saved_codes`).once('value');
+                    const data = snapshot.val();
+                    codes = data ? Object.values(data) : [];
+                    console.log(`✅ Fetched ${codes.length} codes for ${username}`);
+                } catch (err) {
+                    throw err;
+                }
+            } else {
+                // Memory fallback
+                const user = memoryUsers.get(username);
+                codes = user?.saved_codes ? Object.values(user.saved_codes) : [];
+            }
+
+            socket.emit('fetch_saved_codes_response', { success: true, codes });
+        } catch (err) {
+            console.error("[CODES] Fetch Error:", err.message);
+            socket.emit('fetch_saved_codes_response', { success: false, error: "Failed to fetch codes: " + err.message, codes: [] });
+        }
+    });
+
+    socket.on('load_code', async ({ username, codeId }) => {
+        console.log(`[CODES] Load Code Request: ${username} - ${codeId}`);
+
+        try {
+            if (!socket.data.username || socket.data.username !== username) {
+                socket.emit('load_code_response', { success: false, error: "Authentication failed" });
+                return;
+            }
+
+            if (!codeId) {
+                socket.emit('load_code_response', { success: false, error: "Code ID is required" });
+                return;
+            }
+
+            let code = null;
+
+            if (firebaseDb) {
+                try {
+                    const snapshot = await firebaseDb.ref(`users/${username}/saved_codes/${codeId}`).once('value');
+                    code = snapshot.val();
+                } catch (err) {
+                    throw err;
+                }
+            } else {
+                // Memory fallback
+                const user = memoryUsers.get(username);
+                code = user?.saved_codes?.[codeId] || null;
+            }
+
+            if (!code) {
+                socket.emit('load_code_response', { success: false, error: "Code not found" });
+                return;
+            }
+
+            console.log(`✅ Loaded code for ${username}: ${code.name}`);
+            socket.emit('load_code_response', { success: true, code });
+        } catch (err) {
+            console.error("[CODES] Load Error:", err.message);
+            socket.emit('load_code_response', { success: false, error: "Failed to load code: " + err.message });
+        }
+    });
+
+    socket.on('delete_code', async ({ username, codeId }) => {
+        console.log(`[CODES] Delete Code Request: ${username} - ${codeId}`);
+
+        try {
+            if (!socket.data.username || socket.data.username !== username) {
+                socket.emit('delete_code_response', { success: false, error: "Authentication failed" });
+                return;
+            }
+
+            if (!codeId) {
+                socket.emit('delete_code_response', { success: false, error: "Code ID is required" });
+                return;
+            }
+
+            if (firebaseDb) {
+                try {
+                    await firebaseDb.ref(`users/${username}/saved_codes/${codeId}`).remove();
+                    console.log(`✅ Deleted code for ${username}: ${codeId}`);
+                } catch (err) {
+                    throw err;
+                }
+            } else {
+                // Memory fallback
+                const user = memoryUsers.get(username);
+                if (user?.saved_codes?.[codeId]) {
+                    delete user.saved_codes[codeId];
+                    memoryUsers.set(username, user);
+                }
+            }
+
+            socket.emit('delete_code_response', { success: true, message: "Code deleted" });
+        } catch (err) {
+            console.error("[CODES] Delete Error:", err.message);
+            socket.emit('delete_code_response', { success: false, error: "Failed to delete code: " + err.message });
+        }
+    });
+
+    socket.on('rename_code', async ({ username, codeId, newName }) => {
+        console.log(`[CODES] Rename Code Request: ${username} - ${codeId} -> "${newName}"`);
+
+        try {
+            if (!socket.data.username || socket.data.username !== username) {
+                socket.emit('rename_code_response', { success: false, error: "Authentication failed" });
+                return;
+            }
+
+            if (!codeId) {
+                socket.emit('rename_code_response', { success: false, error: "Code ID is required" });
+                return;
+            }
+
+            if (!newName || newName.trim().length === 0) {
+                socket.emit('rename_code_response', { success: false, error: "Code name cannot be empty" });
+                return;
+            }
+
+            if (firebaseDb) {
+                try {
+                    await firebaseDb.ref(`users/${username}/saved_codes/${codeId}`).update({
+                        name: newName.trim(),
+                        updatedAt: new Date().toISOString()
+                    });
+                    console.log(`✅ Renamed code for ${username}: ${codeId}`);
+                } catch (err) {
+                    throw err;
+                }
+            } else {
+                // Memory fallback
+                const user = memoryUsers.get(username);
+                if (user?.saved_codes?.[codeId]) {
+                    user.saved_codes[codeId].name = newName.trim();
+                    user.saved_codes[codeId].updatedAt = new Date().toISOString();
+                    memoryUsers.set(username, user);
+                }
+            }
+
+            socket.emit('rename_code_response', { success: true, message: "Code renamed" });
+        } catch (err) {
+            console.error("[CODES] Rename Error:", err.message);
+            socket.emit('rename_code_response', { success: false, error: "Failed to rename code: " + err.message });
+        }
+    });
+
     socket.on('move', (data) => {
         if (currentRoomId && rooms[currentRoomId]) {
             const player = rooms[currentRoomId].players[socket.id];

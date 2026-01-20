@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords } from 'lucide-react';
 import { Tutorial } from './Tutorial';
+import { SavedCodePanel } from './SavedCodePanel';
 import { ATTRIBUTES, getUpgradeCost } from '../utils/AttributeRegistry';
+import type { SavedCode } from '../utils/NetworkManager';
 
 interface LobbyProps {
     onJoinRoom: (roomId: string, settings?: any) => void;
@@ -16,6 +18,11 @@ interface LobbyProps {
     onUpgrade?: (attributeId: string) => void;
     onSignup?: (username: string) => void;
     leaderboard?: any[];
+    savedCodes?: SavedCode[];
+    onLoadCode?: (code: SavedCode) => void;
+    onDeleteCode?: (codeId: string) => void;
+    onRenameCode?: (codeId: string, newName: string) => void;
+    loadingSavedCodes?: boolean;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -30,7 +37,12 @@ export const Lobby: React.FC<LobbyProps> = ({
     username,
     onUpgrade,
     onSignup,
-    leaderboard = []
+    leaderboard = [],
+    savedCodes = [],
+    onLoadCode,
+    onDeleteCode,
+    onRenameCode,
+    loadingSavedCodes = false
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
@@ -41,6 +53,9 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [activeTab, setActiveTab] = useState<'join' | 'create'>('join');
     const [createName, setCreateName] = useState('');
     const [isPublic] = useState(true);
+    
+    // Inventory vs Saved Code tabs
+    const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code'>('inventory');
 
     const handleJoin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -285,14 +300,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                     {/* RIGHT: Inventory & Upgrades (40% width) */}
                     <div className="flex-[2] bg-cyber-dark/80 border-2 border-cyber-accent/20 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl backdrop-blur-xl">
                         <div className="p-6 border-b border-cyber-accent/10 flex justify-between items-center shrink-0">
-                            <div>
+                            <div className="flex-1">
                                 <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-tighter">
                                     <Wrench className="text-cyber-accent" size={20} />
-                                    Inventory
+                                    {inventoryTab === 'inventory' ? 'Inventory' : 'Saved Code'}
                                 </h2>
-                                <div className="text-[10px] text-cyber-muted uppercase font-bold tracking-widest">Global Assets</div>
+                                <div className="text-[10px] text-cyber-muted uppercase font-bold tracking-widest">
+                                    {inventoryTab === 'inventory' ? 'Global Assets' : 'Your Scripts'}
+                                </div>
                             </div>
-                            {userProfile && (
+                            {userProfile && inventoryTab === 'inventory' && (
                                 <div className="bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-xl flex items-center gap-2">
                                     <DollarSign className="text-emerald-400" size={16} />
                                     <span className="text-xl font-black text-emerald-400">{userProfile.money.toLocaleString()}</span>
@@ -300,91 +317,121 @@ export const Lobby: React.FC<LobbyProps> = ({
                             )}
                         </div>
 
+                        {/* Tab Buttons */}
+                        {isLoggedIn && (
+                            <div className="px-6 py-3 border-b border-cyber-accent/10 flex gap-2">
+                                <button
+                                    onClick={() => setInventoryTab('inventory')}
+                                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'inventory' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
+                                >
+                                    Inventory
+                                </button>
+                                <button
+                                    onClick={() => setInventoryTab('saved-code')}
+                                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'saved-code' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
+                                >
+                                    Saved Code
+                                </button>
+                            </div>
+                        )}
+
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                            {!isLoggedIn ? (
-                                <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40 grayscale">
-                                    <Lock size={48} className="mb-4 text-cyber-muted" />
-                                    <div className="text-sm font-black text-white uppercase mb-2">Systems Locked</div>
-                                    <div className="text-[10px] text-cyber-muted uppercase">Login to access inventory & upgrades</div>
-                                </div>
-                            ) : userProfile && (
+                            {inventoryTab === 'inventory' ? (
                                 <>
-                                    <div className="grid grid-cols-1 gap-4 pb-4">
-                                        {Object.values(ATTRIBUTES).map((attr) => {
-                                            const isUnlocked = attr.isBase || userProfile.unlocks.includes(attr.id);
-                                            const currentLimit = userProfile.limits[attr.id] || attr.startLimit;
-                                            const isMaxed = currentLimit >= attr.maxLimit;
-                                            const upgradeCost = getUpgradeCost(attr.id, currentLimit);
-                                            const canAfford = userProfile.money >= upgradeCost;
-                                            const Icon = attr.icon;
+                                    {!isLoggedIn ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40 grayscale">
+                                            <Lock size={48} className="mb-4 text-cyber-muted" />
+                                            <div className="text-sm font-black text-white uppercase mb-2">Systems Locked</div>
+                                            <div className="text-[10px] text-cyber-muted uppercase">Login to access inventory & upgrades</div>
+                                        </div>
+                                    ) : userProfile ? (
+                                        <>
+                                            <div className="grid grid-cols-1 gap-4 pb-4">
+                                                {Object.values(ATTRIBUTES).map((attr) => {
+                                                    const isUnlocked = attr.isBase || userProfile.unlocks.includes(attr.id);
+                                                    const currentLimit = userProfile.limits[attr.id] || attr.startLimit;
+                                                    const isMaxed = currentLimit >= attr.maxLimit;
+                                                    const upgradeCost = getUpgradeCost(attr.id, currentLimit);
+                                                    const canAfford = userProfile.money >= upgradeCost;
+                                                    const Icon = attr.icon;
 
-                                            if (!isUnlocked) return (
-                                                <div key={attr.id} className="bg-black/20 border border-cyber-muted/10 rounded-2xl p-4 opacity-50 flex items-center gap-4">
-                                                    <div className="bg-cyber-muted/10 p-3 rounded-xl grayscale">
-                                                        <Icon size={24} className="text-cyber-muted" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <div className="text-xs font-bold text-cyber-muted uppercase tracking-wider">{attr.name}</div>
-                                                        <div className="text-[8px] text-cyber-muted uppercase">Locked (Level {userProfile.level + 1}+)</div>
-                                                    </div>
-                                                    <Lock size={16} className="text-cyber-muted" />
-                                                </div>
-                                            );
-
-                                            return (
-                                                <div key={attr.id} className="bg-cyber-light/30 border border-cyber-accent/20 rounded-2xl p-4 hover:border-cyber-accent/40 transition-all group">
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <div className="bg-cyber-accent/10 p-2.5 rounded-xl text-cyber-accent group-hover:bg-cyber-accent/20 transition-all">
-                                                            <Icon size={20} />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <div className="flex justify-between items-center mb-0.5">
-                                                                <h3 className="text-sm font-black text-white uppercase tracking-tight">{attr.name}</h3>
-                                                                <div className="text-[8px] font-bold text-cyber-accent border border-cyber-accent/20 px-1.5 py-0.5 rounded uppercase">LVL MAX: {attr.maxLimit}</div>
+                                                    if (!isUnlocked) return (
+                                                        <div key={attr.id} className="bg-black/20 border border-cyber-muted/10 rounded-2xl p-4 opacity-50 flex items-center gap-4">
+                                                            <div className="bg-cyber-muted/10 p-3 rounded-xl grayscale">
+                                                                <Icon size={24} className="text-cyber-muted" />
                                                             </div>
-                                                            <div className="flex justify-between items-end">
-                                                                <div className="text-[8px] text-cyber-muted uppercase max-w-[140px] leading-tight line-clamp-1">{attr.description}</div>
-                                                                <div className="text-xs font-black text-white">{currentLimit}</div>
+                                                            <div className="flex-1">
+                                                                <div className="text-xs font-bold text-cyber-muted uppercase tracking-wider">{attr.name}</div>
+                                                                <div className="text-[8px] text-cyber-muted uppercase">Locked (Level {userProfile.level + 1}+)</div>
                                                             </div>
+                                                            <Lock size={16} className="text-cyber-muted" />
                                                         </div>
-                                                    </div>
+                                                    );
 
-                                                    <div className="w-full bg-black/40 rounded-full h-1 mb-4 overflow-hidden">
-                                                        <div
-                                                            className="bg-cyber-accent h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,255,159,0.5)]"
-                                                            style={{ width: `${(currentLimit / attr.maxLimit) * 100}%` }}
-                                                        />
-                                                    </div>
+                                                    return (
+                                                        <div key={attr.id} className="bg-cyber-light/30 border border-cyber-accent/20 rounded-2xl p-4 hover:border-cyber-accent/40 transition-all group">
+                                                            <div className="flex items-center gap-3 mb-3">
+                                                                <div className="bg-cyber-accent/10 p-2.5 rounded-xl text-cyber-accent group-hover:bg-cyber-accent/20 transition-all">
+                                                                    <Icon size={20} />
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <div className="flex justify-between items-center mb-0.5">
+                                                                        <h3 className="text-sm font-black text-white uppercase tracking-tight">{attr.name}</h3>
+                                                                        <div className="text-[8px] font-bold text-cyber-accent border border-cyber-accent/20 px-1.5 py-0.5 rounded uppercase">LVL MAX: {attr.maxLimit}</div>
+                                                                    </div>
+                                                                    <div className="flex justify-between items-end">
+                                                                        <div className="text-[8px] text-cyber-muted uppercase max-w-[140px] leading-tight line-clamp-1">{attr.description}</div>
+                                                                        <div className="text-xs font-black text-white">{currentLimit}</div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
 
-                                                    {!isMaxed ? (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onUpgrade?.(attr.id);
-                                                            }}
-                                                            disabled={!canAfford}
-                                                            className={`w-full py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-cyber-accent text-black hover:bg-emerald-400 active:scale-[0.98]' : 'bg-white/5 text-cyber-muted cursor-not-allowed grayscale'}`}
-                                                        >
-                                                            <TrendingUp size={14} />
-                                                            Upgrade Limit
-                                                            <span className="ml-auto opacity-70 tracking-widest">${upgradeCost.toLocaleString()}</span>
-                                                        </button>
-                                                    ) : (
-                                                        <div className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-black text-[10px] uppercase text-center flex items-center justify-center gap-2">
-                                                            <CheckCircle2 size={14} /> Neural Overload Reached
+                                                            <div className="w-full bg-black/40 rounded-full h-1 mb-4 overflow-hidden">
+                                                                <div
+                                                                    className="bg-cyber-accent h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,255,159,0.5)]"
+                                                                    style={{ width: `${(currentLimit / attr.maxLimit) * 100}%` }}
+                                                                />
+                                                            </div>
+
+                                                            {!isMaxed ? (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onUpgrade?.(attr.id);
+                                                                    }}
+                                                                    disabled={!canAfford}
+                                                                    className={`w-full py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-cyber-accent text-black hover:bg-emerald-400 active:scale-[0.98]' : 'bg-white/5 text-cyber-muted cursor-not-allowed grayscale'}`}
+                                                                >
+                                                                    <TrendingUp size={14} />
+                                                                    Upgrade Limit
+                                                                    <span className="ml-auto opacity-70 tracking-widest">${upgradeCost.toLocaleString()}</span>
+                                                                </button>
+                                                            ) : (
+                                                                <div className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-black text-[10px] uppercase text-center flex items-center justify-center gap-2">
+                                                                    <CheckCircle2 size={14} /> Neural Overload Reached
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-start gap-3">
-                                        <Info className="text-blue-400 shrink-0" size={16} />
-                                        <p className="text-[9px] text-blue-100 uppercase tracking-wider leading-relaxed font-bold">
-                                            Level up to receive <span className="text-cyber-accent">Draft Cards</span>. Choose new attributes to expand your logic capabilities. Use money to increase execution limits.
-                                        </p>
-                                    </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-start gap-3">
+                                                <Info className="text-blue-400 shrink-0" size={16} />
+                                                <p className="text-[9px] text-blue-100 uppercase tracking-wider leading-relaxed font-bold">
+                                                    Level up to receive <span className="text-cyber-accent">Draft Cards</span>. Choose new attributes to expand your logic capabilities. Use money to increase execution limits.
+                                                </p>
+                                            </div>
+                                        </>
+                                    ) : null}
                                 </>
+                            ) : (
+                                <SavedCodePanel
+                                    savedCodes={savedCodes}
+                                    onLoad={(code) => onLoadCode?.(code)}
+                                    onDelete={(codeId) => onDeleteCode?.(codeId)}
+                                    onRename={(codeId, newName) => onRenameCode?.(codeId, newName)}
+                                    isLoading={loadingSavedCodes}
+                                />
                             )}
                         </div>
                     </div>

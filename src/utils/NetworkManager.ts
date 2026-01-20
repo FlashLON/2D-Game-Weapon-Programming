@@ -8,6 +8,47 @@ export interface AuthResponse {
     isNew?: boolean;
 }
 
+// Saved Code Interfaces
+export interface SavedCode {
+    id: string;
+    name: string;
+    code: string;
+    createdAt: string;
+    updatedAt: string;
+    isDefault: boolean;
+}
+
+export interface SaveCodeResponse {
+    success: boolean;
+    codeId?: string;
+    message?: string;
+    error?: string;
+}
+
+export interface FetchCodesResponse {
+    success: boolean;
+    codes?: SavedCode[];
+    error?: string;
+}
+
+export interface LoadCodeResponse {
+    success: boolean;
+    code?: SavedCode;
+    error?: string;
+}
+
+export interface DeleteCodeResponse {
+    success: boolean;
+    message?: string;
+    error?: string;
+}
+
+export interface RenameCodeResponse {
+    success: boolean;
+    message?: string;
+    error?: string;
+}
+
 class NetworkManager {
     private socket: Socket | null = null;
     private connected: boolean = false;
@@ -155,6 +196,97 @@ class NetworkManager {
 
     sendFire(data: any) {
         if (this.socket && this.connected) this.socket.emit('fire', data);
+    }
+
+    // Saved Code Methods
+    async saveCode(username: string, codeName: string, codeContent: string): Promise<SaveCodeResponse> {
+        if (!this.socket || !this.connected) return { success: false, error: "Not connected to server" };
+
+        console.log('[NetworkManager] 📤 Saving Code:', codeName);
+        return new Promise((resolve) => {
+            if (!this.socket) return resolve({ success: false, error: "Socket lost" });
+
+            this.socket.once('save_code_response', (res: SaveCodeResponse) => {
+                console.log('[NetworkManager] 📥 SAVE CODE RESPONSE:', res);
+                resolve(res);
+            });
+
+            this.socket.emit('save_code', { username, codeName, codeContent });
+
+            setTimeout(() => resolve({ success: false, error: "Save Timeout (Server took too long)" }), 10000);
+        });
+    }
+
+    async fetchSavedCodes(username: string): Promise<FetchCodesResponse> {
+        if (!this.socket || !this.connected) return { success: false, error: "Not connected to server", codes: [] };
+
+        console.log('[NetworkManager] 📤 Fetching Saved Codes for:', username);
+        return new Promise((resolve) => {
+            if (!this.socket) return resolve({ success: false, error: "Socket lost", codes: [] });
+
+            this.socket.once('fetch_saved_codes_response', (res: FetchCodesResponse) => {
+                console.log('[NetworkManager] 📥 FETCH CODES RESPONSE:', res);
+                resolve(res);
+            });
+
+            this.socket.emit('fetch_saved_codes', { username });
+
+            setTimeout(() => resolve({ success: false, error: "Fetch Timeout (Server took too long)", codes: [] }), 10000);
+        });
+    }
+
+    async loadCode(username: string, codeId: string): Promise<LoadCodeResponse> {
+        if (!this.socket || !this.connected) return { success: false, error: "Not connected to server" };
+
+        console.log('[NetworkManager] 📤 Loading Code:', codeId);
+        return new Promise((resolve) => {
+            if (!this.socket) return resolve({ success: false, error: "Socket lost" });
+
+            this.socket.once('load_code_response', (res: LoadCodeResponse) => {
+                console.log('[NetworkManager] 📥 LOAD CODE RESPONSE:', res);
+                resolve(res);
+            });
+
+            this.socket.emit('load_code', { username, codeId });
+
+            setTimeout(() => resolve({ success: false, error: "Load Timeout (Server took too long)" }), 10000);
+        });
+    }
+
+    async deleteCode(username: string, codeId: string): Promise<DeleteCodeResponse> {
+        if (!this.socket || !this.connected) return { success: false, error: "Not connected to server" };
+
+        console.log('[NetworkManager] 📤 Deleting Code:', codeId);
+        return new Promise((resolve) => {
+            if (!this.socket) return resolve({ success: false, error: "Socket lost" });
+
+            this.socket.once('delete_code_response', (res: DeleteCodeResponse) => {
+                console.log('[NetworkManager] 📥 DELETE CODE RESPONSE:', res);
+                resolve(res);
+            });
+
+            this.socket.emit('delete_code', { username, codeId });
+
+            setTimeout(() => resolve({ success: false, error: "Delete Timeout (Server took too long)" }), 10000);
+        });
+    }
+
+    async renameCode(username: string, codeId: string, newName: string): Promise<RenameCodeResponse> {
+        if (!this.socket || !this.connected) return { success: false, error: "Not connected to server" };
+
+        console.log('[NetworkManager] 📤 Renaming Code:', codeId);
+        return new Promise((resolve) => {
+            if (!this.socket) return resolve({ success: false, error: "Socket lost" });
+
+            this.socket.once('rename_code_response', (res: RenameCodeResponse) => {
+                console.log('[NetworkManager] 📥 RENAME CODE RESPONSE:', res);
+                resolve(res);
+            });
+
+            this.socket.emit('rename_code', { username, codeId, newName });
+
+            setTimeout(() => resolve({ success: false, error: "Rename Timeout (Server took too long)" }), 10000);
+        });
     }
 
     disconnect() {

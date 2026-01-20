@@ -4,9 +4,10 @@ import { Arena } from './components/Arena';
 import { Lobby } from './components/Lobby';
 import { LevelUpModal } from './components/LevelUpModal';
 import { Console, type LogMessage, type LogType } from './components/Console';
+import { SaveCodeModal } from './components/SaveCodeModal';
 import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
-import { networkManager } from './utils/NetworkManager';
+import { networkManager, type SavedCode } from './utils/NetworkManager';
 import { ATTRIBUTES, getUpgradeCost } from './utils/AttributeRegistry';
 import { Play, RotateCcw, Link as LinkIcon, CheckCircle2, LogOut } from 'lucide-react';
 import { DocsPanel } from './components/DocsPanel';
@@ -76,6 +77,11 @@ function App() {
   const [username, setUsername] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+
+  // Saved Code State
+  const [savedCodes, setSavedCodes] = useState<SavedCode[]>([]);
+  const [saveCodeModalOpen, setSaveCodeModalOpen] = useState(false);
+  const [loadingSavedCodes, setLoadingSavedCodes] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
@@ -305,8 +311,80 @@ function App() {
     currentRoomRef.current = currentRoom;
   }, [currentRoom]);
 
+  // Saved Code Handlers
+  async function loadSavedCodes(user: string) {
+    if (!user) return;
+    setLoadingSavedCodes(true);
+    try {
+      const response = await networkManager.fetchSavedCodes(user);
+      if (response.success) {
+        setSavedCodes(response.codes || []);
+      } else {
+        addLog('Failed to load saved codes', 'error');
+      }
+    } catch (error) {
+      addLog('Error fetching saved codes: ' + String(error), 'error');
+    } finally {
+      setLoadingSavedCodes(false);
+    }
+  }
 
-  useEffect(() => {
+  async function handleSaveCode(codeName: string) {
+    try {
+      const response = await networkManager.saveCode(username, codeName, code);
+      if (response.success) {
+        addLog(`Code saved as "${codeName}"`, 'success');
+        setSaveCodeModalOpen(false);
+        // Reload saved codes list
+        await loadSavedCodes(username);
+      } else {
+        addLog(response.error || 'Failed to save code', 'error');
+      }
+    } catch (error) {
+      addLog('Save code error: ' + String(error), 'error');
+    }
+  }
+
+  async function handleLoadCode(savedCode: SavedCode) {
+    try {
+      setCode(savedCode.code);
+      addLog(`Loaded "${savedCode.name}"`, 'success');
+      // Recompile with loaded code
+      await handleCompile(savedCode.code);
+    } catch (error) {
+      addLog('Failed to load code: ' + String(error), 'error');
+    }
+  }
+
+  async function handleDeleteCode(codeId: string) {
+    try {
+      const response = await networkManager.deleteCode(username, codeId);
+      if (response.success) {
+        addLog('Code deleted', 'success');
+        await loadSavedCodes(username);
+      } else {
+        addLog('Failed to delete code', 'error');
+      }
+    } catch (error) {
+      addLog('Delete error: ' + String(error), 'error');
+    }
+  }
+
+  async function handleRenameCode(codeId: string, newName: string) {
+    try {
+      const response = await networkManager.renameCode(username, codeId, newName);
+      if (response.success) {
+        addLog('Code renamed', 'success');
+        await loadSavedCodes(username);
+      } else {
+        addLog('Failed to rename code', 'error');
+      }
+    } catch (error) {
+      addLog('Rename error: ' + String(error), 'error');
+    }
+  }
+
+  const handleLogin = async (name: string) => {
     const init = async () => {
       try {
         await pyodideManager.init((msg, isError) => {
@@ -420,6 +498,8 @@ function App() {
       setUserProfile(res.profile);
       setIsLoggedIn(true);
       setStatus("Ready");
+      // Load saved codes after login
+      await loadSavedCodes(name);
     } else {
       addLog(`Login Failed: ${res.error}`, "error");
       setStatus(res.error || "Auth Error");
@@ -448,6 +528,8 @@ function App() {
       setUserProfile(res.profile);
       setIsLoggedIn(true);
       setStatus("Ready");
+      // Load saved codes after signup
+      await loadSavedCodes(name);
     } else {
       addLog(`Signup Failed: ${res.error}`, "error");
       setStatus(res.error || "Auth Error");
@@ -528,6 +610,11 @@ function App() {
             username={username}
             onUpgrade={handleUpgrade}
             leaderboard={globalLeaderboard}
+            savedCodes={savedCodes}
+            onLoadCode={handleLoadCode}
+            onDeleteCode={handleDeleteCode}
+            onRenameCode={handleRenameCode}
+            loadingSavedCodes={loadingSavedCodes}
           />
         ) : (
           <>
@@ -568,6 +655,15 @@ function App() {
               >
                 <RotateCcw size={18} />
               </button>
+              {isLoggedIn && (
+                <button
+                  onClick={() => setSaveCodeModalOpen(true)}
+                  className="flex items-center gap-2 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all text-sm active:scale-95"
+                  title="Save current code to your account"
+                >
+                  💾 SAVE CODE
+                </button>
+              )}
               <button
                 onClick={handleSave}
                 className="flex items-center gap-2 bg-cyber-accent text-black font-black px-4 py-2 rounded-lg shadow-xl shadow-cyber-accent/30 hover:bg-emerald-400 transition-all font-mono text-sm active:scale-95"
@@ -587,6 +683,13 @@ function App() {
           onClose={() => setShowLevelUpModal(false)}
         />
       )}
+
+      <SaveCodeModal
+        isOpen={saveCodeModalOpen}
+        onClose={() => setSaveCodeModalOpen(false)}
+        onSave={handleSaveCode}
+        isLoading={loadingSavedCodes}
+      />
     </div>
   );
 }
