@@ -630,7 +630,6 @@ function App() {
             onLoadCode={handleLoadCode}
             onDeleteCode={handleDeleteCode}
             onRenameCode={handleRenameCode}
-            onRenameCode={handleRenameCode}
             loadingSavedCodes={loadingSavedCodes}
             onEquipTitle={handleEquipTitle}
           />

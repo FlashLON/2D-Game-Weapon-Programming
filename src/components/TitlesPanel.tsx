@@ -1,5 +1,5 @@
 import React from 'react';
-import { TITLES, getTitleStyle, Title } from '../utils/TitleRegistry';
+import { TITLES, getTitleStyle, type Title } from '../utils/TitleRegistry';
 import { Trophy, Lock, CheckCircle2 } from 'lucide-react';
 
 interface TitlesPanelProps {

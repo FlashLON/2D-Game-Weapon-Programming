@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import { gameEngine, type GameState } from '../engine/GameEngine';
 
 import { networkManager } from '../utils/NetworkManager';
