@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords } from 'lucide-react';
 import { Tutorial } from './Tutorial';
 import { SavedCodePanel } from './SavedCodePanel';
+import { TitlesPanel } from './TitlesPanel';
 import { ATTRIBUTES, getUpgradeCost } from '../utils/AttributeRegistry';
 import type { SavedCode } from '../utils/NetworkManager';
 
@@ -11,7 +12,16 @@ interface LobbyProps {
     isConnected: boolean;
     serverUrl: string;
     setServerUrl: (url: string) => void;
-    userProfile?: { level: number; xp: number; money: number; maxXp: number; unlocks: string[]; limits: Record<string, number> };
+    userProfile?: {
+        level: number;
+        xp: number;
+        money: number;
+        maxXp: number;
+        unlocks: string[];
+        limits: Record<string, number>;
+        titles: string[];
+        equippedTitle: string | null;
+    };
     onLogin?: (username: string) => void;
     isLoggedIn?: boolean;
     username?: string;
@@ -22,7 +32,9 @@ interface LobbyProps {
     onLoadCode?: (code: SavedCode) => void;
     onDeleteCode?: (codeId: string) => void;
     onRenameCode?: (codeId: string, newName: string) => void;
+    onRenameCode?: (codeId: string, newName: string) => void;
     loadingSavedCodes?: boolean;
+    onEquipTitle?: (titleId: string | null) => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -55,7 +67,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [isPublic] = useState(true);
 
     // Inventory vs Saved Code tabs
-    const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code'>('inventory');
+    const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code' | 'titles'>('inventory');
 
     const handleJoin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -313,10 +325,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                             <div className="flex-1">
                                 <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-tighter">
                                     <Wrench className="text-cyber-accent" size={20} />
-                                    {inventoryTab === 'inventory' ? 'Inventory' : 'Saved Code'}
+                                    {inventoryTab === 'inventory' ? 'Inventory' : inventoryTab === 'titles' ? 'Titles' : 'Saved Code'}
                                 </h2>
                                 <div className="text-[10px] text-cyber-muted uppercase font-bold tracking-widest">
-                                    {inventoryTab === 'inventory' ? 'Global Assets' : 'Your Scripts'}
+                                    {inventoryTab === 'inventory' ? 'Global Assets' : inventoryTab === 'titles' ? 'Identity Matrix' : 'Your Scripts'}
                                 </div>
                             </div>
                             {userProfile && inventoryTab === 'inventory' && (
@@ -341,6 +353,12 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'saved-code' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
                                 >
                                     Saved Code
+                                </button>
+                                <button
+                                    onClick={() => setInventoryTab('titles')}
+                                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'titles' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
+                                >
+                                    Titles
                                 </button>
                             </div>
                         )}
@@ -434,6 +452,12 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         </>
                                     ) : null}
                                 </>
+                            ) : inventoryTab === 'titles' ? (
+                                <TitlesPanel
+                                    unlockedTitles={userProfile?.titles || []}
+                                    equippedTitle={userProfile?.equippedTitle || null}
+                                    onEquip={(id) => onEquipTitle?.(id)}
+                                />
                             ) : (
                                 <SavedCodePanel
                                     savedCodes={savedCodes}

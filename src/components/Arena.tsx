@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { gameEngine, type GameState } from '../engine/GameEngine';
 
 import { networkManager } from '../utils/NetworkManager';
+import { TITLES } from '../utils/TitleRegistry';
 
 export const Arena: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -191,6 +192,32 @@ export const Arena: React.FC = () => {
 
                     ctx.fillStyle = hpColor;
                     ctx.fillRect(ent.x - barW / 2, barY, barW * hpPct, barH);
+
+                    // Render Username (for multiplayer)
+                    if (ent.type === 'player' && (ent as any).username) {
+                        // Check for Title
+                        const playerEnt = ent as any;
+                        if (playerEnt.equippedTitle && TITLES[playerEnt.equippedTitle]) {
+                            const titleDef = TITLES[playerEnt.equippedTitle];
+                            ctx.font = 'bold 9px "Outfit", sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.fillStyle = titleDef.color; // Use title color directly
+                            // Can't render tailwind styles in canvas easily, so just color/shadow
+                            ctx.shadowBlur = 4;
+                            ctx.shadowColor = titleDef.color;
+                            ctx.fillText(titleDef.name.toUpperCase(), ent.x, barY - 14);
+                            ctx.shadowBlur = 0;
+                        }
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '10px "Outfit", sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.shadowBlur = 2;
+                        ctx.shadowColor = 'black';
+                        ctx.fillText((ent as any).username, ent.x, barY - 4);
+                        ctx.textAlign = 'left'; // Reset
+                        ctx.shadowBlur = 0;
+                    }
                 }
             });
 

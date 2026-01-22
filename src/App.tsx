@@ -72,7 +72,9 @@ function App() {
       money: 0,
       unlocks: ['speed', 'damage', 'hp', 'cooldown'],
       limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
-      lastUpgradeLevel: {}
+      lastUpgradeLevel: {},
+      titles: [],
+      equippedTitle: null
     };
   });
   const [username, setUsername] = useState<string>('');
@@ -94,6 +96,17 @@ function App() {
       networkManager.saveProfile(userProfile);
     }
   }, [userProfile, isLoggedIn]);
+
+  const handleEquipTitle = (titleId: string | null) => {
+    setUserProfile((prev: any) => ({
+      ...prev,
+      equippedTitle: titleId
+    }));
+    if (networkManager.isConnected()) {
+      const socket = (networkManager as any).socket; // Access socket directly if needed or add method
+      if (socket) socket.emit('equip_title', { titleId });
+    }
+  };
 
   const handleProfileUpdate = (newProfile: any) => {
     setUserProfile((prev: any) => ({
@@ -617,7 +630,9 @@ function App() {
             onLoadCode={handleLoadCode}
             onDeleteCode={handleDeleteCode}
             onRenameCode={handleRenameCode}
+            onRenameCode={handleRenameCode}
             loadingSavedCodes={loadingSavedCodes}
+            onEquipTitle={handleEquipTitle}
           />
         ) : (
           <>

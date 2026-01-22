@@ -140,6 +140,46 @@ app.get('/health', (req, res) => {
     });
 });
 
+// --- TITLE LOGIC HELPERS ---
+const TITLES_LIST = [
+    'killer', 'sneaky', 'threeforone', 'unstoppable', 'monster',
+    'friendly', 'hostile', 'zzz', 'op', 'modhelper', 'mod', 'dev',
+    'god', 'godkiller', 'immortal', 'trueking', 'theultragod'
+];
+
+function unlockTitle(username, titleId, socket) {
+    let user = memoryUsers.get(username);
+    // If using firebase, we'd fetch here, but we are using sync memory cache mostly for game loop
+    if (!user) return;
+
+    if (!user.titles) user.titles = ['beginner']; // Default
+    if (!user.titles.includes(titleId)) {
+        user.titles.push(titleId);
+        console.log(`🏆 UNSOCKED TITLE: ${username} -> ${titleId}`);
+        if (socket) socket.emit('notification', { type: 'unlock', message: `Title Unlocked: ${titleId.toUpperCase()}` });
+        saveProgress(username, user);
+
+        // Check for 'The Ultra God'
+        const nonAdminTitles = ['killer', 'sneaky', 'threeforone', 'unstoppable', 'monster', 'friendly', 'hostile', 'zzz', 'op', 'modhelper', 'godkiller', 'immortal', 'trueking'];
+        const hasAll = nonAdminTitles.every(t => user.titles.includes(t));
+        if (hasAll && !user.titles.includes('theultragod')) {
+            unlockTitle(username, 'theultragod', socket);
+        }
+    }
+}
+
+function checkTitles(username, stats, socket) {
+    if (!username) return;
+
+    // 1. Killer (30 kills) - Need persistent kill count
+    // 2. OP (Max Stats)
+    // We check if limits are maxed. This requires knowing max limits.
+    // Assuming max limits: Speed 600, Damage 100, etc. Simplified check:
+    if (stats.limits && stats.limits.speed >= 600 && stats.limits.damage >= 100 && stats.limits.hp >= 500) { // Example caps
+        unlockTitle(username, 'op', socket);
+    }
+}
+
 app.get('/api/status', (req, res) => {
     const totalPlayers = Object.values(rooms).reduce((sum, r) => sum + Object.keys(r.players).length, 0);
     const totalProjectiles = Object.values(rooms).reduce((sum, r) => sum + r.projectiles.length, 0);
@@ -348,7 +388,9 @@ io.on('connection', (socket) => {
             maxXp: profile?.maxXp || 100,
             money: profile?.money || 0,
             unlocks: profile?.unlocks || ['speed', 'damage'],
-            limits: profile?.limits || { speed: 200, damage: 5 }
+            limits: profile?.limits || { speed: 200, damage: 5 },
+            titles: profile?.titles || [],
+            equippedTitle: profile?.equippedTitle || null
         };
 
         socket.emit('init', {
@@ -359,6 +401,11 @@ io.on('connection', (socket) => {
                 score: room.score
             }
         });
+
+        checkTitles(socket.data.username, {
+            ...profile,
+            killstreak: 0 // Reset on join
+        }, socket);
 
         console.log(`Player ${socket.id} joined room ${currentRoomId}`);
     });
@@ -377,6 +424,35 @@ io.on('connection', (socket) => {
                 p.money = profile.money;
                 p.unlocks = profile.unlocks;
                 p.limits = profile.limits;
+                p.titles = profile.titles;
+                p.equippedTitle = profile.equippedTitle;
+
+                checkTitles(socket.data.username, p, socket);
+            }
+        }
+    });
+
+    socket.on('equip_title', ({ titleId }) => {
+        if (socket.data.username) {
+            const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+            if (roomId && rooms[roomId] && rooms[roomId].players[socket.id]) {
+                const p = rooms[roomId].players[socket.id];
+                if (p.titles && p.titles.includes(titleId)) {
+                    p.equippedTitle = titleId;
+                    // Persist
+                    const user = memoryUsers.get(socket.data.username);
+                    if (user) {
+                        user.equippedTitle = titleId;
+                        saveProgress(socket.data.username, user);
+                    }
+                } else if (titleId === null) {
+                    p.equippedTitle = null;
+                    const user = memoryUsers.get(socket.data.username);
+                    if (user) {
+                        user.equippedTitle = null;
+                        saveProgress(socket.data.username, user);
+                    }
+                }
             }
         }
     });
@@ -870,7 +946,21 @@ setInterval(() => {
                 const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
                 if (dist < ent.radius + proj.radius) {
                     const dmg = (proj.damage || 10);
+
+                    // Logic for Sneaky (One Shot Kill on Player)
+                    if (ent.type === 'player' && dmg >= ent.maxHp && ent.hp >= ent.maxHp * 0.99) {
+                        if (room.players[proj.playerId]) {
+                            unlockTitle(room.players[proj.playerId].username, 'sneaky', null);
+                        }
+                    }
+
                     ent.hp -= dmg;
+
+                    // Logic for ThreeForOne (Multikill on Pierce)
+                    if (ent.hp <= 0 && room.players[proj.playerId]) {
+                        proj.hitCount = (proj.hitCount || 0) + 1;
+                        if (proj.hitCount >= 3) unlockTitle(room.players[proj.playerId].username, 'threeforone', null);
+                    }
 
                     // Vampirism
                     if (proj.vampirism > 0 && room.players[proj.playerId]) {
@@ -911,6 +1001,13 @@ setInterval(() => {
                             const dSq = (t.x - proj.x) ** 2 + (t.y - proj.y) ** 2;
                             if (dSq < exRadius ** 2) {
                                 t.hp -= (proj.explosion_damage || 15);
+
+                                // Track Multikill for Explosion
+                                if (t.hp <= 0 && room.players[proj.playerId]) {
+                                    proj.hitCount = (proj.hitCount || 0) + 1;
+                                    if (proj.hitCount >= 3) unlockTitle(room.players[proj.playerId].username, 'threeforone', null);
+                                }
+
                                 const exAngle = Math.atan2(t.y - proj.y, t.x - proj.x);
                                 t.velocity.x += Math.cos(exAngle) * 50;
                                 t.velocity.y += Math.sin(exAngle) * 50;
@@ -948,6 +1045,18 @@ setInterval(() => {
                             killer.kills++;
                             killer.xp += 50;
                             killer.money += 25;
+                            killer.killstreak = (killer.killstreak || 0) + 1; // Increment streak
+
+                            // Check Titles
+                            if (killer.kills >= 30) unlockTitle(killer.username, 'killer', null);
+                            if (killer.killstreak >= 100) unlockTitle(killer.username, 'unstoppable', null);
+                            if (killer.killstreak >= 1000) unlockTitle(killer.username, 'monster', null);
+
+                            // Check God Slayer
+                            if (ent.type === 'player' && room.players[ent.id] && room.players[ent.id].titles && room.players[ent.id].titles.includes('god')) {
+                                unlockTitle(killer.username, 'godkiller', null);
+                            }
+
                             if (killer.xp >= killer.maxXp) {
                                 killer.level++;
                                 killer.xp -= killer.maxXp;
