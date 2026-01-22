@@ -53,7 +53,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [activeTab, setActiveTab] = useState<'join' | 'create'>('join');
     const [createName, setCreateName] = useState('');
     const [isPublic] = useState(true);
-    
+
     // Inventory vs Saved Code tabs
     const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code'>('inventory');
 
@@ -167,7 +167,24 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     </div>
                                     <p className="text-cyber-muted text-sm mb-6">Team up with friends to survive endless waves and massive bosses.</p>
 
-                                    <ul className="space-y-2 mb-8">
+                                    <div className="space-y-3 mb-4">
+                                        <button
+                                            onClick={() => onJoinRoom('coop-main', { mode: 'coop', public: true })}
+                                            disabled={!isConnected}
+                                            className={`w-full py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${isConnected ? 'bg-purple-600/20 text-purple-400 border border-purple-500/50 hover:bg-purple-600/40 hover:text-white' : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'}`}
+                                        >
+                                            <Globe size={16} /> JOIN PUBLIC SECTOR
+                                        </button>
+                                        <button
+                                            onClick={() => onJoinRoom(`coop-private-${Math.floor(Math.random() * 10000)}`, { mode: 'coop', public: false })}
+                                            disabled={!isConnected}
+                                            className={`w-full py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${isConnected ? 'bg-purple-600 text-white hover:bg-purple-500 shadow-lg shadow-purple-600/20' : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'}`}
+                                        >
+                                            <Lock size={16} /> CREATE PRIVATE SQUAD
+                                        </button>
+                                    </div>
+
+                                    <ul className="space-y-2 mb-2">
                                         <li className="flex items-center gap-2 text-[10px] font-bold text-purple-300 uppercase font-mono">
                                             <Users2 size={12} /> Mutual Defense
                                         </li>
@@ -176,13 +193,6 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         </li>
                                     </ul>
                                 </div>
-                                <button
-                                    onClick={() => onJoinRoom('coop-main', { mode: 'coop' })}
-                                    disabled={!isConnected}
-                                    className={`mt-auto w-full font-black py-4 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3 z-10 ${isConnected ? 'bg-purple-600 text-white hover:bg-purple-500' : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'}`}
-                                >
-                                    <Users2 size={20} /> START CO-OP
-                                </button>
                             </div>
 
                             {/* Multiplayer Card */}

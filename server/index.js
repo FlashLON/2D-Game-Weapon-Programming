@@ -700,6 +700,12 @@ setInterval(() => {
                         color = '#ffaa00';
                         speed *= 1.5;
                         hp *= 0.6;
+                    } else if (room.wave > 7 && rand > 0.4) {
+                        type = 'sniper';
+                        radius = 20;
+                        color = '#00ff00'; // Green
+                        speed *= 0.8;
+                        hp *= 0.8;
                     }
 
                     room.enemies.push({
@@ -712,7 +718,8 @@ setInterval(() => {
                         maxHp: hp,
                         color: color,
                         velocity: { x: 0, y: 0 },
-                        speed: speed
+                        speed: speed,
+                        shootTimer: Math.random() * 2 // Desync shots
                     });
                 }
                 if (room.waveTimer > 5) room.waveState = 'fight';
@@ -1021,6 +1028,40 @@ setInterval(() => {
                         }
                     }
 
+                } else if (ent.enemyType === 'sniper') {
+                    // SNIPER AI
+                    const dist = Math.sqrt((nearestPlayer.x - ent.x) ** 2 + (nearestPlayer.y - ent.y) ** 2);
+                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+
+                    if (dist > 400) {
+                        // Approach
+                        ent.velocity.x += Math.cos(angle) * ent.speed * dt;
+                        ent.velocity.y += Math.sin(angle) * ent.speed * dt;
+                    } else if (dist < 250) {
+                        // Back away
+                        ent.velocity.x -= Math.cos(angle) * ent.speed * dt;
+                        ent.velocity.y -= Math.sin(angle) * ent.speed * dt;
+                    }
+
+                    // Shoot
+                    ent.shootTimer = (ent.shootTimer || 0) + dt;
+                    if (ent.shootTimer > 3) {
+                        ent.shootTimer = 0;
+                        room.projectiles.push({
+                            id: 'sp_' + Math.random(),
+                            playerId: 'enemy',
+                            type: 'projectile',
+                            isEnemyProjectile: true,
+                            x: ent.x, y: ent.y,
+                            velocity: { x: Math.cos(angle) * 700, y: Math.sin(angle) * 700 },
+                            lifetime: 2,
+                            radius: 6,
+                            damage: 40,
+                            color: '#00ff00'
+                        });
+                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#00ff00' });
+                    }
+
                 } else {
                     // STANDARD ENEMY AI
                     const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
@@ -1041,9 +1082,33 @@ setInterval(() => {
                 if (dist < p.radius + ent.radius) {
                     p.hp -= ent.isBoss ? 1 : 0.5;
                     if (p.hp <= 0) {
-                        p.hp = p.maxHp;
-                        p.deaths = (p.deaths || 0) + 1;
-                        p.x = 400; p.y = 300;
+                        if (room.mode === 'coop') {
+                            p.dead = true;
+                            p.hp = 0;
+                            p.x = -99999; // Move away
+                            p.deaths = (p.deaths || 0) + 1;
+
+                            // Check Wipe
+                            const alive = Object.values(room.players).filter((pl) => !pl.dead);
+                            if (alive.length === 0) {
+                                // RESET GAME
+                                room.wave = 0; // Will increment to 1 next tick
+                                room.waveState = 'idle';
+                                room.enemies = [];
+                                room.projectiles = [];
+                                Object.values(room.players).forEach((pl) => {
+                                    pl.dead = false;
+                                    pl.hp = pl.maxHp;
+                                    pl.x = 400; pl.y = 300;
+                                    pl.velocity = { x: 0, y: 0 };
+                                });
+                                io.to(roomId).emit('visual_effect', { type: 'wave_start', wave: 1 }); // Visual Reset
+                            }
+                        } else {
+                            p.hp = p.maxHp;
+                            p.deaths = (p.deaths || 0) + 1;
+                            p.x = 400; p.y = 300;
+                        }
                     }
                 }
             });

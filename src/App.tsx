@@ -5,6 +5,7 @@ import { Lobby } from './components/Lobby';
 import { LevelUpModal } from './components/LevelUpModal';
 import { Console, type LogMessage, type LogType } from './components/Console';
 import { SaveCodeModal } from './components/SaveCodeModal';
+import { LoadCodeModal } from './components/LoadCodeModal';
 import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
 import { networkManager, type SavedCode } from './utils/NetworkManager';
@@ -81,6 +82,7 @@ function App() {
   // Saved Code State
   const [savedCodes, setSavedCodes] = useState<SavedCode[]>([]);
   const [saveCodeModalOpen, setSaveCodeModalOpen] = useState(false);
+  const [loadCodeModalOpen, setLoadCodeModalOpen] = useState(false);
   const [loadingSavedCodes, setLoadingSavedCodes] = useState(false);
 
   useEffect(() => {
@@ -657,13 +659,22 @@ function App() {
                 <RotateCcw size={18} />
               </button>
               {isLoggedIn && (
-                <button
-                  onClick={() => setSaveCodeModalOpen(true)}
-                  className="flex items-center gap-2 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all text-sm active:scale-95"
-                  title="Save current code to your account"
-                >
-                  💾 SAVE CODE
-                </button>
+                <>
+                  <button
+                    onClick={() => setLoadCodeModalOpen(true)}
+                    className="flex items-center gap-2 bg-gray-700 text-white font-bold px-4 py-2 rounded-lg shadow-lg hover:bg-gray-600 transition-all text-sm active:scale-95"
+                    title="Load saved code"
+                  >
+                    📂 LOAD CODE
+                  </button>
+                  <button
+                    onClick={() => setSaveCodeModalOpen(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all text-sm active:scale-95"
+                    title="Save current code to your account"
+                  >
+                    💾 SAVE CODE
+                  </button>
+                </>
               )}
               <button
                 onClick={handleSave}
@@ -689,6 +700,13 @@ function App() {
         isOpen={saveCodeModalOpen}
         onClose={() => setSaveCodeModalOpen(false)}
         onSave={handleSaveCode}
+      />
+      <LoadCodeModal
+        isOpen={loadCodeModalOpen}
+        onClose={() => setLoadCodeModalOpen(false)}
+        savedCodes={savedCodes}
+        onLoad={(code) => setCode(code)}
+        onDelete={handleDeleteCode}
       />
     </div>
   );
