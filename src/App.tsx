@@ -384,7 +384,7 @@ function App() {
     }
   }
 
-  const handleLogin = async (name: string) => {
+  useEffect(() => {
     const init = async () => {
       try {
         await pyodideManager.init((msg, isError) => {
@@ -449,6 +449,7 @@ function App() {
       } else if (effect.type === 'boss_fire') {
         gameEngine.spawnParticles(effect.x, effect.y, '#ff00ff', 10);
         gameEngine.addGridImpulse(effect.x, effect.y, 10, 100);
+        gameEngine.triggerShake(0.3);
       }
     };
 
@@ -688,7 +689,6 @@ function App() {
         isOpen={saveCodeModalOpen}
         onClose={() => setSaveCodeModalOpen(false)}
         onSave={handleSaveCode}
-        isLoading={loadingSavedCodes}
       />
     </div>
   );

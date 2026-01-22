@@ -41,7 +41,7 @@ if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
 // --- ACCOUNT HELPERS ---
 async function findUser(username) {
     if (!username || username.trim() === '') return null;
-    
+
     if (firebaseDb) {
         try {
             const snapshot = await firebaseDb.ref(`users/${username}`).once('value');
@@ -56,7 +56,7 @@ async function findUser(username) {
 
 async function upsertUser(username, userData) {
     if (!username || username.trim() === '') return;
-    
+
     if (firebaseDb) {
         try {
             await firebaseDb.ref(`users/${username}`).update({
@@ -143,7 +143,7 @@ app.get('/health', (req, res) => {
 app.get('/api/status', (req, res) => {
     const totalPlayers = Object.values(rooms).reduce((sum, r) => sum + Object.keys(r.players).length, 0);
     const totalProjectiles = Object.values(rooms).reduce((sum, r) => sum + r.projectiles.length, 0);
-    
+
     res.json({
         timestamp: new Date().toISOString(),
         database: firebaseDb ? 'Firebase connected' : 'Memory storage (no persistence)',
@@ -680,16 +680,39 @@ setInterval(() => {
                     else if (side === 2) { ex = Math.random() * 800; ey = 650; }
                     else { ex = -50; ey = Math.random() * 600; }
 
+                    // Enemy Variety
+                    const rand = Math.random();
+                    let type = 'standard';
+                    let radius = 20;
+                    let color = '#ff0055';
+                    let speed = 50 + (room.wave * 2);
+                    let hp = 30 + (room.wave * 15);
+
+                    if (room.wave > 3 && rand > 0.8) {
+                        type = 'tank';
+                        radius = 35;
+                        color = '#880022';
+                        speed *= 0.6;
+                        hp *= 2.5;
+                    } else if (room.wave > 5 && rand > 0.6) {
+                        type = 'speedster';
+                        radius = 15;
+                        color = '#ffaa00';
+                        speed *= 1.5;
+                        hp *= 0.6;
+                    }
+
                     room.enemies.push({
                         id: 'enemy_' + Math.random().toString(36).substr(2, 5),
                         type: 'enemy',
+                        enemyType: type,
                         x: ex, y: ey,
-                        radius: 20,
-                        hp: 30 + (room.wave * 15),
-                        maxHp: 30 + (room.wave * 15),
-                        color: room.wave % 5 === 0 ? '#ff00ff' : '#ff0055',
+                        radius: radius,
+                        hp: hp,
+                        maxHp: hp,
+                        color: color,
                         velocity: { x: 0, y: 0 },
-                        speed: 80 + (room.wave * 5)
+                        speed: speed
                     });
                 }
                 if (room.waveTimer > 5) room.waveState = 'fight';
@@ -702,15 +725,16 @@ setInterval(() => {
                     type: 'enemy',
                     isBoss: true,
                     x: 400, y: -100,
-                    radius: 60,
-                    hp: 500 * (room.wave / 5),
-                    maxHp: 500 * (room.wave / 5),
+                    radius: 70,
+                    hp: 800 * (room.wave / 5),
+                    maxHp: 800 * (room.wave / 5),
                     color: '#ff00ff',
                     velocity: { x: 0, y: 0 },
-                    speed: 40,
-                    bossPhase: 0
+                    speed: 45,
+                    bossTimer: 0,
+                    bossState: 'chase' // chase, rapid_fire, charge
                 });
-                io.to(roomId).emit('boss_spawn', { wave: room.wave, hp: 500 * (room.wave / 5) });
+                io.to(roomId).emit('boss_spawn', { wave: room.wave, hp: 800 * (room.wave / 5) });
             }
 
             if (room.waveState === 'fight' && room.enemies.length === 0) {
@@ -852,6 +876,23 @@ setInterval(() => {
                         ent.velocity.y += Math.sin(angle) * proj.knockback;
                     }
 
+                    // Enemy Projectile Collision
+                    if (proj.isEnemyProjectile && room.players[ent.id]) {
+                        // It hit a player! Projectiles from enemies
+                        ent.hp -= (proj.damage || 5);
+                        room.projectiles.splice(i, 1);
+
+                        // Visual hit
+                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ff0055', strength: 10 });
+
+                        if (ent.hp <= 0) {
+                            ent.hp = ent.maxHp;
+                            ent.deaths = (ent.deaths || 0) + 1;
+                            ent.x = 400; ent.y = 300;
+                        }
+                        return; // Done with this projectile
+                    }
+
                     // Explosion
                     if (proj.explosion_radius > 0) {
                         const exRadius = proj.explosion_radius;
@@ -924,13 +965,68 @@ setInterval(() => {
             });
 
             if (nearestPlayer) {
-                const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
-                const force = ent.isBoss ? ent.speed : ent.speed;
-                ent.velocity.x += Math.cos(angle) * force * dt;
-                ent.velocity.y += Math.sin(angle) * force * dt;
+                if (ent.isBoss) {
+                    // BOSS AI
+                    ent.bossTimer = (ent.bossTimer || 0) + dt;
 
-                if (ent.isBoss && Math.random() < 0.05) {
-                    io.to(roomId).emit('visual_effect', { type: 'boss_fire', x: ent.x, y: ent.y, angle });
+                    if (ent.bossState === 'chase') {
+                        const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                        ent.velocity.x += Math.cos(angle) * ent.speed * dt;
+                        ent.velocity.y += Math.sin(angle) * ent.speed * dt;
+
+                        // Switch to attack every 4 seconds
+                        if (ent.bossTimer > 4) {
+                            ent.bossTimer = 0;
+                            ent.bossState = Math.random() < 0.5 ? 'rapid_fire' : 'charge';
+                        }
+                    } else if (ent.bossState === 'rapid_fire') {
+                        ent.velocity.x *= 0.9;
+                        ent.velocity.y *= 0.9;
+
+                        if (ent.bossTimer % 0.2 < dt) { // Fire every 0.2s
+                            const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x) + (Math.random() - 0.5) * 0.5;
+                            room.projectiles.push({
+                                id: 'bp_' + Math.random(),
+                                playerId: 'boss',
+                                type: 'projectile',
+                                isEnemyProjectile: true,
+                                x: ent.x, y: ent.y,
+                                velocity: { x: Math.cos(angle) * 400, y: Math.sin(angle) * 400 },
+                                lifetime: 3,
+                                radius: 8,
+                                damage: 20,
+                                color: '#ff00ff'
+                            });
+                            io.to(roomId).emit('visual_effect', { type: 'boss_fire', x: ent.x, y: ent.y });
+                        }
+
+                        if (ent.bossTimer > 2) {
+                            ent.bossTimer = 0;
+                            ent.bossState = 'chase';
+                        }
+                    } else if (ent.bossState === 'charge') {
+                        if (ent.bossTimer < 0.5) {
+                            // Telegraph (stop and shake?)
+                            ent.velocity.x *= 0.9; ent.velocity.y *= 0.9;
+                        } else if (ent.bossTimer < 0.6) {
+                            // Launch
+                            const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                            ent.velocity.x = Math.cos(angle) * 800;
+                            ent.velocity.y = Math.sin(angle) * 800;
+                        }
+
+                        if (ent.bossTimer > 1.5) {
+                            ent.bossTimer = 0;
+                            ent.bossState = 'chase';
+                        }
+                    }
+
+                } else {
+                    // STANDARD ENEMY AI
+                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                    const force = ent.speed;
+                    ent.velocity.x += Math.cos(angle) * force * dt;
+                    ent.velocity.y += Math.sin(angle) * force * dt;
                 }
             }
 

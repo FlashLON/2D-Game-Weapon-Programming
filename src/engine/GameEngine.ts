@@ -150,6 +150,10 @@ export class GameEngine {
         }
     }
 
+    triggerShake(amount: number = 0.5) {
+        this.state.screenshake = amount;
+    }
+
     setEnforcer(callback: (params: any) => any) {
         this.enforcer = callback;
     }
