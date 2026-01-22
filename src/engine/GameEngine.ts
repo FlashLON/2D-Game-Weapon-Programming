@@ -122,7 +122,14 @@ export class GameEngine {
     private localPlayerId: string | null = null;
     private lastHitInfo: any = null;
     private lastFireTime: number = 0;
-    private playerStats = { hp: 100, cooldown: 0.5 };
+    private playerStats = {
+        hp: 100,
+        cooldown: 0.5,
+        level: 1,
+        xp: 0,
+        maxXp: 100,
+        money: 0
+    };
 
     constructor() {
         // Initialize default state with empty arrays
@@ -162,7 +169,11 @@ export class GameEngine {
         if (!profile) return;
         this.playerStats = {
             hp: profile.limits?.hp || 100,
-            cooldown: profile.limits?.cooldown || 0.5
+            cooldown: profile.limits?.cooldown || 0.5,
+            level: profile.level || 1,
+            xp: profile.xp || 0,
+            maxXp: profile.maxXp || 100,
+            money: profile.money || 0
         };
         // Update current player if exists
         const player = this.getLocalPlayer();
@@ -212,7 +223,21 @@ export class GameEngine {
         this.state = {
             entities: [
                 // Player
-                { id: 'player', x: 400, y: 300, radius: 20, color: '#00ff9f', hp: initialHp, maxHp: initialHp, type: 'player', velocity: { x: 0, y: 0 } },
+                {
+                    id: 'player',
+                    x: 400, y: 300,
+                    radius: 20,
+                    color: '#00ff9f',
+                    hp: initialHp,
+                    maxHp: initialHp,
+                    type: 'player',
+                    velocity: { x: 0, y: 0 },
+                    // Inherit stats from profile for Sandbox
+                    level: this.playerStats.level,
+                    xp: this.playerStats.xp,
+                    maxXp: this.playerStats.maxXp,
+                    money: this.playerStats.money
+                },
                 // Dummy Enemy
                 { id: 'enemy1', x: 600, y: 300, radius: 20, color: '#ff0055', hp: 50, maxHp: 50, type: 'enemy', velocity: { x: 0, y: 0 } }
             ],
@@ -539,39 +564,16 @@ export class GameEngine {
                             e.velocity = { x: 0, y: 0 };
                             this.state.score += 1;
 
-                            // SOLO PROGRESSION LOGIC
+                            // SOLO PROGRESSION LOGIC (DISABLED FOR SANDBOX)
+                            /*
                             if (!this.isMultiplayer) {
                                 const player = this.getLocalPlayer();
                                 if (player) {
-                                    if (player.xp === undefined) player.xp = 0;
-                                    if (player.level === undefined) player.level = 1;
-                                    if (player.maxXp === undefined) player.maxXp = 100;
-                                    if (player.money === undefined) player.money = 0;
-
-                                    player.xp += 25;
-                                    player.money += 15;
-
-                                    if (player.xp >= player.maxXp) {
-                                        player.level++;
-                                        player.xp -= player.maxXp;
-                                        player.maxXp = Math.floor(player.maxXp * 1.5);
-
-                                        if (this.onVisualEffect) {
-                                            this.onVisualEffect({
-                                                type: 'levelup',
-                                                x: player.x,
-                                                y: player.y,
-                                                color: '#00ff9f',
-                                                level: player.level,
-                                                xp: player.xp,
-                                                maxXp: player.maxXp,
-                                                money: player.money,
-                                                playerId: player.id
-                                            });
-                                        }
-                                    }
+                                    // XP/stats are visual only in sandbox, preventing "restart" bugs
+                                    // But we do NOT award new XP permanently/locally here to keep it pure.
                                 }
                             }
+                            */
 
                             if (this.weaponScript && this.weaponScript.on_kill) {
                                 try { this.weaponScript.on_kill(e.id); } catch (err) { console.error(err); }
