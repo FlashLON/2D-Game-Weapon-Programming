@@ -3,6 +3,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 const admin = require('firebase-admin');
+const fs = require('fs');
+const path = require('path');
 
 // --- DATABASE SETUP (FIREBASE) ---
 let firebaseDb = null;
@@ -12,6 +14,19 @@ const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
 const FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined;
 
 const memoryUsers = new Map(); // Fallback for when Firebase is not connected
+const DB_FILE = path.join(__dirname, 'database.json');
+
+// LOAD LOCAL DB
+if (fs.existsSync(DB_FILE)) {
+    try {
+        const raw = fs.readFileSync(DB_FILE, 'utf8');
+        const data = JSON.parse(raw);
+        Object.entries(data).forEach(([u, d]) => memoryUsers.set(u, d));
+        console.log(`📂 Loaded ${memoryUsers.size} users from local database.json`);
+    } catch (err) {
+        console.error("Failed to load database.json:", err.message);
+    }
+}
 
 if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
     try {
@@ -71,7 +86,16 @@ async function upsertUser(username, userData) {
         }
     } else {
         const existing = memoryUsers.get(username) || {};
-        memoryUsers.set(username, { ...existing, ...userData, lastSeen: new Date().toISOString() });
+        const newData = { ...existing, ...userData, lastSeen: new Date().toISOString() };
+        memoryUsers.set(username, newData);
+
+        // PERSIST TO FILE
+        try {
+            const data = Object.fromEntries(memoryUsers);
+            fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+        } catch (err) {
+            console.error("Failed to save to database.json:", err.message);
+        }
     }
 }
 
