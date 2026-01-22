@@ -32,7 +32,6 @@ interface LobbyProps {
     onLoadCode?: (code: SavedCode) => void;
     onDeleteCode?: (codeId: string) => void;
     onRenameCode?: (codeId: string, newName: string) => void;
-    onRenameCode?: (codeId: string, newName: string) => void;
     loadingSavedCodes?: boolean;
     onEquipTitle?: (titleId: string | null) => void;
 }
@@ -54,7 +53,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     onLoadCode,
     onDeleteCode,
     onRenameCode,
-    loadingSavedCodes = false
+    loadingSavedCodes = false,
+    onEquipTitle
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
