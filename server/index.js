@@ -967,6 +967,9 @@ setInterval(() => {
             let nearestPlayer = null;
             let minDist = Infinity;
             Object.values(room.players).forEach(p => {
+                // Ignore dead players
+                if (p.dead || p.x < -1000) return;
+
                 const d = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);
                 if (d < minDist) { minDist = d; nearestPlayer = p; }
             });

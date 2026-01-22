@@ -132,6 +132,9 @@ export const Arena: React.FC = () => {
 
             // 3. Draw all Entities (Players, Enemies, Projectiles)
             [...state.entities, ...state.projectiles].forEach(ent => {
+                // Skip dead entities (moved off-screen)
+                if (ent.x < -1000) return;
+
                 const drawX = ent.renderX ?? ent.x;
                 const drawY = ent.renderY ?? ent.y;
 
@@ -261,6 +264,28 @@ export const Arena: React.FC = () => {
                 ctx.textAlign = 'left';
             }
             ctx.shadowBlur = 0;
+
+            // --- SPECTATOR OVERLAY (If Dead) ---
+            if (networkManager.isConnected()) {
+                const myId = networkManager.getPlayerId();
+                const me = state.entities.find(e => e.id === myId);
+                if (me && me.x < -1000) { // Dead check
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    ctx.fillStyle = '#ff0055';
+                    ctx.font = 'black 32px "Outfit", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = 'black';
+                    ctx.fillText("CRITICAL FAILURE // SYSTEM DOWN", canvas.width / 2, canvas.height / 2);
+                    ctx.font = 'bold 16px "Outfit", sans-serif';
+                    ctx.fillStyle = '#ff9f9f';
+                    ctx.fillText("WAITING FOR SQUAD REVIVE...", canvas.width / 2, canvas.height / 2 + 30);
+                    ctx.textAlign = 'left';
+                    ctx.shadowBlur = 0;
+                }
+            }
 
             // 5. Draw Feedback: Damage Numbers
             state.damageNumbers.forEach(dn => {

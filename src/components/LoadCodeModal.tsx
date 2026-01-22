@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FolderOpen, X, Code, Trash2 } from 'lucide-react';
+import { FolderOpen, X, Trash2 } from 'lucide-react';
 import { type SavedCode } from '../utils/NetworkManager';
 
 interface LoadCodeModalProps {
