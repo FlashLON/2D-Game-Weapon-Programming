@@ -667,6 +667,7 @@ setInterval(() => {
                 room.wave = (room.wave || 0) + 1;
                 room.waveState = 'spawning';
                 room.waveTimer = 0;
+                room.bossSpawned = false; // Reset boss flag
                 io.to(roomId).emit('wave_start', { wave: room.wave });
             }
 
@@ -725,8 +726,9 @@ setInterval(() => {
                 if (room.waveTimer > 5) room.waveState = 'fight';
             }
 
-            // Boss Spawn every 5 waves
-            if (room.wave > 0 && room.wave % 5 === 0 && room.waveState === 'fight' && !room.enemies.some(e => e.isBoss)) {
+            // Boss Spawn every 5 waves (ensure only once)
+            if (room.wave > 0 && room.wave % 5 === 0 && room.waveState === 'fight' && !room.enemies.some(e => e.isBoss) && !room.bossSpawned) {
+                room.bossSpawned = true;
                 room.enemies.push({
                     id: 'boss_' + room.wave,
                     type: 'enemy',
