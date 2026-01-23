@@ -74,7 +74,8 @@ function App() {
       limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
       lastUpgradeLevel: {},
       titles: [],
-      equippedTitle: null
+      equippedTitle: null,
+      killCount: 0
     };
   });
   const [username, setUsername] = useState<string>('');

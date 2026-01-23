@@ -200,12 +200,25 @@ function unlockTitle(username, titleId, socket) {
 
 function checkTitles(username, stats, socket) {
     if (!username) return;
+    let user = memoryUsers.get(username);
+    if (!user) return;
 
-    // 1. Killer (30 kills) - Need persistent kill count
-    // 2. OP (Max Stats)
-    // We check if limits are maxed. This requires knowing max limits.
-    // Assuming max limits: Speed 600, Damage 100, etc. Simplified check:
-    if (stats.limits && stats.limits.speed >= 600 && stats.limits.damage >= 100 && stats.limits.hp >= 500) { // Example caps
+    // Initialize tracking fields if they don't exist
+    if (!user.killCount) user.killCount = 0;
+    if (!user.titles) user.titles = [];
+
+    // 1. Killer (30 kills)
+    if (user.killCount >= 30 && !user.titles.includes('killer')) {
+        unlockTitle(username, 'killer', socket);
+    }
+
+    // 2. OP (Max Stats) - Check if all major attributes are maxed
+    // Assuming reasonable maxes: Speed 600, Damage 100, HP 500, Cooldown 0.1
+    if (stats.limits && 
+        stats.limits.speed >= 600 && 
+        stats.limits.damage >= 100 && 
+        stats.limits.hp >= 500 && 
+        stats.limits.cooldown <= 0.1) {
         unlockTitle(username, 'op', socket);
     }
 }
@@ -307,7 +320,8 @@ io.on('connection', (socket) => {
                     unlocks: user.unlocks || ['speed', 'damage'],
                     limits: user.limits || { speed: 200, damage: 5 },
                     titles: user.titles || [],
-                    equippedTitle: user.equippedTitle || null
+                    equippedTitle: user.equippedTitle || null,
+                    killCount: user.killCount || 0
                 }
             });
 
@@ -353,6 +367,7 @@ io.on('connection', (socket) => {
                 lastUpgradeLevel: {},
                 titles: [],
                 equippedTitle: null,
+                killCount: 0,
                 createdAt: new Date().toISOString()
             };
 
@@ -373,7 +388,8 @@ io.on('connection', (socket) => {
                     limits: newUser.limits,
                     lastUpgradeLevel: newUser.lastUpgradeLevel,
                     titles: newUser.titles || [],
-                    equippedTitle: newUser.equippedTitle || null
+                    equippedTitle: newUser.equippedTitle || null,
+                    killCount: newUser.killCount || 0
                 }
             });
 
@@ -1091,6 +1107,12 @@ setInterval(() => {
                             killer.xp += 50;
                             killer.money += 25;
                             killer.killstreak = (killer.killstreak || 0) + 1; // Increment streak
+
+                            // Update persistent kill count
+                            let user = memoryUsers.get(killer.username);
+                            if (user) {
+                                user.killCount = (user.killCount || 0) + 1;
+                            }
 
                             // Check Titles
                             if (killer.kills >= 30) unlockTitle(killer.username, 'killer', null);
