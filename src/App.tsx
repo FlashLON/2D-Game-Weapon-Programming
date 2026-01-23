@@ -471,6 +471,10 @@ function App() {
     networkManager.setOnVisualEffect(handleVisualEffect);
     gameEngine.onVisualEffect = handleVisualEffect;
 
+    networkManager.setOnProfileUpdate((newProfile) => {
+      handleProfileUpdate(newProfile);
+    });
+
     networkManager.setOnLeaderboardUpdate((data) => {
       setGlobalLeaderboard(data);
     });

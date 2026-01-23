@@ -180,7 +180,13 @@ function unlockTitle(username, titleId, socket) {
     if (!user.titles.includes(titleId)) {
         user.titles.push(titleId);
         console.log(`🏆 UNSOCKED TITLE: ${username} -> ${titleId}`);
-        if (socket) socket.emit('notification', { type: 'unlock', message: `Title Unlocked: ${titleId.toUpperCase()}` });
+
+        if (socket) {
+            socket.emit('notification', { type: 'unlock', message: `Title Unlocked: ${titleId.toUpperCase()}` });
+            // FORCE UPDATE CLIENT PROFILE
+            socket.emit('profile_update', user);
+        }
+
         saveProgress(username, user);
 
         // Check for 'The Ultra God'
@@ -299,7 +305,9 @@ io.on('connection', (socket) => {
                     maxXp: user.maxXp || 100,
                     money: user.money || 0,
                     unlocks: user.unlocks || ['speed', 'damage'],
-                    limits: user.limits || { speed: 200, damage: 5 }
+                    limits: user.limits || { speed: 200, damage: 5 },
+                    titles: user.titles || [],
+                    equippedTitle: user.equippedTitle || null
                 }
             });
 
@@ -343,6 +351,8 @@ io.on('connection', (socket) => {
                 unlocks: ['speed', 'damage', 'hp', 'cooldown'],
                 limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
                 lastUpgradeLevel: {},
+                titles: [],
+                equippedTitle: null,
                 createdAt: new Date().toISOString()
             };
 
@@ -353,7 +363,18 @@ io.on('connection', (socket) => {
             socket.emit('login_response', {
                 success: true,
                 isNew: true,
-                profile: newUser
+                profile: {
+                    username: newUser.username,
+                    level: newUser.level,
+                    xp: newUser.xp,
+                    maxXp: newUser.maxXp,
+                    money: newUser.money,
+                    unlocks: newUser.unlocks,
+                    limits: newUser.limits,
+                    lastUpgradeLevel: newUser.lastUpgradeLevel,
+                    titles: newUser.titles || [],
+                    equippedTitle: newUser.equippedTitle || null
+                }
             });
 
             // Immediately send leaderboard

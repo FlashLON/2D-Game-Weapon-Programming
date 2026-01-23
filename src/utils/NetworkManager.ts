@@ -61,6 +61,7 @@ class NetworkManager {
     private onVisualEffect: ((effect: any) => void) | null = null;
     private onLeaderboardUpdate: ((data: any[]) => void) | null = null;
     private onWaveEvent: ((event: any) => void) | null = null;
+    private onProfileUpdate: ((profile: any) => void) | null = null;
 
     connect(serverUrl: string): Promise<boolean> {
         return new Promise((resolve) => {
@@ -120,6 +121,7 @@ class NetworkManager {
             this.socket.on('global_leaderboard', (data: any[]) => this.onLeaderboardUpdate?.(data));
             this.socket.on('wave_start', (data: any) => this.onWaveEvent?.({ type: 'wave_start', ...data }));
             this.socket.on('boss_spawn', (data: any) => this.onWaveEvent?.({ type: 'boss_spawn', ...data }));
+            this.socket.on('profile_update', (profile: any) => this.onProfileUpdate?.(profile));
 
             // Debug: Log all incoming events
             this.socket.onAny((ev, ...args) => {
@@ -180,6 +182,7 @@ class NetworkManager {
     setOnVisualEffect(cb: (effect: any) => void) { this.onVisualEffect = cb; }
     setOnLeaderboardUpdate(cb: (data: any[]) => void) { this.onLeaderboardUpdate = cb; }
     setOnWaveEvent(cb: (event: any) => void) { this.onWaveEvent = cb; }
+    setOnProfileUpdate(cb: (profile: any) => void) { this.onProfileUpdate = cb; }
 
     // Emitters
     joinRoom(roomId: string, settings?: any, profile?: any) {
