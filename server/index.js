@@ -369,7 +369,8 @@ io.on('connection', (socket) => {
                     limits: user.limits || { speed: 200, damage: 5 },
                     titles: user.titles && user.titles.length > 0 ? user.titles : ['beginner'],
                     equippedTitle: user.equippedTitle || null,
-                    killCount: user.killCount || 0
+                    killCount: user.killCount || 0,
+                    aura_type: user.aura_type || null
                 }
             });
 
@@ -422,6 +423,7 @@ io.on('connection', (socket) => {
                 titles: ['beginner'],
                 equippedTitle: null,
                 killCount: 0,
+                aura_type: null,
                 createdAt: new Date().toISOString()
             };
 
@@ -446,7 +448,8 @@ io.on('connection', (socket) => {
                     lastUpgradeLevel: newUser.lastUpgradeLevel,
                     titles: newUser.titles || [],
                     equippedTitle: newUser.equippedTitle || null,
-                    killCount: newUser.killCount || 0
+                    killCount: newUser.killCount || 0,
+                    aura_type: newUser.aura_type || null
                 }
             });
 
