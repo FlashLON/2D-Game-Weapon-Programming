@@ -1011,7 +1011,8 @@ setInterval(() => {
                     // Logic for Sneaky (One Shot Kill on Player)
                     if (ent.type === 'player' && dmg >= ent.maxHp && ent.hp >= ent.maxHp * 0.99) {
                         if (room.players[proj.playerId]) {
-                            unlockTitle(room.players[proj.playerId].username, 'sneaky', null);
+                            const shooterSocket = io.sockets.sockets.get(proj.playerId);
+                            unlockTitle(room.players[proj.playerId].username, 'sneaky', shooterSocket);
                         }
                     }
 
@@ -1020,7 +1021,10 @@ setInterval(() => {
                     // Logic for ThreeForOne (Multikill on Pierce)
                     if (ent.hp <= 0 && room.players[proj.playerId]) {
                         proj.hitCount = (proj.hitCount || 0) + 1;
-                        if (proj.hitCount >= 3) unlockTitle(room.players[proj.playerId].username, 'threeforone', null);
+                        if (proj.hitCount >= 3) {
+                            const shooterSocket = io.sockets.sockets.get(proj.playerId);
+                            unlockTitle(room.players[proj.playerId].username, 'threeforone', shooterSocket);
+                        }
                     }
 
                     // Vampirism
@@ -1066,7 +1070,10 @@ setInterval(() => {
                                 // Track Multikill for Explosion
                                 if (t.hp <= 0 && room.players[proj.playerId]) {
                                     proj.hitCount = (proj.hitCount || 0) + 1;
-                                    if (proj.hitCount >= 3) unlockTitle(room.players[proj.playerId].username, 'threeforone', null);
+                                    if (proj.hitCount >= 3) {
+                                        const shooterSocket = io.sockets.sockets.get(proj.playerId);
+                                        unlockTitle(room.players[proj.playerId].username, 'threeforone', shooterSocket);
+                                    }
                                 }
 
                                 const exAngle = Math.atan2(t.y - proj.y, t.x - proj.x);
@@ -1112,16 +1119,19 @@ setInterval(() => {
                             let user = memoryUsers.get(killer.username);
                             if (user) {
                                 user.killCount = (user.killCount || 0) + 1;
-                            }
 
-                            // Check Titles
-                            if (killer.kills >= 30) unlockTitle(killer.username, 'killer', null);
-                            if (killer.killstreak >= 100) unlockTitle(killer.username, 'unstoppable', null);
-                            if (killer.killstreak >= 1000) unlockTitle(killer.username, 'monster', null);
+                                // Find socket for this player
+                                const killerSocket = io.sockets.sockets.get(proj.playerId);
 
-                            // Check God Slayer
-                            if (ent.type === 'player' && room.players[ent.id] && room.players[ent.id].titles && room.players[ent.id].titles.includes('god')) {
-                                unlockTitle(killer.username, 'godkiller', null);
+                                // Check Titles using PERSISTENT killCount
+                                if (user.killCount >= 30) unlockTitle(killer.username, 'killer', killerSocket);
+                                if (killer.killstreak >= 100) unlockTitle(killer.username, 'unstoppable', killerSocket);
+                                if (killer.killstreak >= 1000) unlockTitle(killer.username, 'monster', killerSocket);
+
+                                // Check God Slayer
+                                if (ent.type === 'player' && room.players[ent.id] && room.players[ent.id].titles && room.players[ent.id].titles.includes('god')) {
+                                    unlockTitle(killer.username, 'godkiller', killerSocket);
+                                }
                             }
 
                             if (killer.xp >= killer.maxXp) {
