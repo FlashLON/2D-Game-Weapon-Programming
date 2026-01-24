@@ -1240,9 +1240,13 @@ setInterval(() => {
                                 if (killer.killstreak >= 100) unlockTitle(killer.username, 'unstoppable', killerSocket);
                                 if (killer.killstreak >= 1000) unlockTitle(killer.username, 'monster', killerSocket);
 
-                                // Check God Slayer
-                                if (ent.type === 'player' && room.players[ent.id] && room.players[ent.id].titles && room.players[ent.id].titles.includes('god')) {
-                                    unlockTitle(killer.username, 'godkiller', killerSocket);
+                                // Check God Slayer (Eliminate a player holding the GOD title)
+                                if (ent.type === 'player' && room.players[ent.id]) {
+                                    const victim = room.players[ent.id];
+                                    console.log(`[KILL] Checking God Slayer: Victim ${victim.username} equippedTitle: ${victim.equippedTitle}`);
+                                    if (victim.equippedTitle === 'god') {
+                                        unlockTitle(killer.username, 'godkiller', killerSocket);
+                                    }
                                 }
                             } else {
                                 console.log(`[KILL] ⚠️ User ${killer.username} not found in memoryUsers!`);
