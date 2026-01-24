@@ -519,9 +519,10 @@ io.on('connection', (socket) => {
                 p.limits = profile.limits;
                 p.titles = profile.titles;
                 p.equippedTitle = profile.equippedTitle;
-
-                checkTitles(socket.data.username, p, socket);
             }
+
+            // Always check titles on save (handles "OP" title from shop upgrades)
+            checkTitles(socket.data.username, profile, socket);
         }
     });
 
