@@ -509,6 +509,7 @@ io.on('connection', (socket) => {
             limits: profile?.limits || { speed: 200, damage: 5 },
             titles: profile?.titles || [],
             equippedTitle: profile?.equippedTitle || null,
+            aura_type: profile?.aura_type || null,
             // --- SESSION TRACKING ---
             joinedAt: Date.now(),
             lastFireTime: 0,
@@ -550,6 +551,7 @@ io.on('connection', (socket) => {
                 p.limits = profile.limits;
                 p.titles = profile.titles;
                 p.equippedTitle = profile.equippedTitle;
+                p.aura_type = profile.aura_type;
             }
 
             // Always check titles on save (handles "OP" title from shop upgrades)

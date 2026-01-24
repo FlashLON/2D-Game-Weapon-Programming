@@ -143,122 +143,152 @@ export const Arena: React.FC = () => {
                 // --- AURA RENDERING (For Players) ---
                 if (ent.type === 'player' && ent.aura_type) {
                     const aura = ent.aura_type;
-                    const range = 200; // Base aura range
+                    const range = 220; // Slightly increased range for better visibility
 
                     ctx.save();
                     ctx.translate(drawX, drawY);
+                    ctx.globalAlpha = 0.8; // Stronger starting alpha
 
                     if (aura === 'aura_damage') {
-                        // Pulsing Red/Orange Ring
-                        const pulse = Math.sin(time * 4) * 10;
+                        // Pulsing Red/Orange Ring with Inner Glow
+                        const pulse = Math.sin(time * 6) * 15;
                         const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range + pulse);
-                        grad.addColorStop(0, 'rgba(255, 69, 0, 0.2)');
+                        grad.addColorStop(0, 'rgba(255, 50, 0, 0.4)');
+                        grad.addColorStop(0.5, 'rgba(255, 100, 0, 0.1)');
                         grad.addColorStop(1, 'rgba(255, 69, 0, 0)');
                         ctx.fillStyle = grad;
                         ctx.beginPath();
                         ctx.arc(0, 0, range + pulse, 0, Math.PI * 2);
                         ctx.fill();
 
-                        ctx.strokeStyle = 'rgba(255, 69, 0, 0.4)';
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([10, 5]);
-                        ctx.lineDashOffset = -time * 20;
+                        ctx.strokeStyle = '#ff4500';
+                        ctx.lineWidth = 3;
+                        ctx.setLineDash([15, 8]);
+                        ctx.lineDashOffset = -time * 30;
                         ctx.stroke();
                     } else if (aura === 'aura_gravity') {
-                        // Purple Vortex
-                        for (let i = 0; i < 3; i++) {
-                            ctx.rotate(time * (1 + i * 0.5));
-                            ctx.strokeStyle = `rgba(147, 51, 234, ${0.4 - i * 0.1})`;
-                            ctx.lineWidth = 1;
+                        // Purple Singular Vortex
+                        ctx.strokeStyle = '#a855f7';
+                        for (let i = 0; i < 4; i++) {
+                            ctx.save();
+                            ctx.rotate(time * (1.5 + i * 0.4) + (i * Math.PI / 2));
+                            ctx.lineWidth = 2;
                             ctx.beginPath();
-                            ctx.ellipse(0, 0, range, range * 0.4, 0, 0, Math.PI * 2);
+                            ctx.ellipse(0, 0, range * (1 - i * 0.1), range * 0.3, 0, 0, Math.PI * 2);
                             ctx.stroke();
+                            ctx.restore();
                         }
                     } else if (aura === 'aura_corruption') {
-                        // Murky Green Bubbles
+                        // Toxic Clouds
                         const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
-                        grad.addColorStop(0, 'rgba(34, 197, 94, 0.15)');
+                        grad.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
                         grad.addColorStop(1, 'rgba(34, 197, 94, 0)');
                         ctx.fillStyle = grad;
                         ctx.beginPath();
                         ctx.arc(0, 0, range, 0, Math.PI * 2);
                         ctx.fill();
 
-                        for (let i = 0; i < 5; i++) {
-                            const ang = (time * (1 + i)) % (Math.PI * 2);
-                            const r = (range * 0.2) + ((range * 0.7 * i) % range);
-                            ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+                        for (let i = 0; i < 8; i++) {
+                            const offset = (time * (0.5 + i * 0.1)) % (Math.PI * 2);
+                            const r = (range * 0.3) + ((range * 0.6 * (i % 3)) % range);
+                            ctx.fillStyle = 'rgba(22, 101, 52, 0.4)';
                             ctx.beginPath();
-                            ctx.arc(Math.cos(ang) * r, Math.sin(ang) * r, 4, 0, Math.PI * 2);
+                            ctx.arc(Math.cos(offset) * r, Math.sin(offset) * r, 5 + (i % 5), 0, Math.PI * 2);
                             ctx.fill();
                         }
                     } else if (aura === 'aura_execution') {
-                        // Jagged Red Ring
-                        ctx.strokeStyle = 'rgba(220, 38, 38, 0.6)';
-                        ctx.lineWidth = 2;
+                        // Jagged Crimson Blades
+                        ctx.strokeStyle = '#ef4444';
+                        ctx.lineWidth = 3;
                         ctx.beginPath();
-                        for (let a = 0; a < Math.PI * 2; a += 0.2) {
-                            const r = range + (Math.random() > 0.5 ? 10 : -10);
-                            const px = Math.cos(a + time) * r;
-                            const py = Math.sin(a + time) * r;
-                            if (a === 0) ctx.moveTo(px, py);
+                        const segments = 40;
+                        for (let i = 0; i <= segments; i++) {
+                            const a = (i / segments) * Math.PI * 2;
+                            const r = range + (Math.sin(a * 10 + time * 10) * 15);
+                            const px = Math.cos(a) * r;
+                            const py = Math.sin(a) * r;
+                            if (i === 0) ctx.moveTo(px, py);
                             else ctx.lineTo(px, py);
                         }
                         ctx.closePath();
                         ctx.stroke();
+                        ctx.fillStyle = 'rgba(220, 38, 38, 0.1)';
+                        ctx.fill();
                     } else if (aura === 'aura_chaos') {
-                        // Shifting Rainbow
-                        const hue = (time * 100) % 360;
-                        ctx.strokeStyle = `hsla(${hue}, 80%, 60%, 0.5)`;
-                        ctx.lineWidth = 3;
+                        // Rainbow Hyper-Ring
+                        const hue = (time * 150) % 360;
+                        ctx.strokeStyle = `hsla(${hue}, 100%, 50%, 0.7)`;
+                        ctx.lineWidth = 5;
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = `hsla(${hue}, 100%, 50%, 0.9)`;
                         ctx.beginPath();
                         ctx.arc(0, 0, range, 0, Math.PI * 2);
                         ctx.stroke();
-
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = `hsla(${hue}, 80%, 60%, 0.8)`;
-                        ctx.stroke();
                         ctx.shadowBlur = 0;
+
+                        // Internal Sparks
+                        for (let i = 0; i < 5; i++) {
+                            const a = Math.random() * Math.PI * 2;
+                            const r = Math.random() * range;
+                            ctx.fillStyle = `hsla(${(hue + 180) % 360}, 100%, 70%, 1)`;
+                            ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r, 2, 2);
+                        }
                     } else if (aura === 'aura_control') {
-                        // Multi Concentric Blue
-                        ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
-                        ctx.lineWidth = 1;
-                        for (let i = 1; i <= 3; i++) {
-                            const r = (range * (i / 3) + time * 50) % range;
+                        // Stasis Field (Blue Pulse Waves)
+                        ctx.strokeStyle = '#3b82f6';
+                        ctx.lineWidth = 2;
+                        for (let i = 0; i < 4; i++) {
+                            const r = ((time * 100 + i * 60) % range);
+                            ctx.globalAlpha = 1 - (r / range);
                             ctx.beginPath();
                             ctx.arc(0, 0, r, 0, Math.PI * 2);
                             ctx.stroke();
                         }
                     } else if (aura === 'aura_vampire') {
-                        // Siphoning Red
+                        // Siphoning Core
                         const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
-                        grad.addColorStop(0, 'rgba(153, 27, 27, 0.3)');
-                        grad.addColorStop(1, 'rgba(153, 27, 27, 0)');
+                        grad.addColorStop(0, 'rgba(153, 27, 27, 0.5)');
+                        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
                         ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, range, 0, Math.PI * 2);
                         ctx.fill();
 
-                        // Siphon lines
-                        ctx.strokeStyle = 'rgba(153, 27, 27, 0.5)';
-                        for (let i = 0; i < 8; i++) {
-                            const a = (i * Math.PI / 4) + time;
+                        ctx.strokeStyle = '#991b1b';
+                        ctx.lineWidth = 2;
+                        for (let i = 0; i < 12; i++) {
+                            const a = (i * Math.PI / 6) - time * 2;
+                            const r_in = ent.radius + (Math.sin(time * 5 + i) * 5);
                             ctx.beginPath();
                             ctx.moveTo(Math.cos(a) * range, Math.sin(a) * range);
-                            ctx.lineTo(Math.cos(a) * ent.radius, Math.sin(a) * ent.radius);
+                            ctx.lineTo(Math.cos(a) * r_in, Math.sin(a) * r_in);
                             ctx.stroke();
                         }
                     } else if (aura === 'aura_precision') {
-                        // Yellow Scanning Rings
-                        ctx.strokeStyle = 'rgba(234, 179, 8, 0.5)';
+                        // Cyber Grid/Scan
+                        ctx.strokeStyle = 'rgba(234, 179, 8, 0.4)';
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.arc(0, 0, range, 0, Math.PI * 2);
                         ctx.stroke();
 
-                        const scanLine = (time * 100) % 200 - 100;
+                        const scanLine = (time * 150) % (range * 2) - range;
                         ctx.beginPath();
-                        ctx.moveTo(-range, scanLine);
-                        ctx.lineTo(range, scanLine);
+                        const chord = Math.sqrt(range * range - scanLine * scanLine);
+                        ctx.moveTo(-chord, scanLine);
+                        ctx.lineTo(chord, scanLine);
                         ctx.stroke();
+
+                        // Floating crosshairs
+                        ctx.rotate(time * 0.5);
+                        for (let i = 0; i < 4; i++) {
+                            ctx.rotate(Math.PI / 2);
+                            ctx.beginPath();
+                            ctx.moveTo(range - 10, -5);
+                            ctx.lineTo(range, 0);
+                            ctx.lineTo(range - 10, 5);
+                            ctx.stroke();
+                        }
                     }
 
                     ctx.restore();

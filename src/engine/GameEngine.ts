@@ -255,7 +255,8 @@ export class GameEngine {
                     level: this.playerStats.level,
                     xp: this.playerStats.xp,
                     maxXp: this.playerStats.maxXp,
-                    money: this.playerStats.money
+                    money: this.playerStats.money,
+                    aura_type: this.playerStats.aura_type
                 },
                 // Dummy Enemy
                 { id: 'enemy1', x: 600, y: 300, radius: 20, color: '#ff0055', hp: 50, maxHp: 50, type: 'enemy', velocity: { x: 0, y: 0 } }
@@ -387,6 +388,11 @@ export class GameEngine {
                 const bounds = this.getArenaBounds();
                 ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
                 ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
+
+                // SAFEGUARD: Keep aura synced from profile stats
+                if (this.playerStats.aura_type) {
+                    ent.aura_type = this.playerStats.aura_type;
+                }
             }
         });
 
