@@ -75,7 +75,8 @@ function App() {
       lastUpgradeLevel: {},
       titles: [],
       equippedTitle: null,
-      killCount: 0
+      killCount: 0,
+      aura_type: null
     };
   });
   const [username, setUsername] = useState<string>('');
@@ -118,23 +119,25 @@ function App() {
 
   const handleCardSelect = (type: 'unlock' | 'upgrade', attributeId: string, value: number) => {
     setUserProfile((prev: any) => {
-      const newUnlocks = type === 'unlock' && !prev.unlocks.includes(attributeId)
-        ? [...prev.unlocks, attributeId]
-        : prev.unlocks;
+      const isNewUnlock = type === 'unlock' && !prev.unlocks.includes(attributeId);
+      const newUnlocks = isNewUnlock ? [...prev.unlocks, attributeId] : prev.unlocks;
+      const newLimits = { ...prev.limits, [attributeId]: value };
 
-      const newLimits = {
-        ...prev.limits,
-        [attributeId]: value
-      };
+      let newAura = prev.aura_type;
+      if (isNewUnlock && ATTRIBUTES[attributeId]?.isAura) {
+        newAura = attributeId;
+        addLog(`AURA SYNCED: Selected ${ATTRIBUTES[attributeId].name}!`, 'success');
+      }
 
       return {
         ...prev,
         unlocks: newUnlocks,
-        limits: newLimits
+        limits: newLimits,
+        aura_type: newAura
       };
     });
 
-    addLog(`${type === 'unlock' ? 'Unlocked' : 'Upgraded'} ${attributeId}!`, 'success');
+    if (type === 'upgrade') addLog(`Upgraded ${attributeId}!`, 'success');
   };
 
   const handleUpgrade = (attributeId: string) => {
@@ -202,7 +205,7 @@ function App() {
 
     // 2. Dynamically enforce all other attributes
     Object.keys(ATTRIBUTES).forEach(attrId => {
-      if (attrId === 'speed') return; // Handled above
+      if (attrId === 'speed' || ATTRIBUTES[attrId].isAura) return; // Handled above or separately
       if (attrId in p) {
         const limit = unlocks.includes(attrId) ? (limits[attrId] || 0) : 0;
         p[attrId] = Math.min(p[attrId], limit);

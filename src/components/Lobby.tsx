@@ -21,6 +21,7 @@ interface LobbyProps {
         limits: Record<string, number>;
         titles: string[];
         equippedTitle: string | null;
+        aura_type?: string | null;
     };
     onLogin?: (username: string, password?: string) => void;
     isLoggedIn?: boolean;
@@ -386,8 +387,25 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         </div>
                                     ) : userProfile ? (
                                         <>
+                                            {/* Aura Status Card */}
+                                            {userProfile.aura_type && (
+                                                <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 border-2 border-purple-500/40 rounded-2xl p-4 mb-4 relative overflow-hidden">
+                                                    <div className="flex items-center gap-4 relative z-10">
+                                                        <div className="bg-purple-500/30 p-3 rounded-xl border border-purple-500/50">
+                                                            {React.createElement(ATTRIBUTES[userProfile.aura_type]?.icon || Shield, { size: 32, className: "text-purple-400" })}
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-[10px] font-black text-purple-400 uppercase tracking-[0.2em]">Active Aura</div>
+                                                            <div className="text-lg font-black text-white uppercase">{ATTRIBUTES[userProfile.aura_type]?.name}</div>
+                                                            <div className="text-[10px] text-cyber-muted uppercase leading-tight">{ATTRIBUTES[userProfile.aura_type]?.description}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <div className="grid grid-cols-1 gap-4 pb-4">
                                                 {Object.values(ATTRIBUTES).map((attr) => {
+                                                    if (attr.isAura) return null;
                                                     const isUnlocked = attr.isBase || userProfile.unlocks.includes(attr.id);
                                                     const currentLimit = userProfile.limits[attr.id] || attr.startLimit;
                                                     const isMaxed = currentLimit >= attr.maxLimit;

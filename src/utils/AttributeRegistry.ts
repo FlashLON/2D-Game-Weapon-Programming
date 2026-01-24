@@ -4,7 +4,8 @@ import {
     Flame, Skull, Link,
     Compass, RefreshCw, Layers,
     Heart, Magnet, Repeat,
-    Wind, Wand2, Clock
+    Wind, Wand2, Clock, Sparkles,
+    Biohazard, Gem
 } from 'lucide-react';
 
 export interface AttributeConfig {
@@ -18,6 +19,8 @@ export interface AttributeConfig {
     baseCost: number;
     costMultiplier: number;
     icon: any;
+    category?: 'aura' | 'combat' | 'defense' | 'utility';
+    isAura?: boolean;
 }
 
 export const ATTRIBUTES: Record<string, AttributeConfig> = {
@@ -320,6 +323,195 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         baseCost: 1500,
         costMultiplier: 1,
         icon: Wand2
+    },
+    focus_fire: {
+        id: 'focus_fire',
+        name: 'Focus Fire',
+        description: 'Increases damage on subjects hit consecutively.',
+        isBase: false,
+        startLimit: 0.1,
+        maxLimit: 2.0,
+        upgradeStep: 0.1,
+        baseCost: 500,
+        costMultiplier: 1.5,
+        icon: Target
+    },
+    burst_damage: {
+        id: 'burst_damage',
+        name: 'Burst Damage',
+        description: 'Bonus damage on the first hit after an interval.',
+        isBase: false,
+        startLimit: 20,
+        maxLimit: 500,
+        upgradeStep: 20,
+        baseCost: 600,
+        costMultiplier: 1.6,
+        icon: Sparkles
+    },
+    execution_damage: {
+        id: 'execution_damage',
+        name: 'Execution',
+        description: 'Bonus damage based on missing enemy HP.',
+        isBase: false,
+        startLimit: 0.2,
+        maxLimit: 3.0,
+        upgradeStep: 0.2,
+        baseCost: 700,
+        costMultiplier: 1.7,
+        icon: Skull
+    },
+    crit_chance: {
+        id: 'crit_chance',
+        name: 'Critical Chance',
+        description: 'Probability of landing a critical hit.',
+        isBase: false,
+        startLimit: 5,
+        maxLimit: 100,
+        upgradeStep: 5,
+        baseCost: 800,
+        costMultiplier: 1.8,
+        icon: Target
+    },
+    crit_damage: {
+        id: 'crit_damage',
+        name: 'Critical Damage',
+        description: 'Multiplier for critical hit damage.',
+        isBase: false,
+        startLimit: 1.5,
+        maxLimit: 5.0,
+        upgradeStep: 0.25,
+        baseCost: 750,
+        costMultiplier: 1.6,
+        icon: Gem
+    },
+    dot_damage: {
+        id: 'dot_damage',
+        name: 'Corrupt / Burn',
+        description: 'Damages enemies every second for a duration.',
+        isBase: false,
+        startLimit: 5,
+        maxLimit: 200,
+        upgradeStep: 10,
+        baseCost: 900,
+        costMultiplier: 1.7,
+        icon: Biohazard
+    },
+    armor_shred: {
+        id: 'armor_shred',
+        name: 'Armor Shred',
+        description: 'Reduces enemy resistance on every hit.',
+        isBase: false,
+        startLimit: 0.05,
+        maxLimit: 1.0,
+        upgradeStep: 0.05,
+        baseCost: 1000,
+        costMultiplier: 1.8,
+        icon: Shield
+    },
+    // --- AURAS ---
+    aura_damage: {
+        id: 'aura_damage',
+        name: 'Damage Aura',
+        description: 'Permanently increases all outbound damage.',
+        isBase: false,
+        isAura: true,
+        startLimit: 1.2,
+        maxLimit: 1.2,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Flame
+    },
+    aura_gravity: {
+        id: 'aura_gravity',
+        name: 'Gravity Aura',
+        description: 'Amplifies all knockback and vortex forces.',
+        isBase: false,
+        isAura: true,
+        startLimit: 1.5,
+        maxLimit: 1.5,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Magnet
+    },
+    aura_corruption: {
+        id: 'aura_corruption',
+        name: 'Corruption Aura',
+        description: 'Enemies near you continuously corrode.',
+        isBase: false,
+        isAura: true,
+        startLimit: 20,
+        maxLimit: 20,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Biohazard
+    },
+    aura_execution: {
+        id: 'aura_execution',
+        name: 'Execution Aura',
+        description: 'Nearby low-health subjects are terminated faster.',
+        isBase: false,
+        isAura: true,
+        startLimit: 0.5,
+        maxLimit: 0.5,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Skull
+    },
+    aura_chaos: {
+        id: 'aura_chaos',
+        name: 'Chaos Aura',
+        description: 'Randomly hyper-charges your systems.',
+        isBase: false,
+        isAura: true,
+        startLimit: 1,
+        maxLimit: 1,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Sparkles
+    },
+    aura_control: {
+        id: 'aura_control',
+        name: 'Control Aura',
+        description: 'Nearby enemies move and resist with difficulty.',
+        isBase: false,
+        isAura: true,
+        startLimit: 0.5,
+        maxLimit: 0.5,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Shield
+    },
+    aura_vampire: {
+        id: 'aura_vampire',
+        name: 'Vampiric Aura',
+        description: 'Siphons life from all nearby subjects.',
+        isBase: false,
+        isAura: true,
+        startLimit: 0.05,
+        maxLimit: 0.05,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Heart
+    },
+    aura_precision: {
+        id: 'aura_precision',
+        name: 'Precision Aura',
+        description: 'Enhances critical chance and focus efficiency.',
+        isBase: false,
+        isAura: true,
+        startLimit: 1,
+        maxLimit: 1,
+        upgradeStep: 1,
+        baseCost: 5000,
+        costMultiplier: 1,
+        icon: Target
     }
 };
 
@@ -350,7 +542,20 @@ export function generateDraftOptions(
     }
 
     const pool: DraftPoolItem[] = [];
-    lockedIds.forEach(id => pool.push({ type: 'unlock', attributeId: id, weight: 2 }));
+
+    // Check if player already has an Aura
+    const hasAnyAura = unlocked.some(id => ATTRIBUTES[id]?.isAura);
+
+    lockedIds.forEach(id => {
+        const attr = ATTRIBUTES[id];
+        // If it's an aura and player already has one, skip
+        if (attr.isAura && hasAnyAura) return;
+
+        // Lower weight for auras generally to make them feel special
+        const weight = attr.isAura ? 1 : 2;
+        pool.push({ type: 'unlock', attributeId: id, weight });
+    });
+
     upgradableIds.forEach(id => {
         const attr = ATTRIBUTES[id];
         if (attr.maxLimit > attr.startLimit) {

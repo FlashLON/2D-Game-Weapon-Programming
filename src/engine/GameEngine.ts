@@ -48,6 +48,22 @@ export interface Entity {
     money?: number;
     renderX?: number; // Visual X for waves
     renderY?: number; // Visual Y for waves
+    // Damage Modifiers (Projectiles)
+    focus_fire?: number;
+    burst_damage?: number;
+    execution_damage?: number;
+    crit_chance?: number;
+    crit_damage?: number;
+    dot_damage?: number;
+    armor_shred?: number;
+    // Defense / Debuffs (Targets)
+    armor_reduction?: number;
+    last_hit_by?: Record<string, number>; // playerId -> timestamp
+    hit_streak?: Record<string, number>;    // playerId -> count
+    active_dots?: { damage: number, end_time: number, attacker_id: string }[];
+    // Auras
+    aura_type?: string;
+    aura_timer?: number; // For chaotic/random auras
 }
 
 export interface DamageNumber {
@@ -122,13 +138,14 @@ export class GameEngine {
     private localPlayerId: string | null = null;
     private lastHitInfo: any = null;
     private lastFireTime: number = 0;
-    private playerStats = {
+    private playerStats: any = {
         hp: 100,
         cooldown: 0.5,
         level: 1,
         xp: 0,
         maxXp: 100,
-        money: 0
+        money: 0,
+        aura_type: null
     };
 
     constructor() {
@@ -173,13 +190,15 @@ export class GameEngine {
             level: profile.level || 1,
             xp: profile.xp || 0,
             maxXp: profile.maxXp || 100,
-            money: profile.money || 0
+            money: profile.money || 0,
+            aura_type: profile.aura_type
         };
         // Update current player if exists
         const player = this.getLocalPlayer();
         if (player) {
             player.maxHp = this.playerStats.hp;
             if (player.hp > player.maxHp) player.hp = player.maxHp;
+            player.aura_type = profile.aura_type;
         }
     }
 
@@ -527,8 +546,62 @@ export class GameEngine {
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist < p.radius + e.radius) {
-                        const dmg = p.damage || 10;
+                        let dmg = p.damage || 10;
+                        const now = Date.now();
+                        const shooterId = p.playerId || 'unknown';
+
+                        // Initialize target fields
+                        if (!e.last_hit_by) e.last_hit_by = {};
+                        if (!e.hit_streak) e.hit_streak = {};
+                        if (!e.active_dots) e.active_dots = [];
+                        if (e.armor_reduction === undefined) e.armor_reduction = 0;
+
+                        // 1. Critical Hits
+                        if (p.crit_chance && Math.random() * 100 < p.crit_chance) {
+                            dmg *= (p.crit_damage || 2.0);
+                            this.spawnParticles(e.x, e.y, '#ffffff', 5); // Crit visual
+                        }
+
+                        // 2. Focus Fire (Streak bonus)
+                        const lastHitTime = e.last_hit_by[shooterId] || 0;
+                        if (now - lastHitTime < 1000) { // Hit within 1s
+                            e.hit_streak[shooterId] = (e.hit_streak[shooterId] || 0) + 1;
+                            if (p.focus_fire) {
+                                dmg *= (1 + (e.hit_streak[shooterId] * p.focus_fire));
+                            }
+                        } else {
+                            e.hit_streak[shooterId] = 1;
+                        }
+                        e.last_hit_by[shooterId] = now;
+
+                        // 3. Burst Damage
+                        if (p.burst_damage && (now - lastHitTime > 3000)) {
+                            dmg += p.burst_damage;
+                        }
+
+                        // 4. Execution Damage
+                        if (p.execution_damage) {
+                            const hpFactor = 1 - (e.hp / e.maxHp);
+                            dmg *= (1 + (hpFactor * p.execution_damage));
+                        }
+
+                        // 5. Armor Shred
+                        if (p.armor_shred) {
+                            e.armor_reduction = Math.min(0.9, (e.armor_reduction || 0) + p.armor_shred);
+                        }
+                        dmg *= (1 + (e.armor_reduction || 0));
+
+                        // 6. DOT (Apply Corrupt)
+                        if (p.dot_damage) {
+                            e.active_dots.push({
+                                damage: p.dot_damage / 5, // Split over 5 seconds (roughly)
+                                end_time: now + 5000,
+                                attacker_id: shooterId
+                            });
+                        }
+
                         e.hp -= dmg;
+                        this.addDamageNumber(e.x, e.y, Math.round(dmg), (p.crit_chance && Math.random() < 0.3) ? '#ffcc00' : '#ff0055');
 
                         // EXPLOSION ON HIT
                         if (p.explosion_radius && p.explosion_radius > 0) {
@@ -668,6 +741,14 @@ export class GameEngine {
         const chain_range = params.chain_range ?? 0;
         const orbit_speed = params.orbit_speed ?? 3.0;
         const orbit_radius = params.orbit_radius ?? 60;
+        // NEW COMBAT VALS
+        const focus_fire = params.focus_fire ?? 0;
+        const burst_damage = params.burst_damage ?? 0;
+        const execution_damage = params.execution_damage ?? 0;
+        const crit_chance = params.crit_chance ?? 0;
+        const crit_damage = params.crit_damage ?? 0;
+        const dot_damage = params.dot_damage ?? 0;
+        const armor_shred = params.armor_shred ?? 0;
 
         let vx = params.vx ?? 0;
         let vy = params.vy ?? 0;
@@ -690,7 +771,9 @@ export class GameEngine {
             pierce, knockback, chain_count,
             explosion_radius, explosion_damage,
             wave_amplitude, wave_frequency,
-            fade_over_time
+            fade_over_time,
+            focus_fire, burst_damage, execution_damage,
+            crit_chance, crit_damage, dot_damage, armor_shred
         };
         if (!this.isMultiplayer) {
             this.state.projectiles.push(proj);
@@ -826,7 +909,14 @@ export class GameEngine {
                         chain_range: proj.chain_range,
                         fade_over_time: proj.fade_over_time,
                         vampirism: proj.vampirism,
-                        attraction_force: proj.attraction_force
+                        attraction_force: proj.attraction_force,
+                        focus_fire: proj.focus_fire,
+                        burst_damage: proj.burst_damage,
+                        execution_damage: proj.execution_damage,
+                        crit_chance: proj.crit_chance,
+                        crit_damage: proj.crit_damage,
+                        dot_damage: proj.dot_damage,
+                        armor_shred: proj.armor_shred
                     };
                 }
             }
@@ -975,6 +1065,13 @@ export class GameEngine {
 
     addGridImpulse(x: number, y: number, strength: number = 20, radius: number = 100) {
         this.state.gridImpulses.push({ x, y, strength, radius, life: 1.0 });
+    }
+
+    addDamageNumber(x: number, y: number, value: number, color: string) {
+        this.state.damageNumbers.push({
+            id: Math.random().toString(36).substr(2, 9),
+            x, y, value, color, life: 1.0
+        });
     }
 }
 

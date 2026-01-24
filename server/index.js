@@ -1145,7 +1145,59 @@ setInterval(() => {
                 if (ent.id === proj.playerId || ent.type === 'projectile') return;
                 const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
                 if (dist < ent.radius + proj.radius) {
-                    const dmg = (proj.damage || 10);
+                    let dmg = (proj.damage || 10);
+                    const now = Date.now();
+                    const shooterId = proj.playerId || 'unknown';
+
+                    // Initialize tracker fields
+                    if (!ent.last_hit_by) ent.last_hit_by = {};
+                    if (!ent.hit_streak) ent.hit_streak = {};
+                    if (!ent.active_dots) ent.active_dots = [];
+                    if (ent.armor_reduction === undefined) ent.armor_reduction = 0;
+
+                    // 1. Critical Hits
+                    if (proj.crit_chance && Math.random() * 100 < proj.crit_chance) {
+                        dmg *= (proj.crit_damage || 2.0);
+                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ffffff', strength: 5, radius: 20 });
+                    }
+
+                    // 2. Focus Fire
+                    const lastHitTime = ent.last_hit_by[shooterId] || 0;
+                    if (now - lastHitTime < 1000) {
+                        ent.hit_streak[shooterId] = (ent.hit_streak[shooterId] || 0) + 1;
+                        if (proj.focus_fire) {
+                            dmg *= (1 + (ent.hit_streak[shooterId] * proj.focus_fire));
+                        }
+                    } else {
+                        ent.hit_streak[shooterId] = 1;
+                    }
+                    ent.last_hit_by[shooterId] = now;
+
+                    // 3. Burst
+                    if (proj.burst_damage && (now - lastHitTime > 3000)) {
+                        dmg += proj.burst_damage;
+                    }
+
+                    // 4. Execution
+                    if (proj.execution_damage) {
+                        const hpFactor = 1 - (ent.hp / ent.maxHp);
+                        dmg *= (1 + (hpFactor * proj.execution_damage));
+                    }
+
+                    // 5. Armor Shred
+                    if (proj.armor_shred) {
+                        ent.armor_reduction = Math.min(0.9, (ent.armor_reduction || 0) + proj.armor_shred);
+                    }
+                    dmg *= (1 + (ent.armor_reduction || 0));
+
+                    // 6. DOT (Corrupt)
+                    if (proj.dot_damage) {
+                        ent.active_dots.push({
+                            damage: proj.dot_damage / 5,
+                            end_time: now + 5000,
+                            attacker_id: shooterId
+                        });
+                    }
 
                     // Logic for Sneaky (One Shot Kill on ANY entity)
                     if (dmg >= ent.maxHp && ent.hp >= ent.maxHp * 0.99) {
@@ -1342,6 +1394,46 @@ setInterval(() => {
 
         // Standalone Enemy AI & Movement
         room.enemies.forEach(ent => {
+            const now = Date.now();
+
+            // --- DOT / Aura Effects Processing ---
+            if (ent.active_dots) {
+                ent.active_dots = ent.active_dots.filter(dot => {
+                    if (now < dot.end_time) {
+                        ent.hp -= (dot.damage * dt);
+                        return true;
+                    }
+                    return false;
+                });
+            }
+
+            // Auras from nearby players
+            Object.values(room.players).forEach(p => {
+                if (p.dead || p.x < -1000) return;
+                const aura = p.aura_type;
+                if (!aura) return;
+
+                const dist = Math.sqrt((ent.x - p.x) ** 2 + (ent.y - p.y) ** 2);
+                if (dist < 200) {
+                    if (aura === 'aura_corruption') ent.hp -= (10 * dt);
+                    else if (aura === 'aura_execution') {
+                        if (ent.hp < ent.maxHp * 0.3) ent.hp -= (20 * dt);
+                    } else if (aura === 'aura_control') {
+                        // Slow down
+                        ent.velocity.x *= 0.95;
+                        ent.velocity.y *= 0.95;
+                    } else if (aura === 'aura_vampire') {
+                        const siph = 5 * dt;
+                        ent.hp -= siph;
+                        p.hp = Math.min(p.maxHp, p.hp + siph);
+                    }
+                }
+            });
+
+            if (ent.hp <= 0) {
+                // ... logic to remove ent
+            }
+
             let nearestPlayer = null;
             let minDist = Infinity;
             Object.values(room.players).forEach(p => {
