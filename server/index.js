@@ -1203,7 +1203,7 @@ setInterval(() => {
                         targets.forEach(t => {
                             if (t.id === proj.playerId || t.type === 'projectile') return;
                             const dSq = (t.x - proj.x) ** 2 + (t.y - proj.y) ** 2;
-                            if (dSq < exRadius ** 2) {
+                            if (dSq < exRadius * exRadius) {
                                 t.hp -= (proj.explosion_damage || 15);
 
                                 // Track Multikill for Explosion
@@ -1225,11 +1225,52 @@ setInterval(() => {
                         });
                     }
 
-                    // Cleanup projectile unless piercing
-                    if (proj.pierce && proj.pierce > 1) {
+                    // --- CHAIN LIGHTNING LOGIC ---
+                    if (proj.chain_range > 0 && (proj.chain_count || 0) > 0) {
+                        proj.chain_count--;
+
+                        // Find nearest enemy excluding current target
+                        let nearest = null;
+                        let minDistSq = proj.chain_range * proj.chain_range;
+
+                        const candidates = getNearbyEntities(room, ent.x, ent.y, proj.chain_range);
+                        candidates.forEach(c => {
+                            if (c.id === ent.id || c.id === proj.playerId || c.type === 'projectile') return;
+                            const dSq = (c.x - ent.x) ** 2 + (c.y - ent.y) ** 2;
+                            if (dSq < minDistSq) {
+                                minDistSq = dSq;
+                                nearest = c;
+                            }
+                        });
+
+                        if (nearest) {
+                            // Redirect projectile to next target
+                            const angle = Math.atan2(nearest.y - ent.y, nearest.x - ent.x);
+                            const speed = Math.sqrt(proj.velocity.x ** 2 + proj.velocity.y ** 2) || 400;
+                            proj.x = ent.x;
+                            proj.y = ent.y;
+                            proj.velocity.x = Math.cos(angle) * speed;
+                            proj.velocity.y = Math.sin(angle) * speed;
+                            hitSomething = false; // Don't destroy yet
+
+                            // Visual Jump Effect
+                            io.to(roomId).emit('visual_effect', {
+                                type: 'impact', x: ent.x, y: ent.y, color: proj.color, strength: 10
+                            });
+                        } else {
+                            // No more targets to jump to
+                            if (proj.pierce && proj.pierce > 1) {
+                                proj.pierce--;
+                                hitSomething = false;
+                            } else {
+                                hitSomething = true;
+                            }
+                        }
+                    } else if (proj.pierce && proj.pierce > 1) {
                         proj.pierce--;
+                        hitSomething = false;
                     } else {
-                        room.projectiles.splice(i, 1);
+                        hitSomething = true;
                     }
 
                     // Impact FX (if not already handled by explosion)

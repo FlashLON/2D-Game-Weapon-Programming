@@ -517,7 +517,8 @@ export class GameEngine {
             const p = this.state.projectiles[i];
             let hitSomething = false;
 
-            for (const e of this.state.entities) {
+            for (let j = this.state.entities.length - 1; j >= 0; j--) {
+                const e = this.state.entities[j];
                 if (e.type === 'enemy') {
                     const px = p.renderX || p.x;
                     const py = p.renderY || p.y;
@@ -555,58 +556,44 @@ export class GameEngine {
                             } catch (err) { console.error(err); }
                         }
 
-                        hitSomething = true;
-
                         if (e.hp <= 0) {
                             e.hp = e.maxHp;
                             e.x = Math.random() * 700 + 50;
                             e.y = Math.random() * 500 + 50;
                             e.velocity = { x: 0, y: 0 };
                             this.state.score += 1;
-
-                            // SOLO PROGRESSION LOGIC (DISABLED FOR SANDBOX)
-                            /*
-                            if (!this.isMultiplayer) {
-                                const player = this.getLocalPlayer();
-                                if (player) {
-                                    // XP/stats are visual only in sandbox, preventing "restart" bugs
-                                    // But we do NOT award new XP permanently/locally here to keep it pure.
-                                }
-                            }
-                            */
-
                             if (this.weaponScript && this.weaponScript.on_kill) {
                                 try { this.weaponScript.on_kill(e.id); } catch (err) { console.error(err); }
                             }
                         }
 
-                        if (p.chain_range && p.chain_range > 0) {
+                        // --- CHAIN LIGHTNING / PIERCE LOGIC ---
+                        let jumped = false;
+                        if (p.chain_range && p.chain_range > 0 && (p.chain_count || 0) > 0) {
+                            p.chain_count = (p.chain_count || 0) - 1;
                             const nearest = this.getNearestEnemyExcept(p.x, p.y, e.id);
                             if (nearest && Math.sqrt((nearest.x - p.x) ** 2 + (nearest.y - p.y) ** 2) <= p.chain_range) {
-                                const speed = Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2);
+                                const speed = Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2) || 400;
                                 const angle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+                                p.x = e.x; p.y = e.y; // Snap to current enemy before jumping
                                 p.velocity.x = Math.cos(angle) * speed;
                                 p.velocity.y = Math.sin(angle) * speed;
-                                if (p.pierce && p.pierce > 1) {
-                                    p.pierce--;
-                                    hitSomething = false;
-                                } else {
-                                    hitSomething = true;
-                                }
-                            } else if (p.pierce && p.pierce > 1) {
+                                jumped = true;
+                            }
+                        }
+
+                        if (!jumped) {
+                            if (p.pierce && p.pierce > 1) {
                                 p.pierce--;
                                 hitSomething = false;
                             } else {
                                 hitSomething = true;
                             }
-                        } else if (p.pierce && p.pierce > 1) {
-                            p.pierce--;
-                            hitSomething = false;
                         } else {
-                            hitSomething = true;
+                            hitSomething = false;
                         }
 
-                        if (hitSomething) break;
+                        if (hitSomething || jumped) break;
                     }
                 }
             }
