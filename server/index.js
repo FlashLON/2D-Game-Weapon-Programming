@@ -172,19 +172,30 @@ const TITLES_LIST = [
 ];
 
 function unlockTitle(username, titleId, socket) {
+    console.log(`[TITLE] Attempting to unlock "${titleId}" for ${username}`);
+
     let user = memoryUsers.get(username);
-    // If using firebase, we'd fetch here, but we are using sync memory cache mostly for game loop
-    if (!user) return;
+    if (!user) {
+        console.log(`[TITLE] ❌ User ${username} not found in memoryUsers`);
+        return;
+    }
 
     if (!user.titles) user.titles = ['beginner']; // Default
+
+    console.log(`[TITLE] Current titles for ${username}:`, user.titles);
+
     if (!user.titles.includes(titleId)) {
         user.titles.push(titleId);
-        console.log(`🏆 UNSOCKED TITLE: ${username} -> ${titleId}`);
+        console.log(`🏆 UNLOCKED TITLE: ${username} -> ${titleId}`);
+        console.log(`[TITLE] New titles array:`, user.titles);
 
         if (socket) {
+            console.log(`[TITLE] Sending notification to socket ${socket.id}`);
             socket.emit('notification', { type: 'unlock', message: `Title Unlocked: ${titleId.toUpperCase()}` });
             // FORCE UPDATE CLIENT PROFILE
             socket.emit('profile_update', user);
+        } else {
+            console.log(`[TITLE] ⚠️ No socket provided for ${username}`);
         }
 
         saveProgress(username, user);
@@ -195,6 +206,8 @@ function unlockTitle(username, titleId, socket) {
         if (hasAll && !user.titles.includes('theultragod')) {
             unlockTitle(username, 'theultragod', socket);
         }
+    } else {
+        console.log(`[TITLE] ${username} already has "${titleId}"`);
     }
 }
 
@@ -1115,13 +1128,17 @@ setInterval(() => {
                             killer.money += 25;
                             killer.killstreak = (killer.killstreak || 0) + 1; // Increment streak
 
+                            console.log(`[KILL] ${killer.username} got a kill! Session kills: ${killer.kills}, Killstreak: ${killer.killstreak}`);
+
                             // Update persistent kill count
                             let user = memoryUsers.get(killer.username);
                             if (user) {
                                 user.killCount = (user.killCount || 0) + 1;
+                                console.log(`[KILL] Updated persistent killCount for ${killer.username}: ${user.killCount}`);
 
                                 // Find socket for this player
                                 const killerSocket = io.sockets.sockets.get(proj.playerId);
+                                console.log(`[KILL] Socket lookup for ${proj.playerId}:`, killerSocket ? 'Found' : 'Not found');
 
                                 // Check Titles using PERSISTENT killCount
                                 if (user.killCount >= 30) unlockTitle(killer.username, 'killer', killerSocket);
@@ -1132,6 +1149,8 @@ setInterval(() => {
                                 if (ent.type === 'player' && room.players[ent.id] && room.players[ent.id].titles && room.players[ent.id].titles.includes('god')) {
                                     unlockTitle(killer.username, 'godkiller', killerSocket);
                                 }
+                            } else {
+                                console.log(`[KILL] ⚠️ User ${killer.username} not found in memoryUsers!`);
                             }
 
                             if (killer.xp >= killer.maxXp) {
