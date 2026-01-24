@@ -516,6 +516,8 @@ function App() {
     if (res.success) {
       addLog("Login Successful!", "success");
       setUsername(name);
+      console.log('[DEBUG] Login profile received:', res.profile);
+      console.log('[DEBUG] Titles:', res.profile?.titles);
       setUserProfile(res.profile);
       setIsLoggedIn(true);
       setStatus("Ready");

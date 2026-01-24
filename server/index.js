@@ -205,7 +205,7 @@ function checkTitles(username, stats, socket) {
 
     // Initialize tracking fields if they don't exist
     if (!user.killCount) user.killCount = 0;
-    if (!user.titles) user.titles = [];
+    if (!user.titles || user.titles.length === 0) user.titles = ['beginner'];
 
     // 1. Killer (30 kills)
     if (user.killCount >= 30 && !user.titles.includes('killer')) {
@@ -214,10 +214,10 @@ function checkTitles(username, stats, socket) {
 
     // 2. OP (Max Stats) - Check if all major attributes are maxed
     // Assuming reasonable maxes: Speed 600, Damage 100, HP 500, Cooldown 0.1
-    if (stats.limits && 
-        stats.limits.speed >= 600 && 
-        stats.limits.damage >= 100 && 
-        stats.limits.hp >= 500 && 
+    if (stats.limits &&
+        stats.limits.speed >= 600 &&
+        stats.limits.damage >= 100 &&
+        stats.limits.hp >= 500 &&
         stats.limits.cooldown <= 0.1) {
         unlockTitle(username, 'op', socket);
     }
@@ -319,7 +319,7 @@ io.on('connection', (socket) => {
                     money: user.money || 0,
                     unlocks: user.unlocks || ['speed', 'damage'],
                     limits: user.limits || { speed: 200, damage: 5 },
-                    titles: user.titles || [],
+                    titles: user.titles && user.titles.length > 0 ? user.titles : ['beginner'],
                     equippedTitle: user.equippedTitle || null,
                     killCount: user.killCount || 0
                 }
@@ -365,7 +365,7 @@ io.on('connection', (socket) => {
                 unlocks: ['speed', 'damage', 'hp', 'cooldown'],
                 limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
                 lastUpgradeLevel: {},
-                titles: [],
+                titles: ['beginner'],
                 equippedTitle: null,
                 killCount: 0,
                 createdAt: new Date().toISOString()
