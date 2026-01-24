@@ -531,6 +531,18 @@ io.on('connection', (socket) => {
         }
     });
 
+    // TEST COMMAND - Remove in production
+    socket.on('test_unlock_title', ({ titleId }) => {
+        if (socket.data.username) {
+            console.log(`[TEST] Manual unlock request: ${titleId} for ${socket.data.username}`);
+            unlockTitle(socket.data.username, titleId, socket);
+        } else {
+            console.log('[TEST] Cannot unlock - user not logged in');
+            socket.emit('notification', { type: 'error', message: 'Please login first' });
+        }
+    });
+
+
     // --- SAVED CODE HANDLERS ---
     socket.on('save_code', async ({ username, codeName, codeContent }) => {
         console.log(`[CODES] Save Code Request: ${username} - "${codeName}"`);
