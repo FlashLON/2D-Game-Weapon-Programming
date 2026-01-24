@@ -72,23 +72,23 @@ async function findUser(username) {
 async function upsertUser(username, userData) {
     if (!username || username.trim() === '') return;
 
+    const lastSeen = new Date().toISOString();
+    const existing = memoryUsers.get(username) || {};
+    const newData = { ...existing, ...userData, lastSeen };
+
+    // Always update memory cache
+    memoryUsers.set(username, newData);
+
     if (firebaseDb) {
         try {
             await firebaseDb.ref(`users/${username}`).update({
                 ...userData,
-                lastSeen: new Date().toISOString()
+                lastSeen
             });
         } catch (err) {
             console.error(`❌ Firebase error writing user ${username}:`, err.message);
-            // Fallback to memory
-            const existing = memoryUsers.get(username) || {};
-            memoryUsers.set(username, { ...existing, ...userData, lastSeen: new Date().toISOString() });
         }
     } else {
-        const existing = memoryUsers.get(username) || {};
-        const newData = { ...existing, ...userData, lastSeen: new Date().toISOString() };
-        memoryUsers.set(username, newData);
-
         // PERSIST TO FILE
         try {
             const data = Object.fromEntries(memoryUsers);
@@ -216,7 +216,7 @@ function checkTitles(username, stats, socket) {
     let user = memoryUsers.get(username);
     if (!user) return;
 
-    // Initialize tracking fields if they don't exist
+    // Initialize tracking fields
     if (!user.killCount) user.killCount = 0;
     if (!user.titles || user.titles.length === 0) user.titles = ['beginner'];
 
@@ -225,14 +225,21 @@ function checkTitles(username, stats, socket) {
         unlockTitle(username, 'killer', socket);
     }
 
-    // 2. OP (Max Stats) - Check if all major attributes are maxed
-    // Assuming reasonable maxes: Speed 600, Damage 100, HP 500, Cooldown 0.1
-    if (stats.limits &&
-        stats.limits.speed >= 600 &&
-        stats.limits.damage >= 100 &&
-        stats.limits.hp >= 500 &&
-        stats.limits.cooldown <= 0.1) {
-        unlockTitle(username, 'op', socket);
+    // 2. OP (Maximize Stats)
+    // We check if the player has reached the high-tier limits defined in AttributeRegistry
+    if (stats.limits) {
+        const l = stats.limits;
+        const isMaxed = (
+            (l.speed || 0) >= 1200 &&
+            (l.damage || 0) >= 250 &&
+            (l.hp || 0) >= 2000 &&
+            (l.cooldown || 1) <= 0.05 &&
+            (l.pierce || 0) >= 25 &&
+            (l.homing || 0) >= 50
+        );
+        if (isMaxed && !user.titles.includes('op')) {
+            unlockTitle(username, 'op', socket);
+        }
     }
 }
 
@@ -321,6 +328,9 @@ io.on('connection', (socket) => {
             console.log(`[AUTH] Login Success: ${username}`);
             socket.data.username = username;
 
+            // CACHE USER FOR TITLES (Crucial for Firebase users)
+            memoryUsers.set(username, user);
+
             socket.emit('login_response', {
                 success: true,
                 isNew: false,
@@ -386,6 +396,9 @@ io.on('connection', (socket) => {
 
             await upsertUser(username, newUser);
             console.log(`[AUTH] Signup Success: ${username}`);
+
+            // CACHE USER FOR TITLES
+            memoryUsers.set(username, newUser);
 
             socket.data.username = username;
             socket.emit('login_response', {
@@ -464,7 +477,13 @@ io.on('connection', (socket) => {
             unlocks: profile?.unlocks || ['speed', 'damage'],
             limits: profile?.limits || { speed: 200, damage: 5 },
             titles: profile?.titles || [],
-            equippedTitle: profile?.equippedTitle || null
+            equippedTitle: profile?.equippedTitle || null,
+            // --- SESSION TRACKING ---
+            joinedAt: Date.now(),
+            lastFireTime: 0,
+            hasFired: false,
+            lastActionTime: Date.now(),
+            continuousFireStartTime: 0
         };
 
         socket.emit('init', {
@@ -533,12 +552,47 @@ io.on('connection', (socket) => {
 
     // TEST COMMAND - Remove in production
     socket.on('test_unlock_title', ({ titleId }) => {
+        console.log(`[TEST] ========== TEST UNLOCK TITLE ==========`);
+        console.log(`[TEST] Requested titleId: ${titleId}`);
+        console.log(`[TEST] Socket ID: ${socket.id}`);
+        console.log(`[TEST] socket.data.username: ${socket.data.username}`);
+
         if (socket.data.username) {
-            console.log(`[TEST] Manual unlock request: ${titleId} for ${socket.data.username}`);
-            unlockTitle(socket.data.username, titleId, socket);
+            const user = memoryUsers.get(socket.data.username);
+            console.log(`[TEST] User found in memoryUsers: ${!!user}`);
+            if (user) {
+                console.log(`[TEST] User current titles:`, user.titles);
+                console.log(`[TEST] Calling unlockTitle...`);
+                unlockTitle(socket.data.username, titleId, socket);
+            } else {
+                console.log(`[TEST] ❌ User ${socket.data.username} NOT in memoryUsers`);
+                console.log(`[TEST] memoryUsers keys:`, Array.from(memoryUsers.keys()));
+                socket.emit('notification', { type: 'error', message: 'User not found in database' });
+            }
         } else {
-            console.log('[TEST] Cannot unlock - user not logged in');
+            console.log('[TEST] ❌ socket.data.username is undefined - user not logged in');
             socket.emit('notification', { type: 'error', message: 'Please login first' });
+        }
+        console.log(`[TEST] ==========================================`);
+    });
+
+    socket.on('admin_award_title', ({ secret, targetUsername, titleId }) => {
+        const ADMIN_SECRET = process.env.ADMIN_SECRET || 'cyber_secret_2024';
+        if (secret === ADMIN_SECRET) {
+            console.log(`[ADMIN] Awarding "${titleId}" to ${targetUsername}`);
+
+            // Find target socket if online
+            let targetSocket = null;
+            for (const s of io.sockets.sockets.values()) {
+                if (s.data.username === targetUsername) {
+                    targetSocket = s;
+                    break;
+                }
+            }
+
+            unlockTitle(targetUsername, titleId, targetSocket);
+        } else {
+            socket.emit('notification', { type: 'error', message: 'Unauthorized' });
         }
     });
 
@@ -759,6 +813,7 @@ io.on('connection', (socket) => {
             if (player) {
                 player.velocity.x = data.x;
                 player.velocity.y = data.y;
+                player.lastActionTime = Date.now(); // Record activity
             }
         }
     });
@@ -766,6 +821,18 @@ io.on('connection', (socket) => {
     socket.on('fire', (data) => {
         if (currentRoomId && rooms[currentRoomId]) {
             const room = rooms[currentRoomId];
+            const player = room.players[socket.id];
+
+            if (player) {
+                player.lastFireTime = Date.now();
+                player.hasFired = true;
+                player.lastActionTime = Date.now();
+
+                if (!player.continuousFireStartTime) {
+                    player.continuousFireStartTime = Date.now();
+                }
+            }
+
             if (room.projectiles.length > PROJECTILE_CAP) {
                 room.projectiles.shift(); // Max projectile limit
             }
@@ -909,8 +976,23 @@ setInterval(() => {
             }
 
             if (room.waveState === 'fight' && room.enemies.length === 0) {
+                // WAVE COMPLETED
+                const waveCompleted = room.wave;
                 room.waveState = 'idle';
                 room.waveTimer = 0;
+
+                // Check for Immortal and True King upon completing waves
+                Object.values(room.players).forEach(p => {
+                    const pSocket = io.sockets.sockets.get(p.id);
+                    // Immortal: Reach Wave 50 without dying
+                    if (waveCompleted >= 50 && (!p.deaths || p.deaths === 0)) {
+                        unlockTitle(p.username, 'immortal', pSocket);
+                    }
+                    // True King: Reach Wave 100
+                    if (waveCompleted >= 100) {
+                        unlockTitle(p.username, 'trueking', pSocket);
+                    }
+                });
             }
         }
 
@@ -1342,6 +1424,29 @@ setInterval(() => {
             p.y += p.velocity.y * dt;
             p.x = Math.max(p.radius, Math.min(800 - p.radius, p.x));
             p.y = Math.max(p.radius, Math.min(600 - p.radius, p.y));
+
+            // --- TIME BASED TITLES CHECK (Every Tick or Periodic) ---
+            const now = Date.now();
+            const pSocket = io.sockets.sockets.get(p.id);
+
+            // 1. Friendly (30 mins without firing)
+            if (!p.hasFired && (now - p.joinedAt) > 30 * 60 * 1000) {
+                unlockTitle(p.username, 'friendly', pSocket);
+            }
+
+            // 2. Hostile (Fire continuously for 5 mins)
+            // If they haven't fired in 5 seconds, reset continuous start
+            if (p.lastFireTime && (now - p.lastFireTime) > 5000) {
+                p.continuousFireStartTime = 0;
+            }
+            if (p.continuousFireStartTime && (now - p.continuousFireStartTime) > 5 * 60 * 1000) {
+                unlockTitle(p.username, 'hostile', pSocket);
+            }
+
+            // 3. ZZZ (AFK 24 hours) - Use 1 min for testing if you want, but sticking to 24h as per request
+            if (p.lastActionTime && (now - p.lastActionTime) > 24 * 60 * 60 * 1000) {
+                unlockTitle(p.username, 'zzz', pSocket);
+            }
         });
     }
 
