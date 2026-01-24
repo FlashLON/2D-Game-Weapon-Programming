@@ -497,7 +497,7 @@ function App() {
     };
   }, []);
 
-  const handleLogin = async (name: string) => {
+  const handleLogin = async (name: string, pass?: string) => {
     if (!name) return;
     setStatus("Authenticating...");
 
@@ -511,7 +511,7 @@ function App() {
     }
 
     addLog(`Attempting Login for ${name}...`, "info");
-    const res = await networkManager.login(name);
+    const res = await networkManager.login(name, pass);
 
     if (res.success) {
       addLog("Login Successful!", "success");
@@ -529,7 +529,7 @@ function App() {
     }
   };
 
-  const handleSignup = async (name: string) => {
+  const handleSignup = async (name: string, pass?: string) => {
     if (!name) return;
     setStatus("Registering...");
 
@@ -543,7 +543,7 @@ function App() {
     }
 
     addLog(`Creating account for ${name}...`, "info");
-    const res = await networkManager.signup(name);
+    const res = await networkManager.signup(name, pass);
 
     if (res.success) {
       addLog("Account Created! Welcome.", "success");

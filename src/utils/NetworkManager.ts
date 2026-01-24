@@ -130,7 +130,7 @@ class NetworkManager {
         });
     }
 
-    async login(username: string): Promise<AuthResponse> {
+    async login(username: string, password?: string): Promise<AuthResponse> {
         if (!this.socket || !this.connected) return { success: false, error: "Not connected to server" };
 
         console.log('[NetworkManager] 📤 Requesting LOGIN for:', username);
@@ -142,14 +142,14 @@ class NetworkManager {
                 resolve(res);
             });
 
-            this.socket.emit('login', { username });
+            this.socket.emit('login', { username, password });
 
             // Timeout safety (10 seconds for cold starts)
             setTimeout(() => resolve({ success: false, error: "Auth Timeout (Server took too long)" }), 10000);
         });
     }
 
-    async signup(username: string): Promise<AuthResponse> {
+    async signup(username: string, password?: string): Promise<AuthResponse> {
         if (!this.socket || !this.connected) return { success: false, error: "Not connected to server" };
 
         console.log('[NetworkManager] 📤 Requesting SIGNUP for:', username);
@@ -161,7 +161,7 @@ class NetworkManager {
                 resolve(res);
             });
 
-            this.socket.emit('signup', { username });
+            this.socket.emit('signup', { username, password });
 
             // Timeout safety (10 seconds for cold starts)
             setTimeout(() => resolve({ success: false, error: "Auth Timeout (Server took too long)" }), 10000);

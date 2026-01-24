@@ -22,11 +22,11 @@ interface LobbyProps {
         titles: string[];
         equippedTitle: string | null;
     };
-    onLogin?: (username: string) => void;
+    onLogin?: (username: string, password?: string) => void;
     isLoggedIn?: boolean;
     username?: string;
     onUpgrade?: (attributeId: string) => void;
-    onSignup?: (username: string) => void;
+    onSignup?: (username: string, password?: string) => void;
     leaderboard?: any[];
     savedCodes?: SavedCode[];
     onLoadCode?: (code: SavedCode) => void;
@@ -58,6 +58,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
+    const [password, setPassword] = useState('');
     const [showSettings, setShowSettings] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
 
@@ -106,25 +107,36 @@ export const Lobby: React.FC<LobbyProps> = ({
 
                     {!isLoggedIn && (
                         <div className="flex flex-col items-center justify-center gap-4 my-2">
-                            <div className="flex gap-2">
-                                <input
-                                    value={loginName}
-                                    onChange={(e) => setLoginName(e.target.value)}
-                                    placeholder="ENTER USERNAME"
-                                    className="bg-black/40 border border-cyber-muted rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-cyber-accent font-mono uppercase"
-                                />
-                                <button
-                                    onClick={() => onLogin?.(loginName)}
-                                    className="bg-cyber-accent text-black font-bold px-4 py-2 rounded-lg hover:bg-emerald-400 transition-colors text-xs uppercase"
-                                >
-                                    Login
-                                </button>
-                                <button
-                                    onClick={() => onSignup?.(loginName)}
-                                    className="bg-blue-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-400 transition-colors text-xs uppercase"
-                                >
-                                    Signup
-                                </button>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                    <input
+                                        value={loginName}
+                                        onChange={(e) => setLoginName(e.target.value)}
+                                        placeholder="USERNAME"
+                                        className="bg-black/40 border border-cyber-muted rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-cyber-accent font-mono uppercase w-32"
+                                    />
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="PASSWORD"
+                                        className="bg-black/40 border border-cyber-muted rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-cyber-accent font-mono uppercase w-32"
+                                    />
+                                </div>
+                                <div className="flex gap-2 justify-center">
+                                    <button
+                                        onClick={() => onLogin?.(loginName, password)}
+                                        className="bg-cyber-accent text-black font-bold px-6 py-2 rounded-lg hover:bg-emerald-400 transition-colors text-xs uppercase flex-1"
+                                    >
+                                        Login
+                                    </button>
+                                    <button
+                                        onClick={() => onSignup?.(loginName, password)}
+                                        className="bg-blue-500 text-white font-bold px-6 py-2 rounded-lg hover:bg-blue-400 transition-colors text-xs uppercase flex-1"
+                                    >
+                                        Signup
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}

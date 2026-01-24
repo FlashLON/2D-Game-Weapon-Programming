@@ -5,6 +5,12 @@ require('dotenv').config();
 const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
+// --- HASHING HELPER ---
+function hashPassword(password) {
+    return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 // --- DATABASE SETUP (FIREBASE) ---
 let firebaseDb = null;
@@ -308,12 +314,17 @@ io.on('connection', (socket) => {
         console.log(`[SERVER] Received: ${eventName}`, args);
     });
 
-    socket.on('login', async ({ username }) => {
+    socket.on('login', async ({ username, password }) => {
         console.log(`[AUTH] Login Request: ${username}`);
 
         try {
             if (!username || username.trim().length === 0) {
                 socket.emit('login_response', { success: false, error: "Username cannot be empty" });
+                return;
+            }
+
+            if (!password) {
+                socket.emit('login_response', { success: false, error: "Password is required" });
                 return;
             }
 
@@ -323,6 +334,20 @@ io.on('connection', (socket) => {
                 console.log(`[AUTH] Login Failed: ${username} not found`);
                 socket.emit('login_response', { success: false, error: "User not found. Please click Signup." });
                 return;
+            }
+
+            // Check password
+            const hashed = hashPassword(password);
+            if (user.password && user.password !== hashed) {
+                console.log(`[AUTH] Login Failed: ${username} invalid password`);
+                socket.emit('login_response', { success: false, error: "Invalid password" });
+                return;
+            }
+            // If user has no password yet (old account), let them in but maybe set it on next save?
+            // For now, we'll allow it or force set it. Let's just allow it for legacy.
+            if (!user.password) {
+                user.password = hashed;
+                await upsertUser(username, user);
             }
 
             console.log(`[AUTH] Login Success: ${username}`);
@@ -357,7 +382,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('signup', async ({ username }) => {
+    socket.on('signup', async ({ username, password }) => {
         console.log(`[AUTH] Signup Request: ${username}`);
 
         try {
@@ -371,6 +396,11 @@ io.on('connection', (socket) => {
                 return;
             }
 
+            if (!password || password.length < 4) {
+                socket.emit('login_response', { success: false, error: "Password must be at least 4 characters" });
+                return;
+            }
+
             const existing = await findUser(username);
 
             if (existing) {
@@ -381,6 +411,7 @@ io.on('connection', (socket) => {
 
             const newUser = {
                 username,
+                password: hashPassword(password),
                 level: 1,
                 xp: 0,
                 maxXp: 100,
