@@ -405,7 +405,8 @@ export const Lobby: React.FC<LobbyProps> = ({
 
                                             <div className="grid grid-cols-1 gap-4 pb-4">
                                                 {Object.values(ATTRIBUTES).map((attr) => {
-                                                    if (attr.isAura) return null;
+                                                    // Only show the active aura if it's an aura type
+                                                    if (attr.isAura && userProfile.aura_type !== attr.id) return null;
                                                     const isUnlocked = attr.isBase || userProfile.unlocks.includes(attr.id);
                                                     const currentLimit = userProfile.limits[attr.id] || attr.startLimit;
                                                     const isMaxed = currentLimit >= attr.maxLimit;

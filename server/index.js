@@ -1153,6 +1153,16 @@ setInterval(() => {
                     let dmg = (proj.damage || 10);
                     const now = Date.now();
                     const shooterId = proj.playerId || 'unknown';
+                    const room = rooms[roomId]; // Room context
+
+                    // CRITICAL: Apply Damage Aura Multiplier if shooter has it
+                    if (room && room.players[shooterId]) {
+                        const shooter = room.players[shooterId];
+                        if (shooter.aura_type === 'aura_damage') {
+                            const mult = shooter.limits?.['aura_damage'] || 1.1;
+                            dmg *= mult;
+                        }
+                    }
 
                     // Initialize tracker fields
                     if (!ent.last_hit_by) ent.last_hit_by = {};
@@ -1419,18 +1429,19 @@ setInterval(() => {
                 if (!aura) return;
 
                 const dist = Math.sqrt((ent.x - p.x) ** 2 + (ent.y - p.y) ** 2);
-                if (dist < 200) {
-                    if (aura === 'aura_corruption') ent.hp -= (10 * dt);
+                if (dist < 240) {
+                    const power = p.limits?.[aura] || 1;
+                    if (aura === 'aura_corruption') ent.hp -= (power * dt);
                     else if (aura === 'aura_execution') {
-                        if (ent.hp < ent.maxHp * 0.3) ent.hp -= (20 * dt);
+                        if (ent.hp < ent.maxHp * 0.3) ent.hp -= (ent.maxHp * 0.1 * dt);
                     } else if (aura === 'aura_control') {
-                        // Slow down
-                        ent.velocity.x *= 0.95;
-                        ent.velocity.y *= 0.95;
+                        // Slow down (Power is slow factor e.g. 0.8)
+                        ent.velocity.x *= power;
+                        ent.velocity.y *= power;
                     } else if (aura === 'aura_vampire') {
-                        const siph = 5 * dt;
+                        const siph = power * dt * 50;
                         ent.hp -= siph;
-                        p.hp = Math.min(p.maxHp, p.hp + siph);
+                        p.hp = Math.min(p.maxHp, p.hp + siph * 0.1);
                     }
                 }
             });

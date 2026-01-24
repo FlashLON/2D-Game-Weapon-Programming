@@ -65,7 +65,10 @@ function App() {
   // User Profile State (Persisted)
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('user_profile');
-    return saved ? JSON.parse(saved) : {
+    const profile = saved ? JSON.parse(saved) : {};
+
+    // DEFAULT STATE - Merged with saved data to handle migrations
+    return {
       level: 1,
       xp: 0,
       maxXp: 100,
@@ -76,7 +79,8 @@ function App() {
       titles: [],
       equippedTitle: null,
       killCount: 0,
-      aura_type: null
+      aura_type: null,
+      ...profile
     };
   });
   const [username, setUsername] = useState<string>('');

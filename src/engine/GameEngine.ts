@@ -1,4 +1,5 @@
 import type { WeaponScript } from './PyodideManager';
+import { ATTRIBUTES } from '../utils/AttributeRegistry';
 
 /**
  * Represents any moving object in the game world.
@@ -389,9 +390,36 @@ export class GameEngine {
                 ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
                 ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
 
-                // SAFEGUARD: Keep aura synced from profile stats
-                if (this.playerStats.aura_type) {
-                    ent.aura_type = this.playerStats.aura_type;
+                // AURA PROCESSING (Solo Mode)
+                const aura = this.playerStats.aura_type;
+                if (aura) {
+                    ent.aura_type = aura; // Force sync for rendering
+                    const range = 240;
+                    this.state.entities.forEach(enemy => {
+                        if (enemy.type === 'enemy') {
+                            const dx = enemy.x - ent.x;
+                            const dy = enemy.y - ent.y;
+                            const distSq = dx * dx + dy * dy;
+                            if (distSq < range * range) {
+                                // Apply Effect based on aura type and limits
+                                const power = this.playerStats.limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+                                if (aura === 'aura_corruption') {
+                                    enemy.hp -= power * dt;
+                                } else if (aura === 'aura_vampire') {
+                                    const siph = power * dt * 50;
+                                    enemy.hp -= siph;
+                                    ent.hp = Math.min(ent.maxHp, ent.hp + siph * 0.1);
+                                } else if (aura === 'aura_control') {
+                                    enemy.velocity.x *= power; // Power here is slow factor e.g. 0.8
+                                    enemy.velocity.y *= power;
+                                } else if (aura === 'aura_execution') {
+                                    if (enemy.hp < enemy.maxHp * 0.3) {
+                                        enemy.hp -= enemy.maxHp * 0.1 * dt; // 10% max hp per sec
+                                    }
+                                }
+                            }
+                        }
+                    });
                 }
             }
         });
@@ -604,6 +632,12 @@ export class GameEngine {
                                 end_time: now + 5000,
                                 attacker_id: shooterId
                             });
+                        }
+
+                        // CRITICAL: Apply Damage Aura Multiplier if active
+                        const shooter = this.state.entities.find(e => e.id === shooterId);
+                        if (shooter && shooter.aura_type === 'aura_damage') {
+                            dmg *= (this.playerStats.limits?.['aura_damage'] || 1.2);
                         }
 
                         e.hp -= dmg;
