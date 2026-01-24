@@ -9,11 +9,11 @@ export interface Title {
 
 export const TITLES: Record<string, Title> = {
     // Kills & Combat
-    'killer': { id: 'killer', name: 'Killer', description: 'Eliminate 30 players.', color: '#ef4444', rarity: 'common' }, // Red
-    'sneaky': { id: 'sneaky', name: 'Sneaky', description: 'Eliminate a player with a single hit.', color: '#a855f7', rarity: 'rare' }, // Purple
-    'threeforone': { id: 'threeforone', name: 'Three for One', description: 'Eliminate 3 players with a single attack.', color: '#f59e0b', rarity: 'epic' }, // Amber
+    'killer': { id: 'killer', name: 'Killer', description: 'Eliminate 30 enemies.', color: '#ef4444', rarity: 'common' }, // Red
+    'sneaky': { id: 'sneaky', name: 'Sneaky', description: 'Eliminate an enemy or player with a single hit.', color: '#a855f7', rarity: 'rare' }, // Purple
+    'threeforone': { id: 'threeforone', name: 'Three for One', description: 'Eliminate 3 enemies or players with a single attack.', color: '#f59e0b', rarity: 'epic' }, // Amber
     'unstoppable': { id: 'unstoppable', name: 'Unstoppable', description: 'Reach a 100 killstreak.', color: '#ef4444', rarity: 'legendary' },
-    'monster': { id: 'monster', name: 'Monster', description: 'Reach a 1000 killstreak against Level 10+ enemies.', color: '#b91c1c', rarity: 'mythical' },
+    'monster': { id: 'monster', name: 'Monster', description: 'Reach a 1000 killstreak.', color: '#b91c1c', rarity: 'mythical' },
 
     // Playstyle
     'friendly': { id: 'friendly', name: 'Friendly', description: 'Survive 30 minutes in a server without firing a single shot.', color: '#10b981', rarity: 'rare' }, // Emerald

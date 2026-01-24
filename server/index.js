@@ -1021,8 +1021,8 @@ setInterval(() => {
                 if (dist < ent.radius + proj.radius) {
                     const dmg = (proj.damage || 10);
 
-                    // Logic for Sneaky (One Shot Kill on Player)
-                    if (ent.type === 'player' && dmg >= ent.maxHp && ent.hp >= ent.maxHp * 0.99) {
+                    // Logic for Sneaky (One Shot Kill on ANY entity)
+                    if (dmg >= ent.maxHp && ent.hp >= ent.maxHp * 0.99) {
                         if (room.players[proj.playerId]) {
                             const shooterSocket = io.sockets.sockets.get(proj.playerId);
                             unlockTitle(room.players[proj.playerId].username, 'sneaky', shooterSocket);
