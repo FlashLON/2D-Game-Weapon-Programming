@@ -148,7 +148,8 @@ export class GameEngine {
         xp: 0,
         maxXp: 100,
         money: 0,
-        aura_type: null
+        aura_type: null,
+        limits: {}
     };
 
     constructor() {
@@ -194,14 +195,16 @@ export class GameEngine {
             xp: profile.xp || 0,
             maxXp: profile.maxXp || 100,
             money: profile.money || 0,
-            aura_type: profile.aura_type
+            aura_type: profile.aura_type,
+            limits: profile.limits || {}
         };
         // Update current player if exists
         const player = this.getLocalPlayer();
         if (player) {
             player.maxHp = this.playerStats.hp;
             if (player.hp > player.maxHp) player.hp = player.maxHp;
-            player.aura_type = profile.aura_type;
+            player.aura_type = this.playerStats.aura_type;
+            (player as any).limits = this.playerStats.limits;
         }
     }
 
@@ -333,6 +336,13 @@ export class GameEngine {
                 const bounds = this.getArenaBounds();
                 ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
                 ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
+
+                // SYNC AURA: Even in multiplayer, we force our local aura visuals
+                const isLocal = (this.localPlayerId && ent.id === this.localPlayerId) || (!this.localPlayerId && ent.id === 'player');
+                if (isLocal) {
+                    ent.aura_type = this.playerStats.aura_type;
+                    (ent as any).limits = this.playerStats.limits;
+                }
             });
 
             this.state.projectiles.forEach(proj => {

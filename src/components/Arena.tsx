@@ -3,6 +3,7 @@ import { gameEngine, type GameState } from '../engine/GameEngine';
 
 import { networkManager } from '../utils/NetworkManager';
 import { TITLES } from '../utils/TitleRegistry';
+import { ATTRIBUTES } from '../utils/AttributeRegistry';
 
 export const Arena: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -144,8 +145,11 @@ export const Arena: React.FC = () => {
                 if (ent.type === 'player' && ent.aura_type) {
                     const aura = ent.aura_type;
                     const baseRange = 240;
-                    const strength = (ent as any).limits?.[aura] || 1;
-                    const range = baseRange * (1 + (Math.min(strength, 100) / 400));
+                    const strength = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+                    const startLimit = ATTRIBUTES[aura]?.startLimit || 1;
+                    // Scale radius: +5% per 10% increase over base, max +30%
+                    const scaleFactor = Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
+                    const range = baseRange * (1 + scaleFactor);
 
                     ctx.save();
                     ctx.translate(drawX, drawY);
