@@ -65,6 +65,8 @@ export interface Entity {
     // Auras
     aura_type?: string;
     aura_timer?: number; // For chaotic/random auras
+    lastDealtDamageTime?: number; // Last time this entity dealt damage
+    lastCritTime?: number;        // Last time this entity landed a crit
 }
 
 export interface DamageNumber {
@@ -641,7 +643,13 @@ export class GameEngine {
                         }
 
                         e.hp -= dmg;
-                        this.addDamageNumber(e.x, e.y, Math.round(dmg), (p.crit_chance && Math.random() < 0.3) ? '#ffcc00' : '#ff0055');
+                        const isCrit = (p.crit_chance && Math.random() * 100 < p.crit_chance);
+                        this.addDamageNumber(e.x, e.y, Math.round(dmg), isCrit ? '#ffcc00' : '#ff0055');
+
+                        if (shooter) {
+                            shooter.lastDealtDamageTime = now;
+                            if (isCrit) shooter.lastCritTime = now;
+                        }
 
                         // EXPLOSION ON HIT
                         if (p.explosion_radius && p.explosion_radius > 0) {
