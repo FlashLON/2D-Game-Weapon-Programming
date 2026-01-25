@@ -137,6 +137,13 @@ export const Arena: React.FC = () => {
                 // Skip dead entities (moved off-screen)
                 if (ent.x < -1000) return;
 
+                // CRITICAL FIX: Reset rendering state for each entity
+                ctx.globalAlpha = 1.0;
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([]);
+
                 const drawX = ent.renderX ?? ent.x;
                 const drawY = ent.renderY ?? ent.y;
                 const time = performance.now() / 1000;
@@ -144,11 +151,14 @@ export const Arena: React.FC = () => {
                 // --- AURA RENDERING (For Players) ---
                 if (ent.type === 'player' && ent.aura_type) {
                     const aura = ent.aura_type;
+                    const attrDef = ATTRIBUTES[aura];
+                    if (!attrDef) return; // Skip if aura definition is missing
+
                     const baseRange = 240;
-                    const strength = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
-                    const startLimit = ATTRIBUTES[aura]?.startLimit || 1;
+                    const strength = (ent as any).limits?.[aura] || attrDef.startLimit || 1;
+                    const startLimit = attrDef.startLimit || 1;
                     // Scale radius: +5% per 10% increase over base, max +30%
-                    const scaleFactor = Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
+                    const scaleFactor = Math.min(0.3, Math.max(0, (strength / (startLimit || 1)) - 1) * 0.5);
                     const range = baseRange * (1 + scaleFactor);
 
                     ctx.save();

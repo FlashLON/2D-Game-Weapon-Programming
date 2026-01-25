@@ -1267,6 +1267,12 @@ setInterval(() => {
                         }
                     }
 
+                    // Sync damage timing for aura effects
+                    if (room.players[proj.playerId]) {
+                        room.players[proj.playerId].lastDealtDamageTime = Date.now();
+                        if (isCrit) room.players[proj.playerId].lastCritTime = Date.now();
+                    }
+
                     ent.hp -= dmg;
 
                     // Logic for ThreeForOne (Multikill on Pierce)
@@ -1419,6 +1425,10 @@ setInterval(() => {
                                 const killerSocket = io.sockets.sockets.get(proj.playerId);
                                 console.log(`[KILL] Socket lookup for ${proj.playerId}:`, killerSocket ? 'Found' : 'Not found');
 
+                                // Sync damage timing for aura effects
+                                killer.lastDealtDamageTime = Date.now();
+                                if (isCrit) killer.lastCritTime = Date.now();
+
                                 // Check Titles using PERSISTENT killCount
                                 if (user.killCount >= 30) unlockTitle(killer.username, 'killer', killerSocket);
                                 if (killer.killstreak >= 100) unlockTitle(killer.username, 'unstoppable', killerSocket);
@@ -1455,6 +1465,11 @@ setInterval(() => {
         // Standalone Enemy AI & Movement
         room.enemies.forEach(ent => {
             const now = Date.now();
+
+            // Decay highlights
+            if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
+                ent.aura_highlight_timer -= dt;
+            }
 
             // --- DOT / Aura Effects Processing ---
             if (ent.active_dots) {
@@ -1692,6 +1707,11 @@ setInterval(() => {
             p.y += p.velocity.y * dt;
             p.x = Math.max(p.radius, Math.min(800 - p.radius, p.x));
             p.y = Math.max(p.radius, Math.min(600 - p.radius, p.y));
+
+            // Decay highlights
+            if (p.aura_highlight_timer && p.aura_highlight_timer > 0) {
+                p.aura_highlight_timer -= dt;
+            }
 
             // --- TIME BASED TITLES CHECK (Every Tick or Periodic) ---
             const now = Date.now();
