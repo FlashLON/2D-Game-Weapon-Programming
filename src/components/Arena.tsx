@@ -144,9 +144,8 @@ export const Arena: React.FC = () => {
                 if (ent.type === 'player' && ent.aura_type) {
                     const aura = ent.aura_type;
                     const baseRange = 240;
-                    // Scale radius slightly with strength if available
                     const strength = (ent as any).limits?.[aura] || 1;
-                    const range = baseRange * (1 + (Math.min(strength, 100) / 500));
+                    const range = baseRange * (1 + (Math.min(strength, 100) / 400));
 
                     ctx.save();
                     ctx.translate(drawX, drawY);
@@ -159,147 +158,129 @@ export const Arena: React.FC = () => {
 
                     if (aura === 'aura_damage') {
                         // 🔴 Damage Aura – “Power Ring”
-                        const pulse = (Math.sin(time * Math.PI * 2) + 1) * 0.5; // 1s loop
-                        const glowIntensity = dmgRecent ? 0.8 : 0.4;
+                        const pulse = (Math.sin(time * Math.PI * 2) + 1) * 0.5;
+                        const reactiveRange = range * (dmgRecent ? 1.1 : 1.0);
 
-                        const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
-                        grad.addColorStop(0, `rgba(139, 0, 0, ${glowIntensity})`); // Deep red
-                        grad.addColorStop(1, 'rgba(255, 69, 0, 0)'); // Orange fade
+                        const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, reactiveRange);
+                        grad.addColorStop(0, dmgRecent ? 'rgba(255, 255, 255, 0.6)' : 'rgba(139, 0, 0, 0.5)');
+                        grad.addColorStop(1, 'rgba(255, 69, 0, 0)');
                         ctx.fillStyle = grad;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, range, 0, Math.PI * 2);
-                        ctx.fill();
+                        ctx.beginPath(); ctx.arc(0, 0, reactiveRange, 0, Math.PI * 2); ctx.fill();
 
-                        // Pulsing outer ring
-                        ctx.strokeStyle = `rgba(255, 69, 0, ${0.4 + pulse * 0.4})`;
-                        ctx.lineWidth = 2 + pulse * 2;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, range * (0.8 + pulse * 0.2), 0, Math.PI * 2);
-                        ctx.stroke();
+                        ctx.strokeStyle = '#ff4500';
+                        ctx.lineWidth = 3 + pulse * 2;
+                        ctx.beginPath(); ctx.arc(0, 0, reactiveRange * (0.8 + pulse * 0.15), 0, Math.PI * 2); ctx.stroke();
 
                     } else if (aura === 'aura_gravity') {
                         // 🟣 Gravity Aura – “Warp Field”
-                        ctx.save();
                         for (let i = 0; i < 3; i++) {
-                            ctx.rotate(time * 0.5 + i);
+                            ctx.save();
+                            ctx.rotate(time * 0.8 + i);
                             ctx.beginPath();
-                            ctx.strokeStyle = `rgba(147, 51, 234, ${0.2 + Math.sin(time + i) * 0.1})`;
-                            ctx.lineWidth = 1;
-                            // Wavy distortion lines
+                            ctx.strokeStyle = `rgba(168, 85, 247, ${0.3 + Math.sin(time * 2 + i) * 0.2})`;
+                            ctx.lineWidth = 2;
                             ctx.moveTo(-range, 0);
-                            for (let x = -range; x < range; x += 10) {
-                                const y = Math.sin(x * 0.02 + time * 2) * 15;
+                            for (let x = -range; x < range; x += 15) {
+                                const y = Math.sin(x * 0.03 + time * 3) * 20;
                                 ctx.lineTo(x, y);
                             }
                             ctx.stroke();
+                            ctx.restore();
                         }
-                        ctx.restore();
 
                     } else if (aura === 'aura_corruption') {
                         // 🟢 Corruption Aura – “Decay Mist”
                         const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
-                        grad.addColorStop(0, 'rgba(0, 255, 0, 0.15)');
+                        grad.addColorStop(0, 'rgba(34, 197, 94, 0.2)');
                         grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
                         ctx.fillStyle = grad;
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
 
-                        // Upward drifting particles (simulated by time-based pos)
-                        for (let i = 0; i < 8; i++) {
-                            const angle = (i * Math.PI / 4) + time * 0.2;
-                            const dist = (range * 0.3) + ((time * 40 + i * 30) % range);
-                            const alpha = 1 - (dist / range);
-                            const flicker = Math.random() > 0.95 ? 0 : 1;
-                            ctx.fillStyle = `rgba(50, 205, 50, ${alpha * 0.5 * flicker})`;
+                        for (let i = 0; i < 10; i++) {
+                            const angle = (i * Math.PI / 5) + time * 0.5;
+                            const dist = (range * 0.2) + ((time * 60 + i * 50) % (range * 0.8));
+                            const alpha = (1 - (dist / range)) * 0.6;
+                            ctx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
                             ctx.beginPath();
-                            ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist - (time * 10 % 20), 3, 0, Math.PI * 2);
+                            ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist - (time * 15 % 30), 4, 0, Math.PI * 2);
                             ctx.fill();
                         }
 
                     } else if (aura === 'aura_execution') {
                         // 🟠 Execution Aura – “Hunter Halo”
                         let speedMult = 1.0;
-                        // Check nearby low HP enemies
                         const nearbyLowHP = state.entities.some(e =>
                             e.type === 'enemy' &&
                             Math.hypot(e.x - ent.x, e.y - ent.y) < range &&
                             e.hp < e.maxHp * 0.3
                         );
-                        if (nearbyLowHP) speedMult = 3.0;
+                        if (nearbyLowHP) speedMult = 4.0;
 
-                        ctx.rotate(time * 8 * speedMult);
-                        ctx.strokeStyle = dmgRecent ? '#fff' : '#ff8c00'; // Flash white on triggers
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, range * 0.9, 0, Math.PI * 2);
-                        ctx.stroke();
+                        ctx.rotate(time * 10 * speedMult);
+                        ctx.strokeStyle = (dmgRecent || nearbyLowHP) ? '#fff' : '#fb923c';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.arc(0, 0, range * 0.95, 0, Math.PI * 2); ctx.stroke();
 
-                        // Inner "notches"
-                        for (let i = 0; i < 4; i++) {
-                            ctx.rotate(Math.PI / 2);
-                            ctx.beginPath();
-                            ctx.moveTo(range * 0.8, 0);
-                            ctx.lineTo(range * 1.0, 0);
-                            ctx.stroke();
+                        for (let i = 0; i < 8; i++) {
+                            ctx.rotate(Math.PI / 4);
+                            ctx.beginPath(); ctx.moveTo(range * 0.85, 0); ctx.lineTo(range * 1.0, 0); ctx.stroke();
                         }
 
                     } else if (aura === 'aura_chaos') {
                         // 🌈 Chaos Aura – “Glitch Sphere”
-                        const glitch = Math.random() > 0.8;
-                        const hue = (time * 500) % 360;
-                        const rSkew = glitch ? range * (0.9 + Math.random() * 0.2) : range;
+                        const glitch = Math.random() > 0.85;
+                        const hue = (time * 600) % 360;
+                        const rSkew = range * (glitch ? (0.8 + Math.random() * 0.4) : 1.0);
 
-                        ctx.strokeStyle = `hsla(${hue}, 100%, 50%, 0.8)`;
-                        ctx.lineWidth = glitch ? 4 : 2;
-                        if (glitch) ctx.setLineDash([5, 2]);
+                        ctx.strokeStyle = `hsla(${hue}, 100%, 60%, 0.9)`;
+                        ctx.lineWidth = glitch ? 5 : 2;
+                        const jitter = (glitch ? 8 : 0);
                         ctx.beginPath();
-                        const jitter = (glitch ? 1 : 0) * 5;
                         ctx.arc((Math.random() - 0.5) * jitter, (Math.random() - 0.5) * jitter, rSkew, 0, Math.PI * 2);
                         ctx.stroke();
-                        ctx.setLineDash([]);
 
                     } else if (aura === 'aura_control') {
                         // 🔵 Control Aura – “Frozen Field”
-                        ctx.fillStyle = 'rgba(173, 216, 230, 0.1)';
+                        ctx.fillStyle = 'rgba(186, 230, 253, 0.15)';
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
 
-                        // Ripples
-                        ctx.strokeStyle = 'rgba(0, 191, 255, 0.3)';
+                        ctx.strokeStyle = 'rgba(14, 165, 233, 0.4)';
+                        ctx.lineWidth = 2;
                         for (let i = 0; i < 3; i++) {
-                            const r = ((time * 40 + i * 80) % range);
+                            const r = ((time * 50 + i * 90) % range);
                             ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
                         }
-                        // Frost edges
-                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                        ctx.lineWidth = 4;
+                        ctx.setLineDash([5, 5]);
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.stroke();
+                        ctx.setLineDash([]);
 
                     } else if (aura === 'aura_vampire') {
                         // 🩸 Vampiric Aura – “Blood Pulse”
-                        const beat = Math.pow(Math.sin(time * 3), 4); // Heartbeat curve
-                        const glow = 0.2 + beat * 0.3;
+                        const beat = Math.pow(Math.sin(time * 3.5), 6);
+                        const glow = 0.3 + beat * 0.4;
 
                         const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
-                        grad.addColorStop(0, `rgba(139, 0, 0, ${glow})`);
+                        grad.addColorStop(0, `rgba(153, 27, 27, ${glow})`);
                         grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
                         ctx.fillStyle = grad;
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
 
-                        // Inward particles
-                        for (let i = 0; i < 6; i++) {
-                            const angle = (i * Math.PI / 3) + time;
-                            const dist = range - ((time * 50 + i * 40) % range);
-                            ctx.fillStyle = '#ff0000';
-                            ctx.beginPath(); ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 2, 0, Math.PI * 2); ctx.fill();
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (i * Math.PI / 4) + time * 1.5;
+                            const dist = range - ((time * 80 + i * 60) % range);
+                            ctx.fillStyle = '#ef4444';
+                            ctx.beginPath(); ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 2.5, 0, Math.PI * 2); ctx.fill();
                         }
 
                     } else if (aura === 'aura_precision') {
                         // 🎯 Precision Aura – “Target Grid”
-                        ctx.strokeStyle = critRecent ? '#fff' : 'rgba(255, 255, 255, 0.3)';
-                        ctx.lineWidth = 1;
-                        if (critRecent) ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+                        const active = critRecent || dmgRecent;
+                        ctx.strokeStyle = active ? '#fff' : 'rgba(255, 255, 255, 0.4)';
+                        ctx.lineWidth = active ? 2 : 1;
+                        if (active) { ctx.shadowBlur = 15; ctx.shadowColor = '#fff'; }
 
-                        ctx.rotate(time * 0.1);
-                        // Faint grid
+                        ctx.rotate(time * 0.15);
                         for (let i = 0; i < 4; i++) {
                             ctx.rotate(Math.PI / 4);
                             ctx.beginPath();

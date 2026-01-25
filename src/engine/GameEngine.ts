@@ -392,10 +392,16 @@ export class GameEngine {
                 ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
                 ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
 
-                // AURA PROCESSING (Solo Mode)
-                const aura = this.playerStats.aura_type;
+                // AURA & STATS SYNC
+                const isLocal = (this.localPlayerId && ent.id === this.localPlayerId) || (!this.localPlayerId && ent.id === 'player');
+                if (isLocal) {
+                    ent.aura_type = this.playerStats.aura_type;
+                    (ent as any).limits = this.playerStats.limits;
+                }
+
+                // AURA PROCESSING
+                const aura = ent.aura_type;
                 if (aura) {
-                    ent.aura_type = aura; // Force sync for rendering
                     const range = 240;
                     this.state.entities.forEach(enemy => {
                         if (enemy.type === 'enemy') {
@@ -404,7 +410,7 @@ export class GameEngine {
                             const distSq = dx * dx + dy * dy;
                             if (distSq < range * range) {
                                 // Apply Effect based on aura type and limits
-                                const power = this.playerStats.limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+                                const power = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
                                 if (aura === 'aura_corruption') {
                                     enemy.hp -= power * dt;
                                 } else if (aura === 'aura_vampire') {
@@ -639,7 +645,7 @@ export class GameEngine {
                         // CRITICAL: Apply Damage Aura Multiplier if active
                         const shooter = this.state.entities.find(e => e.id === shooterId);
                         if (shooter && shooter.aura_type === 'aura_damage') {
-                            dmg *= (this.playerStats.limits?.['aura_damage'] || 1.2);
+                            dmg *= ((shooter as any).limits?.['aura_damage'] || 1.2);
                         }
 
                         e.hp -= dmg;
@@ -1054,21 +1060,24 @@ export class GameEngine {
                     }
                 } else {
                     // OTHERS: Soft pull towards server position to avoid jumpiness
-                    // INCREASED LERP for better responsiveness (0.2 -> 0.35)
                     const lerpFactor = 0.35;
                     nextEntities.push({
                         ...serverEnt,
+                        aura_type: serverEnt.aura_type || null, // Ensure explicit null
                         x: localEnt.x + (serverEnt.x - localEnt.x) * lerpFactor,
                         y: localEnt.y + (serverEnt.y - localEnt.y) * lerpFactor,
                         velocity: serverEnt.vx !== undefined ? { x: serverEnt.vx, y: serverEnt.vy } : serverEnt.velocity
                     });
                 }
             } else {
-                // NEW ENTITY: Spawn immediately
+                // NEW ENTITY
                 if (serverEnt.vx !== undefined) {
                     serverEnt.velocity = { x: serverEnt.vx, y: serverEnt.vy };
                 }
-                nextEntities.push(serverEnt);
+                nextEntities.push({
+                    ...serverEnt,
+                    aura_type: serverEnt.aura_type || null
+                });
             }
         });
 
