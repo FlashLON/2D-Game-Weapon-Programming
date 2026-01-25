@@ -412,6 +412,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                                                     const canAfford = userProfile.money >= upgradeCost;
                                                     const Icon = attr.icon;
 
+                                                    if (attr.isAura && userProfile.aura_type && userProfile.aura_type !== attr.id) {
+                                                        return null;
+                                                    }
+
                                                     if (!isUnlocked) return (
                                                         <div key={attr.id} className="bg-black/20 border border-cyber-muted/10 rounded-2xl p-4 opacity-50 flex items-center gap-4">
                                                             <div className="bg-cyber-muted/10 p-3 rounded-xl grayscale">
@@ -452,17 +456,6 @@ export const Lobby: React.FC<LobbyProps> = ({
 
                                                             {!isMaxed ? (
                                                                 <div className="flex gap-2">
-                                                                    {isUnlocked && userProfile.aura_type !== attr.id && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                if (onUpgrade) onUpgrade(attr.id);
-                                                                            }}
-                                                                            className="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/50 rounded-xl text-[10px] font-black hover:bg-purple-500/30 transition-all uppercase"
-                                                                        >
-                                                                            Equip
-                                                                        </button>
-                                                                    )}
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();

@@ -67,6 +67,9 @@ export interface Entity {
     aura_timer?: number; // For chaotic/random auras
     lastDealtDamageTime?: number; // Last time this entity dealt damage
     lastCritTime?: number;        // Last time this entity landed a crit
+    aura_highlight_timer?: number;
+    aura_highlight_color?: string;
+    limits?: Record<string, number>;
 }
 
 export interface DamageNumber {
@@ -394,6 +397,11 @@ export class GameEngine {
         }
 
         this.state.entities.forEach(ent => {
+            // Decay highlights
+            if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
+                ent.aura_highlight_timer -= dt;
+            }
+
             ent.x += ent.velocity.x * dt;
             ent.y += ent.velocity.y * dt;
 
@@ -417,37 +425,53 @@ export class GameEngine {
                     const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
                     const range = 240 * rangeScale;
 
-                    this.state.entities.forEach(enemy => {
-                        if (enemy.type === 'enemy') {
-                            const dx = enemy.x - ent.x;
-                            const dy = enemy.y - ent.y;
-                            const distSq = dx * dx + dy * dy;
-                            if (distSq < range * range) {
-                                // Apply Effect based on aura type and limits
-                                const power = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+                    this.state.entities.forEach(target => {
+                        // Auras affect everyone except the owner
+                        if (target.id === ent.id) return;
 
-                                if (aura === 'aura_corruption') {
-                                    enemy.hp -= power * dt;
-                                } else if (aura === 'aura_vampire') {
-                                    const siph = power * dt * 50;
-                                    enemy.hp -= siph;
-                                    ent.hp = Math.min(ent.maxHp, ent.hp + siph * 0.1);
-                                } else if (aura === 'aura_control') {
-                                    enemy.velocity.x *= power; // Power here is slow factor e.g. 0.8
-                                    enemy.velocity.y *= power;
-                                } else if (aura === 'aura_execution') {
-                                    if (enemy.hp < enemy.maxHp * 0.3) {
-                                        enemy.hp -= enemy.maxHp * 0.1 * dt; // 10% max hp per sec
-                                    }
-                                } else if (aura === 'aura_gravity') {
-                                    // PULL enemies inward
-                                    const pullX = ent.x - enemy.x;
-                                    const pullY = ent.y - enemy.y;
-                                    const dist = Math.sqrt(distSq) || 1;
-                                    const force = power * 200 / dist;
-                                    enemy.velocity.x += (pullX / dist) * force * dt;
-                                    enemy.velocity.y += (pullY / dist) * force * dt;
+                        const dx = target.x - ent.x;
+                        const dy = target.y - ent.y;
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq < range * range) {
+                            // UX Bonus: Highlights
+                            if (!target.aura_highlight_timer || target.aura_highlight_timer <= 0) {
+                                target.aura_highlight_timer = 0.2; // 200ms flash
+                                target.aura_highlight_color = ATTRIBUTES[aura]?.category === 'aura' ? '#a855f7' : '#00ff9f'; // Default or based on aura
+                                // Set specific colors based on aura type
+                                if (aura === 'aura_damage') target.aura_highlight_color = '#ff4500';
+                                else if (aura === 'aura_gravity') target.aura_highlight_color = '#a855f7';
+                                else if (aura === 'aura_corruption') target.aura_highlight_color = '#22c55e';
+                                else if (aura === 'aura_execution') target.aura_highlight_color = '#fb923c';
+                                else if (aura === 'aura_chaos') target.aura_highlight_color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                                else if (aura === 'aura_control') target.aura_highlight_color = '#0ea5e9';
+                                else if (aura === 'aura_vampire') target.aura_highlight_color = '#ef4444';
+                                else if (aura === 'aura_precision') target.aura_highlight_color = '#ffffff';
+                            }
+
+                            // Apply Effect based on aura type and limits
+                            const power = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+
+                            if (aura === 'aura_corruption') {
+                                target.hp -= power * dt;
+                            } else if (aura === 'aura_vampire') {
+                                const siph = (power * 50) * dt;
+                                target.hp -= siph;
+                                ent.hp = Math.min(ent.maxHp, ent.hp + siph * 0.1);
+                            } else if (aura === 'aura_control') {
+                                target.velocity.x *= power; // Power here is slow factor e.g. 0.8
+                                target.velocity.y *= power;
+                            } else if (aura === 'aura_execution') {
+                                if (target.hp < target.maxHp * 0.3) {
+                                    target.hp -= (target.maxHp * (power - 1)) * dt;
                                 }
+                            } else if (aura === 'aura_gravity') {
+                                // PULL enemies inward
+                                const pullX = ent.x - target.x;
+                                const pullY = ent.y - target.y;
+                                const dist = Math.sqrt(distSq) || 1;
+                                const force = power * 200 / dist;
+                                target.velocity.x += (pullX / dist) * force * dt;
+                                target.velocity.y += (pullY / dist) * force * dt;
                             }
                         }
                     });
@@ -625,9 +649,12 @@ export class GameEngine {
                         // --- PRECISION AURA: Passive Bonus ---
                         let critChanceBonus = 0;
                         let critDmgBonus = 0;
+                        let focusFireBonus = 0;
                         if (shooter && shooter.aura_type === 'aura_precision') {
-                            critChanceBonus = 15; // 15% flat bonus
-                            critDmgBonus = 0.5;   // +50% multiplier
+                            const strength = (shooter as any).limits?.['aura_precision'] || 1.1;
+                            critChanceBonus = (strength - 1) * 40; // e.g. 1.5 strength -> 20% crit bonus
+                            critDmgBonus = (strength - 1);       // e.g. 1.5 strength -> +50% crit dmg
+                            focusFireBonus = (strength - 1) * 0.5;
                         }
 
                         // 1. Critical Hits
@@ -643,8 +670,9 @@ export class GameEngine {
                         const lastHitTime = e.last_hit_by[shooterId] || 0;
                         if (now - lastHitTime < 1000) { // Hit within 1s
                             e.hit_streak[shooterId] = (e.hit_streak[shooterId] || 0) + 1;
-                            if (p.focus_fire) {
-                                dmg *= (1 + (e.hit_streak[shooterId] * p.focus_fire));
+                            const ffPower = (p.focus_fire || 0) + focusFireBonus;
+                            if (ffPower > 0) {
+                                dmg *= (1 + (e.hit_streak[shooterId] * ffPower));
                             }
                         } else {
                             e.hit_streak[shooterId] = 1;
@@ -679,7 +707,8 @@ export class GameEngine {
 
                         // CRITICAL: Apply Damage Aura Multiplier if active
                         if (shooter && shooter.aura_type === 'aura_damage') {
-                            dmg *= ((shooter as any).limits?.['aura_damage'] || 1.2);
+                            const strength = (shooter as any).limits?.['aura_damage'] || 1.1;
+                            dmg *= strength;
                         }
 
                         e.hp -= dmg;
@@ -830,11 +859,15 @@ export class GameEngine {
         const orbit_radius = params.orbit_radius ?? 60;
         // AURA EFFECTS (Shoot Time)
         if (player && player.aura_type === 'aura_chaos') {
+            const strength = player.limits?.['aura_chaos'] || 1.2;
             const chaos = Math.random();
-            if (chaos < 0.25) {
-                params.damage = (params.damage || 10) * 2;
-                params.radius = (params.radius || 5) * 2;
-                params.color = '#ff00ff';
+            if (chaos < 0.3) {
+                const type = Math.floor(Math.random() * 3);
+                if (type === 0) params.damage = (params.damage || 10) * strength;
+                else if (type === 1) params.speed = (params.speed || 300) * strength;
+                else params.radius = (params.radius || 5) * strength;
+
+                params.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
             }
         }
         const focus_fire = params.focus_fire ?? 0;

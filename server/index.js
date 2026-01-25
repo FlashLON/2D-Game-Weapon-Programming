@@ -886,13 +886,20 @@ io.on('connection', (socket) => {
 
             // --- CHAOS AURA: Random Power Boost ---
             if (player && player.aura_type === 'aura_chaos') {
+                const strength = player.limits?.['aura_chaos'] || 1.2;
                 const chaos = Math.random();
-                if (chaos < 0.25) {
+                if (chaos < 0.3) {
                     const lastProj = room.projectiles[room.projectiles.length - 1];
                     if (lastProj) {
-                        lastProj.damage *= 2;
-                        lastProj.radius *= 2;
-                        lastProj.color = '#ff00ff';
+                        const type = Math.floor(Math.random() * 3);
+                        if (type === 0) lastProj.damage *= strength;
+                        else if (type === 1) {
+                            lastProj.velocity.x *= strength;
+                            lastProj.velocity.y *= strength;
+                        }
+                        else lastProj.radius *= strength;
+
+                        lastProj.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
                     }
                 }
             }
@@ -1186,13 +1193,16 @@ setInterval(() => {
                     // --- AURAS: Server Parity ---
                     let critChanceBonus = 0;
                     let critDmgBonus = 0;
+                    let focusFireBonus = 0;
                     let damageMult = 1.0;
 
                     if (room.players[shooterId]) {
                         const shooter = room.players[shooterId];
                         if (shooter.aura_type === 'aura_precision') {
-                            critChanceBonus = 15;
-                            critDmgBonus = 0.5;
+                            const strength = shooter.limits?.['aura_precision'] || 1.1;
+                            critChanceBonus = (strength - 1) * 40;
+                            critDmgBonus = (strength - 1);
+                            focusFireBonus = (strength - 1) * 0.5;
                         }
                         if (shooter.aura_type === 'aura_damage') {
                             damageMult = shooter.limits?.['aura_damage'] || 1.1;
@@ -1214,8 +1224,9 @@ setInterval(() => {
                     const lastHitTime = ent.last_hit_by[shooterId] || 0;
                     if (now - lastHitTime < 1000) {
                         ent.hit_streak[shooterId] = (ent.hit_streak[shooterId] || 0) + 1;
-                        if (proj.focus_fire) {
-                            dmg *= (1 + (ent.hit_streak[shooterId] * proj.focus_fire));
+                        const ffPower = (proj.focus_fire || 0) + focusFireBonus;
+                        if (ffPower > 0) {
+                            dmg *= (1 + (ent.hit_streak[shooterId] * ffPower));
                         }
                     } else {
                         ent.hit_streak[shooterId] = 1;
@@ -1462,34 +1473,60 @@ setInterval(() => {
                 const aura = p.aura_type;
                 if (!aura) return;
 
-                const dist = Math.sqrt((ent.x - p.x) ** 2 + (ent.y - p.y) ** 2);
+                // Identify all potential targets (players and enemies)
+                const targets = [...Object.values(room.players), ...room.enemies];
 
-                const strength = p.limits?.[aura] || 1;
-                const baseRange = 240;
-                // Match client scaling logic
-                const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / 1.1) - 1) * 0.5);
-                const range = baseRange * rangeScale;
+                targets.forEach(target => {
+                    if (target.id === p.id) return; // Don't affect self
 
-                if (dist < range) {
-                    if (aura === 'aura_corruption') ent.hp -= (strength * dt);
-                    else if (aura === 'aura_execution') {
-                        if (ent.hp < ent.maxHp * 0.3) ent.hp -= (ent.maxHp * 0.1 * dt);
-                    } else if (aura === 'aura_control') {
-                        ent.velocity.x *= strength;
-                        ent.velocity.y *= strength;
-                    } else if (aura === 'aura_vampire') {
-                        const siph = strength * dt * 50;
-                        ent.hp -= siph;
-                        p.hp = Math.min(p.maxHp, p.hp + siph * 0.1);
-                    } else if (aura === 'aura_gravity') {
-                        // PULL enemies inward
-                        const pullX = p.x - ent.x;
-                        const pullY = p.y - ent.y;
-                        const force = strength * 200 / (dist || 1);
-                        ent.velocity.x += (pullX / (dist || 1)) * force * dt;
-                        ent.velocity.y += (pullY / (dist || 1)) * force * dt;
+                    const distSq = (target.x - p.x) ** 2 + (target.y - p.y) ** 2;
+                    const strength = p.limits?.[aura] || 1;
+                    const baseRange = 240;
+                    // Match client scaling logic (1.1 is the default startLimit of aura_damage usually, 
+                    // but for general aura processing we use a consistent base or retrieve it)
+                    const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / 1.1) - 1) * 0.5);
+                    const range = baseRange * rangeScale;
+
+                    if (distSq < range * range) {
+                        const dist = Math.sqrt(distSq);
+
+                        // UX Bonus: Highlights (Decayed by client, but triggered here for sync)
+                        if (!target.aura_highlight_timer || target.aura_highlight_timer <= 0) {
+                            target.aura_highlight_timer = 0.2;
+                            // Color mapping (Synchronized with client)
+                            const colors = {
+                                aura_damage: '#ff4500',
+                                aura_gravity: '#a855f7',
+                                aura_corruption: '#22c55e',
+                                aura_execution: '#fb923c',
+                                aura_chaos: '#ff00ff',
+                                aura_control: '#0ea5e9',
+                                aura_vampire: '#ef4444',
+                                aura_precision: '#ffffff'
+                            };
+                            target.aura_highlight_color = colors[aura] || '#fff';
+                        }
+
+                        // Apply Gameplay Effects
+                        if (aura === 'aura_corruption') target.hp -= (strength * dt);
+                        else if (aura === 'aura_execution') {
+                            if (target.hp < target.maxHp * 0.3) target.hp -= (target.maxHp * (strength - 1) * dt);
+                        } else if (aura === 'aura_control') {
+                            target.velocity.x *= (1 - (1 - strength) * dt * 10); // Smoother slow
+                            target.velocity.y *= (1 - (1 - strength) * dt * 10);
+                        } else if (aura === 'aura_vampire') {
+                            const siph = strength * dt * 50;
+                            target.hp -= siph;
+                            p.hp = Math.min(p.maxHp, p.hp + siph * 0.1);
+                        } else if (aura === 'aura_gravity') {
+                            const pullX = p.x - target.x;
+                            const pullY = p.y - target.y;
+                            const force = strength * 200 / (dist || 1);
+                            target.velocity.x += (pullX / (dist || 1)) * force * dt;
+                            target.velocity.y += (pullY / (dist || 1)) * force * dt;
+                        }
                     }
-                }
+                });
             });
 
             if (ent.hp <= 0) {

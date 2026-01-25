@@ -345,6 +345,25 @@ export const Arena: React.FC = () => {
                 if (ent.type !== 'projectile') {
                     ctx.shadowBlur = 10;
                     ctx.shadowColor = drawColor;
+
+                    // UX BONUS: Aura Entry Highlight
+                    if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
+                        ctx.save();
+                        ctx.strokeStyle = ent.aura_highlight_color || '#fff';
+                        ctx.lineWidth = 3;
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = ent.aura_highlight_color || '#fff';
+                        ctx.beginPath();
+                        ctx.arc(drawX, drawY, ent.radius + 4, 0, Math.PI * 2);
+                        ctx.stroke();
+
+                        // Color Flash
+                        const alpha = Math.min(1, ent.aura_highlight_timer * 5);
+                        ctx.fillStyle = ent.aura_highlight_color || '#fff';
+                        ctx.globalAlpha = alpha * 0.4;
+                        ctx.fill();
+                        ctx.restore();
+                    }
                 }
 
                 ctx.fill();
