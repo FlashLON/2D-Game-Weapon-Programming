@@ -883,6 +883,19 @@ io.on('connection', (socket) => {
                 maxLifetime: data.lifetime || 5,
                 radius: data.radius || 5
             });
+
+            // --- CHAOS AURA: Random Power Boost ---
+            if (player && player.aura_type === 'aura_chaos') {
+                const chaos = Math.random();
+                if (chaos < 0.25) {
+                    const lastProj = room.projectiles[room.projectiles.length - 1];
+                    if (lastProj) {
+                        lastProj.damage *= 2;
+                        lastProj.radius *= 2;
+                        lastProj.color = '#ff00ff';
+                    }
+                }
+            }
         }
     });
 
@@ -1170,11 +1183,32 @@ setInterval(() => {
                     if (!ent.active_dots) ent.active_dots = [];
                     if (ent.armor_reduction === undefined) ent.armor_reduction = 0;
 
+                    // --- AURAS: Server Parity ---
+                    let critChanceBonus = 0;
+                    let critDmgBonus = 0;
+                    let damageMult = 1.0;
+
+                    if (room.players[shooterId]) {
+                        const shooter = room.players[shooterId];
+                        if (shooter.aura_type === 'aura_precision') {
+                            critChanceBonus = 15;
+                            critDmgBonus = 0.5;
+                        }
+                        if (shooter.aura_type === 'aura_damage') {
+                            damageMult = shooter.limits?.['aura_damage'] || 1.1;
+                        }
+                    }
+
                     // 1. Critical Hits
-                    if (proj.crit_chance && Math.random() * 100 < proj.crit_chance) {
-                        dmg *= (proj.crit_damage || 2.0);
+                    const finalCritChance = (proj.crit_chance || 0) + critChanceBonus;
+                    const isCrit = Math.random() * 100 < finalCritChance;
+
+                    if (isCrit) {
+                        dmg *= ((proj.crit_damage || 2.0) + critDmgBonus);
                         io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ffffff', strength: 5, radius: 20 });
                     }
+
+                    dmg *= damageMult;
 
                     // 2. Focus Fire
                     const lastHitTime = ent.last_hit_by[shooterId] || 0;
@@ -1429,19 +1463,31 @@ setInterval(() => {
                 if (!aura) return;
 
                 const dist = Math.sqrt((ent.x - p.x) ** 2 + (ent.y - p.y) ** 2);
-                if (dist < 240) {
-                    const power = p.limits?.[aura] || 1;
-                    if (aura === 'aura_corruption') ent.hp -= (power * dt);
+
+                const strength = p.limits?.[aura] || 1;
+                const baseRange = 240;
+                // Match client scaling logic
+                const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / 1.1) - 1) * 0.5);
+                const range = baseRange * rangeScale;
+
+                if (dist < range) {
+                    if (aura === 'aura_corruption') ent.hp -= (strength * dt);
                     else if (aura === 'aura_execution') {
                         if (ent.hp < ent.maxHp * 0.3) ent.hp -= (ent.maxHp * 0.1 * dt);
                     } else if (aura === 'aura_control') {
-                        // Slow down (Power is slow factor e.g. 0.8)
-                        ent.velocity.x *= power;
-                        ent.velocity.y *= power;
+                        ent.velocity.x *= strength;
+                        ent.velocity.y *= strength;
                     } else if (aura === 'aura_vampire') {
-                        const siph = power * dt * 50;
+                        const siph = strength * dt * 50;
                         ent.hp -= siph;
                         p.hp = Math.min(p.maxHp, p.hp + siph * 0.1);
+                    } else if (aura === 'aura_gravity') {
+                        // PULL enemies inward
+                        const pullX = p.x - ent.x;
+                        const pullY = p.y - ent.y;
+                        const force = strength * 200 / (dist || 1);
+                        ent.velocity.x += (pullX / (dist || 1)) * force * dt;
+                        ent.velocity.y += (pullY / (dist || 1)) * force * dt;
                     }
                 }
             });

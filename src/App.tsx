@@ -129,9 +129,9 @@ function App() {
       const newLimits = { ...prev.limits, [attributeId]: value };
 
       let newAura = prev.aura_type;
-      if (isNewUnlock && ATTRIBUTES[attributeId]?.isAura) {
+      if (ATTRIBUTES[attributeId]?.isAura) {
         newAura = attributeId;
-        addLog(`AURA SYNCED: Selected ${ATTRIBUTES[attributeId].name}!`, 'success');
+        addLog(`AURA EQUIPPED: ${ATTRIBUTES[attributeId].name}!`, 'success');
       }
 
       return {
@@ -178,6 +178,7 @@ function App() {
         ...prev.limits,
         [attributeId]: newLimit
       },
+      aura_type: attr.isAura ? attributeId : prev.aura_type,
       lastUpgradeLevel: {
         ...(prev.lastUpgradeLevel || {}),
         [attributeId]: prev.level

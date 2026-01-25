@@ -451,18 +451,31 @@ export const Lobby: React.FC<LobbyProps> = ({
                                                             </div>
 
                                                             {!isMaxed ? (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        onUpgrade?.(attr.id);
-                                                                    }}
-                                                                    disabled={!canAfford}
-                                                                    className={`w-full py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-cyber-accent text-black hover:bg-emerald-400 active:scale-[0.98]' : 'bg-white/5 text-cyber-muted cursor-not-allowed grayscale'}`}
-                                                                >
-                                                                    <TrendingUp size={14} />
-                                                                    Upgrade Limit
-                                                                    <span className="ml-auto opacity-70 tracking-widest">${upgradeCost.toLocaleString()}</span>
-                                                                </button>
+                                                                <div className="flex gap-2">
+                                                                    {isUnlocked && userProfile.aura_type !== attr.id && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                if (onUpgrade) onUpgrade(attr.id);
+                                                                            }}
+                                                                            className="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/50 rounded-xl text-[10px] font-black hover:bg-purple-500/30 transition-all uppercase"
+                                                                        >
+                                                                            Equip
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (onUpgrade) onUpgrade(attr.id);
+                                                                        }}
+                                                                        disabled={!canAfford}
+                                                                        className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-cyber-accent text-black hover:bg-emerald-400 active:scale-[0.98]' : 'bg-white/5 text-cyber-muted cursor-not-allowed grayscale'}`}
+                                                                    >
+                                                                        <TrendingUp size={14} />
+                                                                        Upgrade Limit
+                                                                        <span className="ml-auto opacity-70 tracking-widest">${upgradeCost.toLocaleString()}</span>
+                                                                    </button>
+                                                                </div>
                                                             ) : (
                                                                 <div className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-black text-[10px] uppercase text-center flex items-center justify-center gap-2">
                                                                     <CheckCircle2 size={14} /> Neural Overload Reached

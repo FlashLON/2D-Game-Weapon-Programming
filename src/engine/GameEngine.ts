@@ -412,7 +412,11 @@ export class GameEngine {
                 // AURA PROCESSING
                 const aura = ent.aura_type;
                 if (aura) {
-                    const range = 240;
+                    const strength = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+                    const startLimit = ATTRIBUTES[aura]?.startLimit || 1;
+                    const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
+                    const range = 240 * rangeScale;
+
                     this.state.entities.forEach(enemy => {
                         if (enemy.type === 'enemy') {
                             const dx = enemy.x - ent.x;
@@ -421,6 +425,7 @@ export class GameEngine {
                             if (distSq < range * range) {
                                 // Apply Effect based on aura type and limits
                                 const power = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+
                                 if (aura === 'aura_corruption') {
                                     enemy.hp -= power * dt;
                                 } else if (aura === 'aura_vampire') {
@@ -434,6 +439,14 @@ export class GameEngine {
                                     if (enemy.hp < enemy.maxHp * 0.3) {
                                         enemy.hp -= enemy.maxHp * 0.1 * dt; // 10% max hp per sec
                                     }
+                                } else if (aura === 'aura_gravity') {
+                                    // PULL enemies inward
+                                    const pullX = ent.x - enemy.x;
+                                    const pullY = ent.y - enemy.y;
+                                    const dist = Math.sqrt(distSq) || 1;
+                                    const force = power * 200 / dist;
+                                    enemy.velocity.x += (pullX / dist) * force * dt;
+                                    enemy.velocity.y += (pullY / dist) * force * dt;
                                 }
                             }
                         }
@@ -601,6 +614,7 @@ export class GameEngine {
                         let dmg = p.damage || 10;
                         const now = Date.now();
                         const shooterId = p.playerId || 'unknown';
+                        const shooter = this.state.entities.find(e => e.id === shooterId);
 
                         // Initialize target fields
                         if (!e.last_hit_by) e.last_hit_by = {};
@@ -608,9 +622,20 @@ export class GameEngine {
                         if (!e.active_dots) e.active_dots = [];
                         if (e.armor_reduction === undefined) e.armor_reduction = 0;
 
+                        // --- PRECISION AURA: Passive Bonus ---
+                        let critChanceBonus = 0;
+                        let critDmgBonus = 0;
+                        if (shooter && shooter.aura_type === 'aura_precision') {
+                            critChanceBonus = 15; // 15% flat bonus
+                            critDmgBonus = 0.5;   // +50% multiplier
+                        }
+
                         // 1. Critical Hits
-                        if (p.crit_chance && Math.random() * 100 < p.crit_chance) {
-                            dmg *= (p.crit_damage || 2.0);
+                        const finalCritChance = (p.crit_chance || 0) + critChanceBonus;
+                        const isCrit = Math.random() * 100 < finalCritChance;
+
+                        if (isCrit) {
+                            dmg *= ((p.crit_damage || 2.0) + critDmgBonus);
                             this.spawnParticles(e.x, e.y, '#ffffff', 5); // Crit visual
                         }
 
@@ -653,13 +678,11 @@ export class GameEngine {
                         }
 
                         // CRITICAL: Apply Damage Aura Multiplier if active
-                        const shooter = this.state.entities.find(e => e.id === shooterId);
                         if (shooter && shooter.aura_type === 'aura_damage') {
                             dmg *= ((shooter as any).limits?.['aura_damage'] || 1.2);
                         }
 
                         e.hp -= dmg;
-                        const isCrit = (p.crit_chance && Math.random() * 100 < p.crit_chance);
                         this.addDamageNumber(e.x, e.y, Math.round(dmg), isCrit ? '#ffcc00' : '#ff0055');
 
                         if (shooter) {
@@ -805,7 +828,15 @@ export class GameEngine {
         const chain_range = params.chain_range ?? 0;
         const orbit_speed = params.orbit_speed ?? 3.0;
         const orbit_radius = params.orbit_radius ?? 60;
-        // NEW COMBAT VALS
+        // AURA EFFECTS (Shoot Time)
+        if (player && player.aura_type === 'aura_chaos') {
+            const chaos = Math.random();
+            if (chaos < 0.25) {
+                params.damage = (params.damage || 10) * 2;
+                params.radius = (params.radius || 5) * 2;
+                params.color = '#ff00ff';
+            }
+        }
         const focus_fire = params.focus_fire ?? 0;
         const burst_damage = params.burst_damage ?? 0;
         const execution_damage = params.execution_damage ?? 0;
