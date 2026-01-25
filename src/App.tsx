@@ -117,7 +117,8 @@ function App() {
   const handleProfileUpdate = (newProfile: any) => {
     setUserProfile((prev: any) => ({
       ...prev,
-      ...newProfile
+      ...newProfile,
+      aura_type: newProfile.aura_type !== undefined ? newProfile.aura_type : prev.aura_type
     }));
   };
 
@@ -137,7 +138,7 @@ function App() {
         ...prev,
         unlocks: newUnlocks,
         limits: newLimits,
-        aura_type: newAura
+        aura_type: newAura || null
       };
     });
 
@@ -525,7 +526,17 @@ function App() {
       setUsername(name);
       console.log('[DEBUG] Login profile received:', res.profile);
       console.log('[DEBUG] Titles:', res.profile?.titles);
-      setUserProfile(res.profile);
+
+      const mergedProfile = {
+        level: 1, xp: 0, maxXp: 100, money: 0,
+        unlocks: ['speed', 'damage', 'hp', 'cooldown'],
+        limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
+        lastUpgradeLevel: {}, titles: [], equippedTitle: null, killCount: 0,
+        aura_type: null,
+        ...res.profile
+      };
+
+      setUserProfile(mergedProfile);
       setIsLoggedIn(true);
       setStatus("Ready");
       // Load saved codes after login
@@ -555,7 +566,15 @@ function App() {
     if (res.success) {
       addLog("Account Created! Welcome.", "success");
       setUsername(name);
-      setUserProfile(res.profile);
+      const mergedProfile = {
+        level: 1, xp: 0, maxXp: 100, money: 0,
+        unlocks: ['speed', 'damage', 'hp', 'cooldown'],
+        limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
+        lastUpgradeLevel: {}, titles: [], equippedTitle: null, killCount: 0,
+        aura_type: null,
+        ...res.profile
+      };
+      setUserProfile(mergedProfile);
       setIsLoggedIn(true);
       setStatus("Ready");
       // Load saved codes after signup

@@ -156,29 +156,41 @@ export const Arena: React.FC = () => {
                     const dmgRecent = (nowMs - lastDmg) < 300;
                     const critRecent = (nowMs - lastCrit) < 300;
 
+                    // MANDATORY BASE GLOW (Ensure it's never invisible)
+                    const baseGlow = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
+                    baseGlow.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+                    baseGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = baseGlow;
+                    ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
+
                     if (aura === 'aura_damage') {
                         // 🔴 Damage Aura – “Power Ring”
                         const pulse = (Math.sin(time * Math.PI * 2) + 1) * 0.5;
                         const reactiveRange = range * (dmgRecent ? 1.1 : 1.0);
 
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = '#ff0000';
                         const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, reactiveRange);
-                        grad.addColorStop(0, dmgRecent ? 'rgba(255, 255, 255, 0.6)' : 'rgba(139, 0, 0, 0.5)');
+                        grad.addColorStop(0, dmgRecent ? 'rgba(255, 255, 255, 0.8)' : 'rgba(220, 38, 38, 0.6)');
                         grad.addColorStop(1, 'rgba(255, 69, 0, 0)');
                         ctx.fillStyle = grad;
                         ctx.beginPath(); ctx.arc(0, 0, reactiveRange, 0, Math.PI * 2); ctx.fill();
 
                         ctx.strokeStyle = '#ff4500';
-                        ctx.lineWidth = 3 + pulse * 2;
+                        ctx.lineWidth = 4 + pulse * 2;
                         ctx.beginPath(); ctx.arc(0, 0, reactiveRange * (0.8 + pulse * 0.15), 0, Math.PI * 2); ctx.stroke();
+                        ctx.shadowBlur = 0;
 
                     } else if (aura === 'aura_gravity') {
                         // 🟣 Gravity Aura – “Warp Field”
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = '#a855f7';
                         for (let i = 0; i < 3; i++) {
                             ctx.save();
                             ctx.rotate(time * 0.8 + i);
                             ctx.beginPath();
-                            ctx.strokeStyle = `rgba(168, 85, 247, ${0.3 + Math.sin(time * 2 + i) * 0.2})`;
-                            ctx.lineWidth = 2;
+                            ctx.strokeStyle = `rgba(168, 85, 247, ${0.5 + Math.sin(time * 2 + i) * 0.3})`;
+                            ctx.lineWidth = 3;
                             ctx.moveTo(-range, 0);
                             for (let x = -range; x < range; x += 15) {
                                 const y = Math.sin(x * 0.03 + time * 3) * 20;
@@ -187,22 +199,23 @@ export const Arena: React.FC = () => {
                             ctx.stroke();
                             ctx.restore();
                         }
+                        ctx.shadowBlur = 0;
 
                     } else if (aura === 'aura_corruption') {
                         // 🟢 Corruption Aura – “Decay Mist”
                         const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
-                        grad.addColorStop(0, 'rgba(34, 197, 94, 0.2)');
+                        grad.addColorStop(0, 'rgba(34, 197, 94, 0.4)');
                         grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
                         ctx.fillStyle = grad;
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
 
-                        for (let i = 0; i < 10; i++) {
-                            const angle = (i * Math.PI / 5) + time * 0.5;
-                            const dist = (range * 0.2) + ((time * 60 + i * 50) % (range * 0.8));
-                            const alpha = (1 - (dist / range)) * 0.6;
-                            ctx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
+                        for (let i = 0; i < 12; i++) {
+                            const angle = (i * Math.PI / 6) + time * 0.5;
+                            const dist = (range * 0.2) + ((time * 70 + i * 40) % (range * 0.8));
+                            const alpha = (1 - (dist / range)) * 0.8;
+                            ctx.fillStyle = `rgba(132, 204, 22, ${alpha})`;
                             ctx.beginPath();
-                            ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist - (time * 15 % 30), 4, 0, Math.PI * 2);
+                            ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist - (time * 15 % 30), 5, 0, Math.PI * 2);
                             ctx.fill();
                         }
 
@@ -214,73 +227,82 @@ export const Arena: React.FC = () => {
                             Math.hypot(e.x - ent.x, e.y - ent.y) < range &&
                             e.hp < e.maxHp * 0.3
                         );
-                        if (nearbyLowHP) speedMult = 4.0;
+                        if (nearbyLowHP) speedMult = 5.0;
 
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = (dmgRecent || nearbyLowHP) ? '#fff' : '#fb923c';
                         ctx.rotate(time * 10 * speedMult);
                         ctx.strokeStyle = (dmgRecent || nearbyLowHP) ? '#fff' : '#fb923c';
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 4;
                         ctx.beginPath(); ctx.arc(0, 0, range * 0.95, 0, Math.PI * 2); ctx.stroke();
 
                         for (let i = 0; i < 8; i++) {
                             ctx.rotate(Math.PI / 4);
                             ctx.beginPath(); ctx.moveTo(range * 0.85, 0); ctx.lineTo(range * 1.0, 0); ctx.stroke();
                         }
+                        ctx.shadowBlur = 0;
 
                     } else if (aura === 'aura_chaos') {
                         // 🌈 Chaos Aura – “Glitch Sphere”
-                        const glitch = Math.random() > 0.85;
-                        const hue = (time * 600) % 360;
-                        const rSkew = range * (glitch ? (0.8 + Math.random() * 0.4) : 1.0);
+                        const glitch = Math.random() > 0.8;
+                        const hue = (time * 800) % 360;
+                        const rSkew = range * (glitch ? (0.7 + Math.random() * 0.6) : 1.0);
 
-                        ctx.strokeStyle = `hsla(${hue}, 100%, 60%, 0.9)`;
-                        ctx.lineWidth = glitch ? 5 : 2;
-                        const jitter = (glitch ? 8 : 0);
+                        ctx.shadowBlur = glitch ? 30 : 10;
+                        ctx.shadowColor = `hsla(${hue}, 100%, 50%, 1)`;
+                        ctx.strokeStyle = `hsla(${hue}, 100%, 70%, 1.0)`;
+                        ctx.lineWidth = glitch ? 6 : 3;
+                        const jitter = (glitch ? 12 : 0);
                         ctx.beginPath();
                         ctx.arc((Math.random() - 0.5) * jitter, (Math.random() - 0.5) * jitter, rSkew, 0, Math.PI * 2);
                         ctx.stroke();
+                        ctx.shadowBlur = 0;
 
                     } else if (aura === 'aura_control') {
                         // 🔵 Control Aura – “Frozen Field”
-                        ctx.fillStyle = 'rgba(186, 230, 253, 0.15)';
+                        ctx.fillStyle = 'rgba(186, 230, 253, 0.3)';
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
 
-                        ctx.strokeStyle = 'rgba(14, 165, 233, 0.4)';
-                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = 'rgba(14, 165, 233, 0.7)';
+                        ctx.lineWidth = 3;
                         for (let i = 0; i < 3; i++) {
-                            const r = ((time * 50 + i * 90) % range);
+                            const r = ((time * 60 + i * 100) % range);
                             ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
                         }
-                        ctx.setLineDash([5, 5]);
-                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                        ctx.setLineDash([8, 8]);
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.stroke();
                         ctx.setLineDash([]);
 
                     } else if (aura === 'aura_vampire') {
                         // 🩸 Vampiric Aura – “Blood Pulse”
-                        const beat = Math.pow(Math.sin(time * 3.5), 6);
-                        const glow = 0.3 + beat * 0.4;
+                        const beat = Math.pow(Math.sin(time * 4), 6);
+                        const glow = 0.4 + beat * 0.5;
 
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = '#ff0000';
                         const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
                         grad.addColorStop(0, `rgba(153, 27, 27, ${glow})`);
                         grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
                         ctx.fillStyle = grad;
                         ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
 
-                        for (let i = 0; i < 8; i++) {
-                            const angle = (i * Math.PI / 4) + time * 1.5;
-                            const dist = range - ((time * 80 + i * 60) % range);
+                        for (let i = 0; i < 12; i++) {
+                            const angle = (i * Math.PI / 6) + time * 2;
+                            const dist = range - ((time * 100 + i * 60) % range);
                             ctx.fillStyle = '#ef4444';
-                            ctx.beginPath(); ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 2.5, 0, Math.PI * 2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 3, 0, Math.PI * 2); ctx.fill();
                         }
+                        ctx.shadowBlur = 0;
 
                     } else if (aura === 'aura_precision') {
                         // 🎯 Precision Aura – “Target Grid”
                         const active = critRecent || dmgRecent;
-                        ctx.strokeStyle = active ? '#fff' : 'rgba(255, 255, 255, 0.4)';
-                        ctx.lineWidth = active ? 2 : 1;
-                        if (active) { ctx.shadowBlur = 15; ctx.shadowColor = '#fff'; }
+                        ctx.strokeStyle = active ? '#fff' : 'rgba(255, 255, 255, 0.7)';
+                        ctx.lineWidth = active ? 3 : 1.5;
+                        if (active) { ctx.shadowBlur = 20; ctx.shadowColor = '#fff'; }
 
-                        ctx.rotate(time * 0.15);
+                        ctx.rotate(time * 0.2);
                         for (let i = 0; i < 4; i++) {
                             ctx.rotate(Math.PI / 4);
                             ctx.beginPath();
