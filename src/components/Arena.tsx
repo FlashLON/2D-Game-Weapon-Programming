@@ -133,299 +133,216 @@ export const Arena: React.FC = () => {
             ctx.globalAlpha = 1.0;
 
             // 3. Draw all Entities (Players, Enemies, Projectiles)
-            [...state.entities, ...state.projectiles].forEach(ent => {
-                // Skip dead entities (moved off-screen)
-                if (ent.x < -1000) return;
+            [...state.entities, ...state.projectiles].forEach((ent) => {
+                if (ent.x < -1000) return; // Skip dead
 
-                // CRITICAL FIX: Reset rendering state for each entity
+                // --- RESET RENDER STATE ---
                 ctx.globalAlpha = 1.0;
                 ctx.shadowBlur = 0;
                 ctx.shadowColor = 'transparent';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([]);
+                ctx.textAlign = 'center';
 
                 const drawX = ent.renderX ?? ent.x;
                 const drawY = ent.renderY ?? ent.y;
                 const time = performance.now() / 1000;
+                const radius = ent.radius || 5;
 
-                // --- AURA RENDERING (For Players) ---
+                // --- 1. AURA RENDERING (Bottom Layer) ---
                 if (ent.type === 'player' && ent.aura_type) {
-                    const aura = ent.aura_type;
-                    const attrDef = ATTRIBUTES[aura];
-                    if (!attrDef) return; // Skip if aura definition is missing
+                    const attrDef = ATTRIBUTES[ent.aura_type];
+                    if (attrDef) {
+                        const strength = (ent as any).limits?.[ent.aura_type] || attrDef.startLimit || 1;
+                        const startLimit = attrDef.startLimit || 1;
+                        const scaleFactor = Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
+                        const range = 240 * (1 + scaleFactor);
 
-                    const baseRange = 240;
-                    const strength = (ent as any).limits?.[aura] || attrDef.startLimit || 1;
-                    const startLimit = attrDef.startLimit || 1;
-                    // Scale radius: +5% per 10% increase over base, max +30%
-                    const scaleFactor = Math.min(0.3, Math.max(0, (strength / (startLimit || 1)) - 1) * 0.5);
-                    const range = baseRange * (1 + scaleFactor);
-
-                    ctx.save();
-                    ctx.translate(drawX, drawY);
-
-                    const nowMs = Date.now();
-                    const lastDmg = (ent as any).lastDealtDamageTime || 0;
-                    const lastCrit = (ent as any).lastCritTime || 0;
-                    const dmgRecent = (nowMs - lastDmg) < 300;
-                    const critRecent = (nowMs - lastCrit) < 300;
-
-                    // MANDATORY BASE GLOW (Ensure it's never invisible)
-                    const baseGlow = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
-                    baseGlow.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
-                    baseGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                    ctx.fillStyle = baseGlow;
-                    ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
-
-                    if (aura === 'aura_damage') {
-                        // 🔴 Damage Aura – “Power Ring”
-                        const pulse = (Math.sin(time * Math.PI * 2) + 1) * 0.5;
-                        const reactiveRange = range * (dmgRecent ? 1.1 : 1.0);
-
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = '#ff0000';
-                        const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, reactiveRange);
-                        grad.addColorStop(0, dmgRecent ? 'rgba(255, 255, 255, 0.8)' : 'rgba(220, 38, 38, 0.6)');
-                        grad.addColorStop(1, 'rgba(255, 69, 0, 0)');
-                        ctx.fillStyle = grad;
-                        ctx.beginPath(); ctx.arc(0, 0, reactiveRange, 0, Math.PI * 2); ctx.fill();
-
-                        ctx.strokeStyle = '#ff4500';
-                        ctx.lineWidth = 4 + pulse * 2;
-                        ctx.beginPath(); ctx.arc(0, 0, reactiveRange * (0.8 + pulse * 0.15), 0, Math.PI * 2); ctx.stroke();
-                        ctx.shadowBlur = 0;
-
-                    } else if (aura === 'aura_gravity') {
-                        // 🟣 Gravity Aura – “Warp Field”
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = '#a855f7';
-                        for (let i = 0; i < 3; i++) {
-                            ctx.save();
-                            ctx.rotate(time * 0.8 + i);
-                            ctx.beginPath();
-                            ctx.strokeStyle = `rgba(168, 85, 247, ${0.5 + Math.sin(time * 2 + i) * 0.3})`;
-                            ctx.lineWidth = 3;
-                            ctx.moveTo(-range, 0);
-                            for (let x = -range; x < range; x += 15) {
-                                const y = Math.sin(x * 0.03 + time * 3) * 20;
-                                ctx.lineTo(x, y);
-                            }
-                            ctx.stroke();
-                            ctx.restore();
-                        }
-                        ctx.shadowBlur = 0;
-
-                    } else if (aura === 'aura_corruption') {
-                        // 🟢 Corruption Aura – “Decay Mist”
-                        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
-                        grad.addColorStop(0, 'rgba(34, 197, 94, 0.4)');
-                        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                        ctx.fillStyle = grad;
-                        ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
-
-                        for (let i = 0; i < 12; i++) {
-                            const angle = (i * Math.PI / 6) + time * 0.5;
-                            const dist = (range * 0.2) + ((time * 70 + i * 40) % (range * 0.8));
-                            const alpha = (1 - (dist / range)) * 0.8;
-                            ctx.fillStyle = `rgba(132, 204, 22, ${alpha})`;
-                            ctx.beginPath();
-                            ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist - (time * 15 % 30), 5, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
-
-                    } else if (aura === 'aura_execution') {
-                        // 🟠 Execution Aura – “Hunter Halo”
-                        let speedMult = 1.0;
-                        const nearbyLowHP = state.entities.some(e =>
-                            e.type === 'enemy' &&
-                            Math.hypot(e.x - ent.x, e.y - ent.y) < range &&
-                            e.hp < e.maxHp * 0.3
-                        );
-                        if (nearbyLowHP) speedMult = 5.0;
-
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = (dmgRecent || nearbyLowHP) ? '#fff' : '#fb923c';
-                        ctx.rotate(time * 10 * speedMult);
-                        ctx.strokeStyle = (dmgRecent || nearbyLowHP) ? '#fff' : '#fb923c';
-                        ctx.lineWidth = 4;
-                        ctx.beginPath(); ctx.arc(0, 0, range * 0.95, 0, Math.PI * 2); ctx.stroke();
-
-                        for (let i = 0; i < 8; i++) {
-                            ctx.rotate(Math.PI / 4);
-                            ctx.beginPath(); ctx.moveTo(range * 0.85, 0); ctx.lineTo(range * 1.0, 0); ctx.stroke();
-                        }
-                        ctx.shadowBlur = 0;
-
-                    } else if (aura === 'aura_chaos') {
-                        // 🌈 Chaos Aura – “Glitch Sphere”
-                        const glitch = Math.random() > 0.8;
-                        const hue = (time * 800) % 360;
-                        const rSkew = range * (glitch ? (0.7 + Math.random() * 0.6) : 1.0);
-
-                        ctx.shadowBlur = glitch ? 30 : 10;
-                        ctx.shadowColor = `hsla(${hue}, 100%, 50%, 1)`;
-                        ctx.strokeStyle = `hsla(${hue}, 100%, 70%, 1.0)`;
-                        ctx.lineWidth = glitch ? 6 : 3;
-                        const jitter = (glitch ? 12 : 0);
-                        ctx.beginPath();
-                        ctx.arc((Math.random() - 0.5) * jitter, (Math.random() - 0.5) * jitter, rSkew, 0, Math.PI * 2);
-                        ctx.stroke();
-                        ctx.shadowBlur = 0;
-
-                    } else if (aura === 'aura_control') {
-                        // 🔵 Control Aura – “Frozen Field”
-                        ctx.fillStyle = 'rgba(186, 230, 253, 0.3)';
-                        ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
-
-                        ctx.strokeStyle = 'rgba(14, 165, 233, 0.7)';
-                        ctx.lineWidth = 3;
-                        for (let i = 0; i < 3; i++) {
-                            const r = ((time * 60 + i * 100) % range);
-                            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-                        }
-                        ctx.setLineDash([8, 8]);
-                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-                        ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.stroke();
-                        ctx.setLineDash([]);
-
-                    } else if (aura === 'aura_vampire') {
-                        // 🩸 Vampiric Aura – “Blood Pulse”
-                        const beat = Math.pow(Math.sin(time * 4), 6);
-                        const glow = 0.4 + beat * 0.5;
-
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = '#ff0000';
-                        const grad = ctx.createRadialGradient(0, 0, ent.radius, 0, 0, range);
-                        grad.addColorStop(0, `rgba(153, 27, 27, ${glow})`);
-                        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                        ctx.fillStyle = grad;
-                        ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
-
-                        for (let i = 0; i < 12; i++) {
-                            const angle = (i * Math.PI / 6) + time * 2;
-                            const dist = range - ((time * 100 + i * 60) % range);
-                            ctx.fillStyle = '#ef4444';
-                            ctx.beginPath(); ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 3, 0, Math.PI * 2); ctx.fill();
-                        }
-                        ctx.shadowBlur = 0;
-
-                    } else if (aura === 'aura_precision') {
-                        // 🎯 Precision Aura – “Target Grid”
-                        const active = critRecent || dmgRecent;
-                        ctx.strokeStyle = active ? '#fff' : 'rgba(255, 255, 255, 0.7)';
-                        ctx.lineWidth = active ? 3 : 1.5;
-                        if (active) { ctx.shadowBlur = 20; ctx.shadowColor = '#fff'; }
-
-                        ctx.rotate(time * 0.2);
-                        for (let i = 0; i < 4; i++) {
-                            ctx.rotate(Math.PI / 4);
-                            ctx.beginPath();
-                            ctx.moveTo(-range, 0); ctx.lineTo(range, 0);
-                            ctx.moveTo(0, -range); ctx.lineTo(0, range);
-                            ctx.stroke();
-                        }
-                        ctx.shadowBlur = 0;
-                    }
-
-                    ctx.restore();
-                }
-
-                ctx.beginPath();
-                ctx.arc(drawX, drawY, ent.radius, 0, Math.PI * 2);
-
-                // Determine Color
-                let drawColor = ent.color;
-
-                // Color other players in Multiplayer matches
-                if (ent.type === 'player' && networkManager.isConnected() && gameEngine.isMultiplayerMode()) {
-                    const myId = networkManager.getPlayerId();
-                    if (ent.id !== myId && ent.id !== 'player') {
-                        drawColor = '#ff9f00'; // Vibrant Orange for Other Players
-                    }
-                }
-
-                ctx.fillStyle = drawColor;
-
-                // Apply fade for projectiles with fade_over_time
-                if (ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime) {
-                    ctx.globalAlpha = Math.max(0.1, ent.lifetime / ent.maxLifetime);
-                }
-
-                // ONLY apply glow to players and enemies (Projectiles are too numerous)
-                if (ent.type !== 'projectile') {
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = drawColor;
-
-                    // UX BONUS: Aura Entry Highlight
-                    if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
                         ctx.save();
-                        ctx.strokeStyle = ent.aura_highlight_color || '#fff';
-                        ctx.lineWidth = 3;
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = ent.aura_highlight_color || '#fff';
-                        ctx.beginPath();
-                        ctx.arc(drawX, drawY, ent.radius + 4, 0, Math.PI * 2);
-                        ctx.stroke();
+                        ctx.translate(drawX, drawY);
 
-                        // Color Flash
-                        const alpha = Math.min(1, ent.aura_highlight_timer * 5);
-                        ctx.fillStyle = ent.aura_highlight_color || '#fff';
-                        ctx.globalAlpha = alpha * 0.4;
-                        ctx.fill();
+                        const nowMs = Date.now();
+                        const lastDmg = ent.lastDealtDamageTime || 0;
+                        const lastCrit = ent.lastCritTime || 0;
+                        const dmgRecent = (nowMs - lastDmg) < 300;
+                        const critRecent = (nowMs - lastCrit) < 300;
+                        const aura = ent.aura_type;
+
+                        // Base Aura Field
+                        const baseGlow = ctx.createRadialGradient(0, 0, radius, 0, 0, range);
+                        baseGlow.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+                        baseGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                        ctx.fillStyle = baseGlow;
+                        ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
+
+                        if (aura === 'aura_damage') {
+                            const pulse = (Math.sin(time * 6) + 1) * 0.5;
+                            const r = range * (dmgRecent ? 1.15 : 1.0);
+                            ctx.shadowBlur = 15; ctx.shadowColor = '#ff0000';
+                            const grad = ctx.createRadialGradient(0, 0, radius, 0, 0, r);
+                            grad.addColorStop(0, dmgRecent ? 'rgba(255, 0, 0, 0.6)' : 'rgba(153, 0, 0, 0.4)');
+                            grad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+                            ctx.fillStyle = grad;
+                            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+                            ctx.strokeStyle = '#ff4500'; ctx.lineWidth = 2 + pulse * 2;
+                            ctx.beginPath(); ctx.arc(0, 0, r * (0.8 + pulse * 0.1), 0, Math.PI * 2); ctx.stroke();
+                        } else if (aura === 'aura_gravity') {
+                            ctx.shadowBlur = 10; ctx.shadowColor = '#a855f7';
+                            for (let i = 0; i < 2; i++) {
+                                ctx.rotate(time * (i === 0 ? 1 : -0.5));
+                                ctx.strokeStyle = `rgba(168, 85, 247, ${0.4 + Math.sin(time * 3) * 0.2})`;
+                                ctx.lineWidth = 2;
+                                ctx.beginPath();
+                                for (let a = 0; a < Math.PI * 2; a += 0.2) {
+                                    const r = range * (0.7 + Math.sin(a * 4 + time * 5) * 0.1);
+                                    const tx = Math.cos(a) * r;
+                                    const ty = Math.sin(a) * r;
+                                    if (a === 0) ctx.moveTo(tx, ty); else ctx.lineTo(tx, ty);
+                                }
+                                ctx.closePath(); ctx.stroke();
+                            }
+                        } else if (aura === 'aura_corruption') {
+                            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
+                            grad.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
+                            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                            ctx.fillStyle = grad;
+                            ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
+                            for (let i = 0; i < 8; i++) {
+                                const a = (i * Math.PI / 4) + time * 0.4;
+                                const d = (range * 0.3) + ((time * 50 + i * 30) % (range * 0.6));
+                                ctx.fillStyle = `rgba(132, 204, 22, ${1 - d / range})`;
+                                ctx.beginPath(); ctx.arc(Math.cos(a) * d, Math.sin(a) * d, 4, 0, Math.PI * 2); ctx.fill();
+                            }
+                        } else if (aura === 'aura_execution') {
+                            const r = range * 0.9;
+                            ctx.shadowBlur = 15; ctx.shadowColor = '#fb923c';
+                            ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 3;
+                            ctx.rotate(time * 4);
+                            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+                            for (let i = 0; i < 4; i++) {
+                                ctx.rotate(Math.PI / 2);
+                                ctx.beginPath(); ctx.moveTo(r - 10, 0); ctx.lineTo(r + 10, 0); ctx.stroke();
+                            }
+                        } else if (aura === 'aura_chaos') {
+                            const hue = (time * 500) % 360;
+                            const glitch = Math.random() > 0.9;
+                            ctx.shadowBlur = glitch ? 25 : 10; ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                            ctx.strokeStyle = `hsl(${hue}, 100%, 70%)`;
+                            ctx.lineWidth = glitch ? 5 : 2;
+                            ctx.beginPath(); ctx.arc((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, range * (glitch ? 0.8 : 1.0), 0, Math.PI * 2); ctx.stroke();
+                        } else if (aura === 'aura_control') {
+                            ctx.fillStyle = 'rgba(14, 165, 233, 0.15)';
+                            ctx.beginPath(); ctx.arc(0, 0, range, 0, Math.PI * 2); ctx.fill();
+                            ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+                            for (let i = 0; i < 2; i++) {
+                                const r = ((time * 80 + i * 120) % range);
+                                ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+                            }
+                        } else if (aura === 'aura_vampire') {
+                            const beat = Math.pow(Math.sin(time * 3), 4);
+                            const r = range * (0.9 + beat * 0.1);
+                            const grad = ctx.createRadialGradient(0, 0, radius, 0, 0, r);
+                            grad.addColorStop(0, `rgba(220, 38, 38, ${0.4 + beat * 0.3})`);
+                            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                            ctx.fillStyle = grad;
+                            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+                        } else if (aura === 'aura_precision') {
+                            ctx.strokeStyle = '#fff'; ctx.lineWidth = (critRecent || dmgRecent) ? 3 : 1;
+                            if (critRecent || dmgRecent) { ctx.shadowBlur = 15; ctx.shadowColor = '#fff'; }
+                            for (let i = 0; i < 4; i++) {
+                                ctx.rotate(Math.PI / 4);
+                                ctx.beginPath(); ctx.moveTo(-range, 0); ctx.lineTo(range, 0); ctx.stroke();
+                                ctx.beginPath(); ctx.moveTo(0, -range); ctx.lineTo(0, range); ctx.stroke();
+                            }
+                        } else {
+                            // Robust Fallback: Generic Aura Circle
+                            ctx.strokeStyle = '#f0f'; ctx.lineWidth = 2;
+                            ctx.setLineDash([5, 5]);
+                            ctx.beginPath(); ctx.arc(0, 0, range * 0.8, 0, Math.PI * 2); ctx.stroke();
+                        }
+
+                        // Debug Label (Small translucent text above player if aura active)
+                        ctx.restore();
+                        ctx.save();
+                        ctx.translate(drawX, drawY);
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                        ctx.font = 'bold 8px "Outfit", sans-serif';
+                        ctx.fillText(aura.replace('aura_', '').toUpperCase(), 0, -radius - 20);
+                        ctx.restore();
+                    } else {
+                        // NO ATTRIBUTE DEF FALLBACK
+                        ctx.save();
+                        ctx.translate(drawX, drawY);
+                        ctx.strokeStyle = '#f0f'; ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.arc(0, 0, radius + 20, 0, Math.PI * 2); ctx.stroke();
                         ctx.restore();
                     }
                 }
 
-                ctx.fill();
-                ctx.shadowBlur = 0; // Reset shadow for other elements
-                ctx.globalAlpha = 1.0; // Reset alpha
+                // --- 2. MAIN ENTITY DRAWING ---
+                let drawColor = ent.color || (ent.type === 'player' ? '#00ff9f' : '#ff0055');
+                const myId = networkManager.getPlayerId();
 
-                // Draw HP bar for living entities (not projectiles)
+                if (ent.type === 'player' && networkManager.isConnected() && gameEngine.isMultiplayerMode()) {
+                    if (ent.id !== myId && ent.id !== 'player') {
+                        drawColor = '#ff9f00'; // Other players
+                    }
+                }
+
+                ctx.globalAlpha = 1.0;
+                if (ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime) {
+                    ctx.globalAlpha = Math.max(0.2, ent.lifetime / ent.maxLifetime);
+                }
+
+                ctx.fillStyle = drawColor;
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+
+                if (ent.type !== 'projectile') {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = drawColor;
+                }
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Entry Highlights
+                if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
+                    ctx.save();
+                    const hColor = ent.aura_highlight_color || '#fff';
+                    ctx.globalAlpha = Math.min(1, ent.aura_highlight_timer * 5) * 0.6;
+                    ctx.strokeStyle = hColor; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.arc(drawX, drawY, radius + 3, 0, Math.PI * 2); ctx.stroke();
+                    ctx.restore();
+                }
+
+                // --- 3. BARS & LABELS ---
                 if (ent.type !== 'projectile') {
                     const hpPct = Math.max(0, Math.min(1, ent.hp / ent.maxHp));
-                    const barW = 32;
-                    const barH = 3;
-                    const barY = ent.y - ent.radius - 8;
+                    const barW = 32, barH = 3, barY = drawY - radius - 8;
 
-                    // Background Bar (Outer border/shadow)
                     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                    ctx.fillRect(ent.x - barW / 2 - 1, barY - 1, barW + 2, barH + 2);
-
-                    // Background bar (Dark base)
+                    ctx.fillRect(drawX - barW / 2 - 1, barY - 1, barW + 2, barH + 2);
                     ctx.fillStyle = '#1a1a1a';
-                    ctx.fillRect(ent.x - barW / 2, barY, barW, barH);
-
-                    // Health fill color logic: Green -> Yellow -> Red
-                    let hpColor = '#00ff9f'; // Healthy Green
-                    if (hpPct < 0.3) hpColor = '#ff0055'; // Critical Red
-                    else if (hpPct < 0.6) hpColor = '#ff9f00'; // Warning Orange
-
+                    ctx.fillRect(drawX - barW / 2, barY, barW, barH);
+                    const hpColor = hpPct < 0.3 ? '#ff0055' : (hpPct < 0.6 ? '#ff9f00' : '#00ff9f');
                     ctx.fillStyle = hpColor;
-                    ctx.fillRect(ent.x - barW / 2, barY, barW * hpPct, barH);
+                    ctx.fillRect(drawX - barW / 2, barY, barW * hpPct, barH);
 
-                    // Render Username (for multiplayer)
+                    // Username & Title
                     if (ent.type === 'player' && (ent as any).username) {
-                        // Check for Title
                         const playerEnt = ent as any;
                         if (playerEnt.equippedTitle && TITLES[playerEnt.equippedTitle]) {
-                            const titleDef = TITLES[playerEnt.equippedTitle];
+                            const title = TITLES[playerEnt.equippedTitle];
                             ctx.font = 'bold 9px "Outfit", sans-serif';
-                            ctx.textAlign = 'center';
-                            ctx.fillStyle = titleDef.color; // Use title color directly
-                            // Can't render tailwind styles in canvas easily, so just color/shadow
-                            ctx.shadowBlur = 4;
-                            ctx.shadowColor = titleDef.color;
-                            ctx.fillText(titleDef.name.toUpperCase(), ent.x, barY - 14);
+                            ctx.fillStyle = title.color;
+                            ctx.shadowBlur = 4; ctx.shadowColor = title.color;
+                            ctx.fillText(title.name.toUpperCase(), drawX, barY - 14);
                             ctx.shadowBlur = 0;
                         }
-
-                        ctx.fillStyle = '#ffffff';
+                        ctx.fillStyle = '#fff';
                         ctx.font = '10px "Outfit", sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.shadowBlur = 2;
-                        ctx.shadowColor = 'black';
-                        ctx.fillText((ent as any).username, ent.x, barY - 4);
-                        ctx.textAlign = 'left'; // Reset
+                        ctx.shadowBlur = 2; ctx.shadowColor = 'black';
+                        ctx.fillText(playerEnt.username, drawX, barY - 4);
                         ctx.shadowBlur = 0;
                     }
                 }

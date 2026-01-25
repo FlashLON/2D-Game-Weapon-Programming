@@ -1126,7 +1126,10 @@ export class GameEngine {
                         // Soft sync: Pull slightly towards server to correct small drifts
                         const pullFactor = 0.1;
                         nextEntities.push({
-                            ...serverEnt,
+                            ...localEnt, // Start with local state
+                            ...serverEnt, // Override with server state
+                            lastDealtDamageTime: serverEnt.lastDealtDamageTime || localEnt.lastDealtDamageTime || 0,
+                            lastCritTime: serverEnt.lastCritTime || localEnt.lastCritTime || 0,
                             x: localEnt.x + (serverEnt.x - localEnt.x) * pullFactor,
                             y: localEnt.y + (serverEnt.y - localEnt.y) * pullFactor,
                             velocity: localEnt.velocity
@@ -1136,8 +1139,11 @@ export class GameEngine {
                     // OTHERS: Soft pull towards server position to avoid jumpiness
                     const lerpFactor = 0.35;
                     nextEntities.push({
-                        ...serverEnt,
-                        aura_type: serverEnt.aura_type || null, // Ensure explicit null
+                        ...localEnt, // Start with local state
+                        ...serverEnt, // Override with server state
+                        aura_type: serverEnt.aura_type || null,
+                        lastDealtDamageTime: serverEnt.lastDealtDamageTime || localEnt.lastDealtDamageTime || 0,
+                        lastCritTime: serverEnt.lastCritTime || localEnt.lastCritTime || 0,
                         x: localEnt.x + (serverEnt.x - localEnt.x) * lerpFactor,
                         y: localEnt.y + (serverEnt.y - localEnt.y) * lerpFactor,
                         velocity: serverEnt.vx !== undefined ? { x: serverEnt.vx, y: serverEnt.vy } : serverEnt.velocity
@@ -1145,13 +1151,20 @@ export class GameEngine {
                 }
             } else {
                 // NEW ENTITY
+                const nextEnt = { ...serverEnt };
                 if (serverEnt.vx !== undefined) {
-                    serverEnt.velocity = { x: serverEnt.vx, y: serverEnt.vy };
+                    nextEnt.velocity = { x: serverEnt.vx, y: serverEnt.vy };
                 }
-                nextEntities.push({
-                    ...serverEnt,
-                    aura_type: serverEnt.aura_type || null
-                });
+                nextEnt.aura_type = serverEnt.aura_type || null;
+                nextEnt.limits = serverEnt.limits || null; // Ensure limits are set for new entities
+                nextEntities.push(nextEnt);
+            }
+
+            // --- DEBUG LOGGING (Throttle) ---
+            const ent = nextEntities[nextEntities.length - 1];
+            if (ent && ent.aura_type && !(ent as any)._auraLogged) {
+                console.log(`[ENGINE] Aura Active: ${ent.aura_type} on entity ${ent.id}`);
+                (ent as any)._auraLogged = true;
             }
         });
 
