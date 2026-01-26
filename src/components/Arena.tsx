@@ -65,6 +65,7 @@ export const Arena: React.FC = () => {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // IMPACT SCREENSHAKE: Offset context
+            ctx.save(); // Save base state for entire frame
             if (state.screenshake > 0) {
                 const shake = state.screenshake * 15;
                 const ox = (Math.random() - 0.5) * shake;
@@ -147,10 +148,13 @@ export const Arena: React.FC = () => {
                 const drawX = ent.renderX ?? ent.x;
                 const drawY = ent.renderY ?? ent.y;
                 const time = performance.now() / 1000;
-                const radius = ent.radius || 5;
+                const radius = ent.radius || 10;
+                const myId = networkManager.getPlayerId();
+                const isLocal = (myId && ent.id === myId) || (!myId && ent.id === 'player');
+                const isPlayer = ent.type === 'player' || !!(ent as any).username || isLocal;
 
                 // --- 1. AURA RENDERING (Bottom Layer) ---
-                if (ent.type === 'player' && ent.aura_type) {
+                if (isPlayer && ent.aura_type) {
                     const attrDef = ATTRIBUTES[ent.aura_type];
                     if (attrDef) {
                         const strength = (ent as any).limits?.[ent.aura_type] || attrDef.startLimit || 1;
@@ -280,18 +284,17 @@ export const Arena: React.FC = () => {
                 }
 
                 // --- 2. MAIN ENTITY DRAWING ---
-                let drawColor = ent.color || (ent.type === 'player' ? '#00ff9f' : '#ff0055');
-                const myId = networkManager.getPlayerId();
+                let drawColor = ent.color || (isPlayer ? '#00ff9f' : '#ff0055');
 
-                if (ent.type === 'player' && networkManager.isConnected() && gameEngine.isMultiplayerMode()) {
-                    if (ent.id !== myId && ent.id !== 'player') {
+                if (isPlayer && networkManager.isConnected() && gameEngine.isMultiplayerMode()) {
+                    if (!isLocal) {
                         drawColor = '#ff9f00'; // Other players
                     }
                 }
 
                 ctx.globalAlpha = 1.0;
                 if (ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime) {
-                    ctx.globalAlpha = Math.max(0.2, ent.lifetime / ent.maxLifetime);
+                    ctx.globalAlpha = Math.max(0.2, (ent.lifetime || 0) / (ent.maxLifetime || 1));
                 }
 
                 ctx.fillStyle = drawColor;
@@ -316,8 +319,8 @@ export const Arena: React.FC = () => {
                 }
 
                 // --- 3. BARS & LABELS ---
-                if (ent.type !== 'projectile') {
-                    const hpPct = Math.max(0, Math.min(1, ent.hp / ent.maxHp));
+                if (ent.type !== 'projectile' || isPlayer) {
+                    const hpPct = Math.max(0, Math.min(1, (ent.hp || 0) / (ent.maxHp || 100)));
                     const barW = 32, barH = 3, barY = drawY - radius - 8;
 
                     ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -329,7 +332,7 @@ export const Arena: React.FC = () => {
                     ctx.fillRect(drawX - barW / 2, barY, barW * hpPct, barH);
 
                     // Username & Title
-                    if (ent.type === 'player' && (ent as any).username) {
+                    if (isPlayer && (ent as any).username) {
                         const playerEnt = ent as any;
                         if (playerEnt.equippedTitle && TITLES[playerEnt.equippedTitle]) {
                             const title = TITLES[playerEnt.equippedTitle];
@@ -586,6 +589,8 @@ export const Arena: React.FC = () => {
                 ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
                 ctx.textAlign = 'left';
             }
+
+            ctx.restore(); // Restore base state (un-shake)
         };
 
         gameEngine.subscribe(render);

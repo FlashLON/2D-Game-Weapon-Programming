@@ -500,6 +500,7 @@ io.on('connection', (socket) => {
             hp: 100,
             maxHp: 100,
             color: '#00ff9f',
+            type: 'player', // CRITICAL: Explicitly set type for client-side rendering
             velocity: { x: 0, y: 0 },
             kills: 0,
             deaths: 0,
