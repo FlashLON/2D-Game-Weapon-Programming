@@ -3,7 +3,6 @@ import { gameEngine, type GameState } from '../engine/GameEngine';
 import { networkManager } from '../utils/NetworkManager';
 import { TITLES } from '../utils/TitleRegistry';
 import { ATTRIBUTES } from '../utils/AttributeRegistry';
-import { MapVoteOverlay } from './MapVoteOverlay';
 
 export const Arena: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -124,13 +123,13 @@ export const Arena: React.FC = () => {
             }
 
             // 2.5 Draw Map Walls (from server state)
-            if ((state as any).walls && (state as any).walls.length > 0) {
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = '#334155';
-                ctx.fillStyle = '#1e293b';
-                ctx.strokeStyle = '#475569';
-                ctx.lineWidth = 1.5;
-                (state as any).walls.forEach((w: any) => {
+            if (state.walls && state.walls.length > 0) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#00ff9f40';
+                ctx.fillStyle = '#0f172a';
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 2;
+                state.walls.forEach(w => {
                     ctx.fillRect(w.x, w.y, w.w, w.h);
                     ctx.strokeRect(w.x, w.y, w.w, w.h);
                 });
@@ -667,8 +666,6 @@ export const Arena: React.FC = () => {
                     filter: 'contrast(1.1) brightness(1.1)',
                 }}
             />
-            {/* Map Vote Overlay — absolute positioned over canvas */}
-            <MapVoteOverlay />
             <div className="absolute top-4 right-4 text-cyber-muted text-xs space-y-1">
                 <div>WASD to Move</div>
                 <div>Click to Fire</div>

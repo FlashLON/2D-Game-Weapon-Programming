@@ -356,12 +356,13 @@ const MAP_IDS = Object.keys(MAPS);
 
 // MAP VOTING STATE — per room
 // room.mapVote = { options: [], votes: {socketId: mapId}, endTime: ms, active: bool }
-const MAP_VOTE_INTERVAL = 3 * 60 * 1000; // 3 minutes
-const MAP_VOTE_DURATION = 20 * 1000;    // 20 seconds to vote
+const MAP_VOTE_INTERVAL = 60 * 1000; // 60 seconds (was 3 min — easier to test)
+const MAP_VOTE_DURATION = 20 * 1000;  // 20 seconds to vote
 
 function startMapVote(roomId) {
     const room = rooms[roomId];
-    if (!room || room.mode !== 'pvp') return;
+    // Run for any non-coop room (pvp, deathmatch, etc.)
+    if (!room || room.mode === 'coop') return;
 
     // Pick 3 random distinct maps (exclude current map)
     const options = [];
@@ -2013,12 +2014,12 @@ setInterval(() => {
             });
         });
 
-        // --- MAP VOTE TIMER (PvP rooms only) ---
+        // --- MAP VOTE TIMER (non-coop rooms only) ---
         if (room.mode !== 'coop') {
             room.mapVoteTimer = (room.mapVoteTimer || 0) + dt;
-            if (room.mapVoteTimer >= MAP_VOTE_INTERVAL / 1000 && Object.keys(room.players).length >= 2) {
+            if (room.mapVoteTimer >= MAP_VOTE_INTERVAL / 1000 && Object.keys(room.players).length >= 1) {
+                room.mapVoteTimer = 0;
                 if (!room.mapVote || !room.mapVote.active) {
-                    room.mapVoteTimer = 0;
                     startMapVote(roomId);
                 }
             }

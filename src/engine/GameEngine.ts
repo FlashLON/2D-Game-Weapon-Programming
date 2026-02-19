@@ -124,6 +124,8 @@ export interface GameState {
     gridImpulses: GridImpulse[];
     wave?: number;
     waveState?: string;
+    walls?: { x: number; y: number; w: number; h: number }[];
+    currentMap?: string;
 }
 
 /**
@@ -1221,6 +1223,8 @@ export class GameEngine {
         this.state.score = snapshot.score || 0;
         this.state.wave = snapshot.wave || 0;
         this.state.waveState = snapshot.waveState || 'idle';
+        this.state.walls = snapshot.walls || [];
+        this.state.currentMap = snapshot.currentMap || 'arena_open';
 
         // 4. Leaderboard
         const leaderboard = Object.values(snapshot.players || {}).map((p: any) => ({

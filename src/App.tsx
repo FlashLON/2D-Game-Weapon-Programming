@@ -6,6 +6,7 @@ import { LevelUpModal } from './components/LevelUpModal';
 import { Console, type LogMessage, type LogType } from './components/Console';
 import { SaveCodeModal } from './components/SaveCodeModal';
 import { LoadCodeModal } from './components/LoadCodeModal';
+import { MapVoteOverlay } from './components/MapVoteOverlay';
 import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
 import { networkManager, type SavedCode } from './utils/NetworkManager';
@@ -742,6 +743,13 @@ function App() {
           onSelectCard={handleCardSelect}
           onClose={() => setShowLevelUpModal(false)}
         />
+      )}
+
+      {/* Map Vote Overlay — fixed, full-screen, above everything */}
+      {currentRoom && currentRoom !== 'offline' && (
+        <div className="fixed inset-0 pointer-events-none z-[9999]">
+          <MapVoteOverlay />
+        </div>
       )}
 
       <SaveCodeModal
