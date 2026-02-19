@@ -356,13 +356,17 @@ const MAP_IDS = Object.keys(MAPS);
 
 // MAP VOTING STATE — per room
 // room.mapVote = { options: [], votes: {socketId: mapId}, endTime: ms, active: bool }
-const MAP_VOTE_INTERVAL = 60 * 1000; // 60 seconds (was 3 min — easier to test)
+const MAP_VOTE_INTERVAL = 10 * 1000; // DEBUG: 10 seconds
 const MAP_VOTE_DURATION = 20 * 1000;  // 20 seconds to vote
 
 function startMapVote(roomId) {
+    console.log(`[VOTE] Attempting to start vote in room ${roomId}...`);
     const room = rooms[roomId];
     // Run for any non-coop room (pvp, deathmatch, etc.)
-    if (!room || room.mode === 'coop') return;
+    if (!room) { console.log(`[VOTE] Room ${roomId} not found`); return; }
+    if (room.mode === 'coop') { console.log(`[VOTE] Room is coop, skipping`); return; }
+
+    console.log(`[VOTE] Starting vote with ${Object.keys(room.players).length} players`);
 
     // Pick 3 random distinct maps (exclude current map)
     const options = [];
@@ -2014,13 +2018,20 @@ setInterval(() => {
             });
         });
 
-        // --- MAP VOTE TIMER (non-coop rooms only) ---
         if (room.mode !== 'coop') {
             room.mapVoteTimer = (room.mapVoteTimer || 0) + dt;
-            if (room.mapVoteTimer >= MAP_VOTE_INTERVAL / 1000 && Object.keys(room.players).length >= 1) {
-                room.mapVoteTimer = 0;
-                if (!room.mapVote || !room.mapVote.active) {
-                    startMapVote(roomId);
+            // console.log(`[VOTE TIMER] ${roomId}: ${room.mapVoteTimer.toFixed(1)} / ${(MAP_VOTE_INTERVAL / 1000)}`);
+            if (room.mapVoteTimer >= MAP_VOTE_INTERVAL / 1000) {
+                if (Object.keys(room.players).length >= 1) {
+                    room.mapVoteTimer = 0;
+                    if (!room.mapVote || !room.mapVote.active) {
+                        startMapVote(roomId);
+                    } else {
+                        console.log(`[VOTE] Timer hit but vote already active`);
+                    }
+                } else {
+                    // Reset timer if 0 players so it doesn't build up forever
+                    if (room.mapVoteTimer > (MAP_VOTE_INTERVAL / 1000) * 2) room.mapVoteTimer = 0;
                 }
             }
         }

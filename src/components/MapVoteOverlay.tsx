@@ -25,6 +25,7 @@ export const MapVoteOverlay: React.FC<MapVoteOverlayProps> = ({ onMapChange }) =
 
     useEffect(() => {
         networkManager.setOnMapVoteStart((data) => {
+            console.log('[CLIENT] Map Vote Started!', data);
             setOptions(data.options || []);
             setTally({});
             setMyVote(null);
