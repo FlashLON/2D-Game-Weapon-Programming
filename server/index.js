@@ -138,11 +138,7 @@ function getMemoryLeaderboard() {
         .map(u => ({ username: u.username, level: u.level || 1, money: u.money || 0 }));
 }
 
-// Global leaderboard update every 30 seconds
-setInterval(async () => {
-    const leaderboard = await getGlobalLeaderboard();
-    io.emit('global_leaderboard', leaderboard);
-}, 30000);
+// Global leaderboard update is started after io is created (see bottom of server setup)
 
 const app = express();
 const server = http.createServer(app);
@@ -152,6 +148,12 @@ const io = new Server(server, {
         methods: ['GET', 'POST']
     }
 });
+
+// Global leaderboard update every 30 seconds (must be after io is defined)
+setInterval(async () => {
+    const leaderboard = await getGlobalLeaderboard();
+    io.emit('global_leaderboard', leaderboard);
+}, 30000);
 
 const PORT = process.env.PORT || 3000;
 
@@ -222,7 +224,6 @@ function checkTitles(username, stats, socket) {
     let user = memoryUsers.get(username);
     if (!user) return;
 
-    // Initialize tracking fields
     if (!user.killCount) user.killCount = 0;
     if (!user.titles || user.titles.length === 0) user.titles = ['beginner'];
 
@@ -231,8 +232,32 @@ function checkTitles(username, stats, socket) {
         unlockTitle(username, 'killer', socket);
     }
 
-    // 2. OP (Maximize Stats)
-    // We check if the player has reached the high-tier limits defined in AttributeRegistry
+    // 2. Veteran (Level 10)
+    if ((user.level || 1) >= 10 && !user.titles.includes('veteran')) {
+        unlockTitle(username, 'veteran', socket);
+    }
+
+    // 3. Unstoppable (100 killstreak — checked from stats.killstreak)
+    if ((stats.killstreak || 0) >= 100 && !user.titles.includes('unstoppable')) {
+        unlockTitle(username, 'unstoppable', socket);
+    }
+
+    // 4. Monster (1000 killstreak)
+    if ((stats.killstreak || 0) >= 1000 && !user.titles.includes('monster')) {
+        unlockTitle(username, 'monster', socket);
+    }
+
+    // 5. Shredder (10 000 total match damage)
+    if ((stats.matchDamage || 0) >= 10000 && !user.titles.includes('shredder')) {
+        unlockTitle(username, 'shredder', socket);
+    }
+
+    // 6. Deadeye (50 crits in one match)
+    if ((stats.matchCrits || 0) >= 50 && !user.titles.includes('deadeye')) {
+        unlockTitle(username, 'deadeye', socket);
+    }
+
+    // 7. OP (Maximize core Stats)
     if (stats.limits) {
         const l = stats.limits;
         const isMaxed = (
@@ -246,13 +271,156 @@ function checkTitles(username, stats, socket) {
         if (isMaxed && !user.titles.includes('op')) {
             unlockTitle(username, 'op', socket);
         }
+
+        // Magnetar (max vortex)
+        if ((l.attraction_force || 0) >= 100 && !user.titles.includes('magnetar')) {
+            unlockTitle(username, 'magnetar', socket);
+        }
     }
 }
+
+// ─── MAP DEFINITIONS ──────────────────────────────────────────────────────────
+// Each map defines wall rectangles [x, y, width, height] and a display name.
+const MAPS = {
+    arena_open: {
+        id: 'arena_open',
+        name: 'Open Field',
+        description: 'No cover. Pure aim wins.',
+        color: '#00ff9f',
+        walls: []
+    },
+    arena_cross: {
+        id: 'arena_cross',
+        name: 'Cross Roads',
+        description: 'Two intersecting walls split the arena.',
+        color: '#3b82f6',
+        walls: [
+            { x: 350, y: 100, w: 100, h: 20 },
+            { x: 350, y: 480, w: 100, h: 20 },
+            { x: 100, y: 290, w: 20, h: 100 },
+            { x: 680, y: 290, w: 20, h: 100 }
+        ]
+    },
+    arena_pillars: {
+        id: 'arena_pillars',
+        name: 'Pillars',
+        description: 'Six pillars create tight lanes.',
+        color: '#a855f7',
+        walls: [
+            { x: 200, y: 150, w: 30, h: 30 },
+            { x: 570, y: 150, w: 30, h: 30 },
+            { x: 200, y: 420, w: 30, h: 30 },
+            { x: 570, y: 420, w: 30, h: 30 },
+            { x: 385, y: 100, w: 30, h: 30 },
+            { x: 385, y: 470, w: 30, h: 30 }
+        ]
+    },
+    arena_fortress: {
+        id: 'arena_fortress',
+        name: 'Fortress',
+        description: 'A center room with entry gaps on each side.',
+        color: '#f59e0b',
+        walls: [
+            // Center box with gaps
+            { x: 280, y: 200, w: 100, h: 15 },   // top-left segment
+            { x: 420, y: 200, w: 100, h: 15 },   // top-right segment
+            { x: 280, y: 385, w: 100, h: 15 },   // bottom-left
+            { x: 420, y: 385, w: 100, h: 15 },   // bottom-right
+            { x: 280, y: 215, w: 15, h: 80 },    // left-top
+            { x: 280, y: 310, w: 15, h: 80 },    // left-bottom
+            { x: 505, y: 215, w: 15, h: 80 },    // right-top
+            { x: 505, y: 310, w: 15, h: 80 }     // right-bottom
+        ]
+    },
+    arena_maze: {
+        id: 'arena_maze',
+        name: 'Maze Runner',
+        description: 'Tight corridors. Homing weapons shine.',
+        color: '#ef4444',
+        walls: [
+            { x: 150, y: 100, w: 200, h: 15 },
+            { x: 450, y: 100, w: 200, h: 15 },
+            { x: 150, y: 100, w: 15, h: 150 },
+            { x: 635, y: 100, w: 15, h: 150 },
+            { x: 150, y: 350, w: 200, h: 15 },
+            { x: 450, y: 350, w: 200, h: 15 },
+            { x: 150, y: 350, w: 15, h: 150 },
+            { x: 635, y: 350, w: 15, h: 150 },
+            { x: 300, y: 200, w: 15, h: 150 },
+            { x: 485, y: 200, w: 15, h: 150 }
+        ]
+    }
+};
+
+const MAP_IDS = Object.keys(MAPS);
+
+// MAP VOTING STATE — per room
+// room.mapVote = { options: [], votes: {socketId: mapId}, endTime: ms, active: bool }
+const MAP_VOTE_INTERVAL = 3 * 60 * 1000; // 3 minutes
+const MAP_VOTE_DURATION = 20 * 1000;    // 20 seconds to vote
+
+function startMapVote(roomId) {
+    const room = rooms[roomId];
+    if (!room || room.mode !== 'pvp') return;
+
+    // Pick 3 random distinct maps (exclude current map)
+    const options = [];
+    const currentMap = room.currentMap || 'arena_open';
+    const pool = MAP_IDS.filter(id => id !== currentMap);
+    while (options.length < 3 && pool.length > 0) {
+        const idx = Math.floor(Math.random() * pool.length);
+        options.push(pool.splice(idx, 1)[0]);
+    }
+    if (options.length < 3) options.push(currentMap); // fallback
+
+    room.mapVote = {
+        options,
+        votes: {},
+        active: true,
+        endTime: Date.now() + MAP_VOTE_DURATION
+    };
+
+    io.to(roomId).emit('map_vote_start', {
+        options: options.map(id => ({ id, ...MAPS[id] })),
+        duration: MAP_VOTE_DURATION
+    });
+
+    // Auto-resolve after vote duration
+    setTimeout(() => resolveMapVote(roomId), MAP_VOTE_DURATION);
+}
+
+function resolveMapVote(roomId) {
+    const room = rooms[roomId];
+    if (!room || !room.mapVote || !room.mapVote.active) return;
+
+    // Count votes
+    const tally = {};
+    room.mapVote.options.forEach(id => { tally[id] = 0; });
+    Object.values(room.mapVote.votes).forEach(v => { if (tally[v] !== undefined) tally[v]++; });
+
+    // Pick winner (random tiebreak)
+    let winner = room.mapVote.options[0];
+    let maxVotes = -1;
+    for (const [mapId, count] of Object.entries(tally)) {
+        if (count > maxVotes) { maxVotes = count; winner = mapId; }
+    }
+
+    room.mapVote.active = false;
+    room.currentMap = winner;
+    room.walls = MAPS[winner].walls;
+
+    io.to(roomId).emit('map_change', {
+        mapId: winner,
+        map: MAPS[winner],
+        tally
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.get('/api/status', (req, res) => {
     const totalPlayers = Object.values(rooms).reduce((sum, r) => sum + Object.keys(r.players).length, 0);
     const totalProjectiles = Object.values(rooms).reduce((sum, r) => sum + r.projectiles.length, 0);
-
     res.json({
         timestamp: new Date().toISOString(),
         database: firebaseDb ? 'Firebase connected' : 'Memory storage (no persistence)',
@@ -918,6 +1086,19 @@ io.on('connection', (socket) => {
         }
     }
 
+    socket.on('vote_map', ({ mapId }) => {
+        if (!currentRoomId) return;
+        const room = rooms[currentRoomId];
+        if (!room || !room.mapVote || !room.mapVote.active) return;
+        if (!room.mapVote.options.includes(mapId)) return;
+        room.mapVote.votes[socket.id] = mapId;
+        // Broadcast updated vote tally to room so UI can update live
+        const tally = {};
+        room.mapVote.options.forEach(id => { tally[id] = 0; });
+        Object.values(room.mapVote.votes).forEach(v => { if (tally[v] !== undefined) tally[v]++; });
+        io.to(currentRoomId).emit('map_vote_update', { tally });
+    });
+
     socket.on('disconnect', () => {
         leaveRoom(socket.id);
     });
@@ -968,30 +1149,72 @@ setInterval(() => {
                     else if (side === 2) { ex = Math.random() * 800; ey = 650; }
                     else { ex = -50; ey = Math.random() * 600; }
 
-                    // Enemy Variety
+                    // Enemy Variety — wave-scaled with new types
                     const rand = Math.random();
                     let type = 'standard';
                     let radius = 20;
                     let color = '#ff0055';
                     let speed = 50 + (room.wave * 2);
                     let hp = 30 + (room.wave * 15);
+                    let extraProps = {};
 
-                    if (room.wave > 3 && rand > 0.8) {
+                    if (room.wave > 2 && rand > 0.88) {
+                        // HEALER — restores HP to nearby enemies
+                        type = 'healer';
+                        radius = 18;
+                        color = '#4ade80';
+                        speed *= 0.7;
+                        hp *= 0.8;
+                        extraProps = { healCooldown: 0, healRadius: 120, healAmount: 8 };
+
+                    } else if (room.wave > 3 && rand > 0.78) {
+                        // TANK
                         type = 'tank';
                         radius = 35;
                         color = '#880022';
-                        speed *= 0.6;
-                        hp *= 2.5;
-                    } else if (room.wave > 5 && rand > 0.6) {
+                        speed *= 0.55;
+                        hp *= 3.0;
+
+                    } else if (room.wave > 4 && rand > 0.68) {
+                        // BERSERKER — speeds up and deals more damage at low HP
+                        type = 'berserker';
+                        radius = 22;
+                        color = '#f97316';
+                        speed *= 1.0;
+                        hp *= 1.2;
+                        extraProps = { enraged: false };
+
+                    } else if (room.wave > 5 && rand > 0.58) {
+                        // GHOST — phases in/out, invulnerable while phased
+                        type = 'ghost';
+                        radius = 18;
+                        color = '#c4b5fd';
+                        speed *= 1.2;
+                        hp *= 0.7;
+                        extraProps = { phased: false, phaseTimer: 0, phaseCycle: 3.0 };
+
+                    } else if (room.wave > 5 && rand > 0.48) {
+                        // SPEEDSTER
                         type = 'speedster';
                         radius = 15;
                         color = '#ffaa00';
-                        speed *= 1.5;
-                        hp *= 0.6;
-                    } else if (room.wave > 7 && rand > 0.4) {
+                        speed *= 1.6;
+                        hp *= 0.55;
+
+                    } else if (room.wave > 6 && rand > 0.38) {
+                        // SPLITTER — spawns 2 mini-clones on death
+                        type = 'splitter';
+                        radius = 26;
+                        color = '#fb7185';
+                        speed *= 0.9;
+                        hp *= 1.3;
+                        extraProps = { splits: 2 };
+
+                    } else if (room.wave > 7 && rand > 0.28) {
+                        // SNIPER
                         type = 'sniper';
                         radius = 20;
-                        color = '#00ff00'; // Green
+                        color = '#00ff00';
                         speed *= 0.8;
                         hp *= 0.8;
                     }
@@ -1007,7 +1230,8 @@ setInterval(() => {
                         color: color,
                         velocity: { x: 0, y: 0 },
                         speed: speed,
-                        shootTimer: Math.random() * 2 // Desync shots
+                        shootTimer: Math.random() * 2,
+                        ...extraProps
                     });
                 }
                 if (room.waveTimer > 5) room.waveState = 'fight';
@@ -1056,8 +1280,9 @@ setInterval(() => {
 
         updateRoomGrid(room);
 
-        // Update Physics
-        room.projectiles.forEach((proj, i) => {
+        // Update Physics — iterate in reverse so splice(i,1) does not corrupt loop
+        for (let i = room.projectiles.length - 1; i >= 0; i--) {
+            const proj = room.projectiles[i];
             proj.lifetime -= dt;
             if (proj.lifetime <= 0) {
                 // Split on Death
@@ -1079,7 +1304,7 @@ setInterval(() => {
                     }
                 }
                 room.projectiles.splice(i, 1);
-                return;
+                continue;
             }
 
             const nearby = getNearbyEntities(room, proj.x, proj.y, proj.radius + 50);
@@ -1167,8 +1392,11 @@ setInterval(() => {
             }
 
             // Collisions
+            let hitSomething = false;
             nearby.forEach(ent => {
                 if (ent.id === proj.playerId || ent.type === 'projectile') return;
+                // GHOST: invulnerable while phased
+                if (ent.enemyType === 'ghost' && ent.phased) return;
                 const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
                 if (dist < ent.radius + proj.radius) {
                     let dmg = (proj.damage || 10);
@@ -1298,12 +1526,9 @@ setInterval(() => {
                         ent.velocity.y += Math.sin(angle) * proj.knockback;
                     }
 
-                    // Enemy Projectile Collision
+                    // Enemy Projectile Collision — damage was already applied above;
+                    // just handle visual + death + removal for enemy projectiles.
                     if (proj.isEnemyProjectile && room.players[ent.id]) {
-                        // It hit a player! Projectiles from enemies
-                        ent.hp -= (proj.damage || 5);
-                        room.projectiles.splice(i, 1);
-
                         // Visual hit
                         io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ff0055', strength: 10 });
 
@@ -1312,6 +1537,7 @@ setInterval(() => {
                             ent.deaths = (ent.deaths || 0) + 1;
                             ent.x = 400; ent.y = 300;
                         }
+                        hitSomething = true;
                         return; // Done with this projectile
                     }
 
@@ -1461,7 +1687,12 @@ setInterval(() => {
                     }
                 }
             });
-        });
+
+            // Remove projectile if it hit something and wasn't a pierce/chain
+            if (hitSomething) {
+                room.projectiles.splice(i, 1);
+            }
+        } // end projectile for loop
 
         // Standalone Enemy AI & Movement
         room.enemies.forEach(ent => {
@@ -1483,33 +1714,28 @@ setInterval(() => {
                 });
             }
 
-            // Auras from nearby players
+            // Auras from nearby players — affect ENEMIES ONLY (not allied players)
             Object.values(room.players).forEach(p => {
                 if (p.dead || p.x < -1000) return;
                 const aura = p.aura_type;
                 if (!aura) return;
 
-                // Identify all potential targets (players and enemies)
-                const targets = [...Object.values(room.players), ...room.enemies];
+                // Only target enemies, never allied players
+                const targets = room.enemies;
 
                 targets.forEach(target => {
-                    if (target.id === p.id) return; // Don't affect self
-
                     const distSq = (target.x - p.x) ** 2 + (target.y - p.y) ** 2;
                     const strength = p.limits?.[aura] || 1;
                     const baseRange = 240;
-                    // Match client scaling logic (1.1 is the default startLimit of aura_damage usually, 
-                    // but for general aura processing we use a consistent base or retrieve it)
                     const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / 1.1) - 1) * 0.5);
                     const range = baseRange * rangeScale;
 
                     if (distSq < range * range) {
-                        const dist = Math.sqrt(distSq);
+                        const dist = Math.sqrt(distSq) || 1;
 
-                        // UX Bonus: Highlights (Decayed by client, but triggered here for sync)
+                        // Highlight targets being affected
                         if (!target.aura_highlight_timer || target.aura_highlight_timer <= 0) {
                             target.aura_highlight_timer = 0.2;
-                            // Color mapping (Synchronized with client)
                             const colors = {
                                 aura_damage: '#ff4500',
                                 aura_gravity: '#a855f7',
@@ -1523,30 +1749,69 @@ setInterval(() => {
                             target.aura_highlight_color = colors[aura] || '#fff';
                         }
 
-                        // Apply Gameplay Effects
-                        if (aura === 'aura_corruption') target.hp -= (strength * dt);
-                        else if (aura === 'aura_execution') {
-                            if (target.hp < target.maxHp * 0.3) target.hp -= (target.maxHp * (strength - 1) * dt);
+                        // Apply gameplay effects
+                        if (aura === 'aura_corruption') {
+                            target.hp -= (strength * dt);
+
+                        } else if (aura === 'aura_execution') {
+                            // Only kicker-in below 30% HP; strength is a damage multiplier (e.g. 1.2 = +20%)
+                            if (target.hp < target.maxHp * 0.3) {
+                                target.hp -= (target.maxHp * (strength - 1) * 0.1 * dt);
+                            }
+
                         } else if (aura === 'aura_control') {
-                            target.velocity.x *= (1 - (1 - strength) * dt * 10); // Smoother slow
-                            target.velocity.y *= (1 - (1 - strength) * dt * 10);
+                            // Friction-based slow: strength < 1 (e.g. 0.7 = 30% slow)
+                            // Apply as a damping multiplier each frame, clamped so velocity can't flip sign
+                            const damping = Math.pow(Math.max(0, strength), dt * 3);
+                            target.velocity.x *= damping;
+                            target.velocity.y *= damping;
+
                         } else if (aura === 'aura_vampire') {
                             const siph = strength * dt * 50;
                             target.hp -= siph;
-                            p.hp = Math.min(p.maxHp, p.hp + siph * 0.1);
+                            p.hp = Math.min(p.maxHp, p.hp + siph * 0.5); // heal caster
+
                         } else if (aura === 'aura_gravity') {
                             const pullX = p.x - target.x;
                             const pullY = p.y - target.y;
-                            const force = strength * 200 / (dist || 1);
-                            target.velocity.x += (pullX / (dist || 1)) * force * dt;
-                            target.velocity.y += (pullY / (dist || 1)) * force * dt;
+                            const force = strength * 200 / dist;
+                            target.velocity.x += (pullX / dist) * force * dt;
+                            target.velocity.y += (pullY / dist) * force * dt;
                         }
                     }
                 });
             });
 
+            // Remove enemies killed by aura/DOT effects (all modes)
             if (ent.hp <= 0) {
-                // ... logic to remove ent
+                const idx = room.enemies.indexOf(ent);
+                if (idx !== -1) {
+                    // SPLITTER: spawn mini-clones
+                    if (ent.enemyType === 'splitter' && !ent.hasSplit) {
+                        ent.hasSplit = true;
+                        for (let s = 0; s < (ent.splits || 2); s++) {
+                            const angle = (s / (ent.splits || 2)) * Math.PI * 2;
+                            const miniHp = ent.maxHp * 0.25;
+                            room.enemies.push({
+                                id: 'mini_' + Math.random().toString(36).substr(2, 5),
+                                type: 'enemy',
+                                enemyType: 'standard',
+                                x: ent.x + Math.cos(angle) * 30,
+                                y: ent.y + Math.sin(angle) * 30,
+                                radius: Math.round(ent.radius * 0.55),
+                                hp: miniHp,
+                                maxHp: miniHp,
+                                color: '#fda4af',
+                                velocity: { x: Math.cos(angle) * 80, y: Math.sin(angle) * 80 },
+                                speed: (ent.speed || 60) * 1.4,
+                                shootTimer: 0
+                            });
+                        }
+                        io.to(roomId).emit('visual_effect', { type: 'explosion', x: ent.x, y: ent.y, color: '#fb7185', strength: 15, radius: 60 });
+                    }
+                    room.enemies.splice(idx, 1);
+                    return; // skip further processing for this enemy
+                }
             }
 
             let nearestPlayer = null;
@@ -1650,6 +1915,52 @@ setInterval(() => {
                         io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#00ff00' });
                     }
 
+                } else if (ent.enemyType === 'healer') {
+                    // HEALER AI — stay near allies and heal them
+                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                    const distToPlayer = Math.sqrt((nearestPlayer.x - ent.x) ** 2 + (nearestPlayer.y - ent.y) ** 2);
+                    if (distToPlayer > 300) {
+                        ent.velocity.x += Math.cos(angle) * ent.speed * dt;
+                        ent.velocity.y += Math.sin(angle) * ent.speed * dt;
+                    }
+                    // Heal nearby enemies every 2 seconds
+                    ent.healCooldown = (ent.healCooldown || 0) + dt;
+                    if (ent.healCooldown > 2) {
+                        ent.healCooldown = 0;
+                        const healRadius = ent.healRadius || 120;
+                        const healAmount = ent.healAmount || 8;
+                        room.enemies.forEach(ally => {
+                            if (ally.id !== ent.id && ally.hp < ally.maxHp) {
+                                const d = Math.sqrt((ally.x - ent.x) ** 2 + (ally.y - ent.y) ** 2);
+                                if (d < healRadius) {
+                                    ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
+                                    io.to(roomId).emit('visual_effect', { type: 'heal', x: ally.x, y: ally.y, color: '#4ade80' });
+                                }
+                            }
+                        });
+                    }
+
+                } else if (ent.enemyType === 'ghost') {
+                    // GHOST AI — phases in/out, invulnerable while phased
+                    ent.phaseTimer = (ent.phaseTimer || 0) + dt;
+                    const cycle = ent.phaseCycle || 3.0;
+                    ent.phased = (ent.phaseTimer % (cycle * 2)) > cycle;
+                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                    ent.velocity.x += Math.cos(angle) * ent.speed * (ent.phased ? 1.5 : 0.8) * dt;
+                    ent.velocity.y += Math.sin(angle) * ent.speed * (ent.phased ? 1.5 : 0.8) * dt;
+
+                } else if (ent.enemyType === 'berserker') {
+                    // BERSERKER AI — gets faster and more dangerous at low HP
+                    const hpFrac = ent.hp / ent.maxHp;
+                    if (hpFrac < 0.4 && !ent.enraged) {
+                        ent.enraged = true;
+                        ent.speed *= 1.8;
+                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#f97316', strength: 20 });
+                    }
+                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                    ent.velocity.x += Math.cos(angle) * ent.speed * dt;
+                    ent.velocity.y += Math.sin(angle) * ent.speed * dt;
+
                 } else {
                     // STANDARD ENEMY AI
                     const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
@@ -1702,6 +2013,17 @@ setInterval(() => {
             });
         });
 
+        // --- MAP VOTE TIMER (PvP rooms only) ---
+        if (room.mode !== 'coop') {
+            room.mapVoteTimer = (room.mapVoteTimer || 0) + dt;
+            if (room.mapVoteTimer >= MAP_VOTE_INTERVAL / 1000 && Object.keys(room.players).length >= 2) {
+                if (!room.mapVote || !room.mapVote.active) {
+                    room.mapVoteTimer = 0;
+                    startMapVote(roomId);
+                }
+            }
+        }
+
         // Player movement
         Object.values(room.players).forEach(p => {
             p.x += p.velocity.x * dt;
@@ -1748,7 +2070,10 @@ setInterval(() => {
                 projectiles: room.projectiles,
                 score: room.score,
                 wave: room.wave,
-                waveState: room.waveState
+                waveState: room.waveState,
+                walls: room.walls || [],
+                currentMap: room.currentMap || 'arena_open',
+                mapVote: room.mapVote || null
             });
         }
     }

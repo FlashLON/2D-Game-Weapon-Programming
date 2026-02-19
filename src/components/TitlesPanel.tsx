@@ -8,7 +8,21 @@ interface TitlesPanelProps {
     onEquip: (titleId: string | null) => void;
 }
 
+// Sort order: admin → mythical → legendary → epic → rare → common
+const RARITY_ORDER: Record<Title['rarity'], number> = {
+    admin: 0,
+    mythical: 1,
+    legendary: 2,
+    epic: 3,
+    rare: 4,
+    common: 5
+};
+
 export const TitlesPanel: React.FC<TitlesPanelProps> = ({ unlockedTitles, equippedTitle, onEquip }) => {
+    const sortedTitles = Object.values(TITLES).sort(
+        (a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity]
+    );
+
     return (
         <div className="space-y-4">
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-start gap-3">
@@ -22,9 +36,12 @@ export const TitlesPanel: React.FC<TitlesPanelProps> = ({ unlockedTitles, equipp
                 {/* None Option */}
                 <div
                     onClick={() => onEquip(null)}
-                    className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer group ${equippedTitle === null ? 'bg-cyber-accent/10 border-cyber-accent' : 'bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10'}`}
+                    className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer group
+                        ${equippedTitle === null
+                            ? 'bg-cyber-accent/10 border-cyber-accent'
+                            : 'bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10'}`}
                 >
-                    <div className="flex items-center justify-betaween">
+                    <div className="flex items-center justify-between">
                         <div>
                             <div className="text-xs font-black text-white uppercase mb-1">No Title</div>
                             <div className="text-[9px] text-cyber-muted uppercase">Stay Incognito</div>
@@ -33,7 +50,7 @@ export const TitlesPanel: React.FC<TitlesPanelProps> = ({ unlockedTitles, equipp
                     </div>
                 </div>
 
-                {Object.values(TITLES).map((title: Title) => {
+                {sortedTitles.map((title: Title) => {
                     const isUnlocked = unlockedTitles.includes(title.id);
                     const isEquipped = equippedTitle === title.id;
                     const styleClass = getTitleStyle(title.rarity);
@@ -44,28 +61,50 @@ export const TitlesPanel: React.FC<TitlesPanelProps> = ({ unlockedTitles, equipp
                         <div
                             key={title.id}
                             onClick={() => isUnlocked && onEquip(title.id)}
-                            className={`relative p-4 rounded-xl border-2 transition-all ${isUnlocked ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'} ${isEquipped ? 'bg-black/40 ' + styleClass.replace('bg-', 'border-') : 'bg-black/20 border-transparent hover:bg-white/5'} ${isUnlocked && !isEquipped ? 'hover:border-white/20' : ''}`}
+                            className={`relative p-4 rounded-xl border-2 transition-all
+                                ${isUnlocked ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}
+                                ${isEquipped
+                                    ? styleClass  /* full card style when equipped */
+                                    : isUnlocked
+                                        ? 'bg-black/20 border-white/10 hover:bg-white/5 hover:border-white/20'
+                                        : 'bg-black/20 border-white/5'
+                                }`}
                         >
-                            <div className="flex justify-between items-start">
+                            {/* Rarity badge — top right */}
+                            <div className="absolute top-2 right-3 flex flex-col items-end gap-0.5">
+                                <span className={`text-[7px] font-black uppercase tracking-widest
+                                    ${title.rarity === 'mythical' ? 'text-fuchsia-400'
+                                        : title.rarity === 'legendary' ? 'text-amber-400'
+                                            : title.rarity === 'epic' ? 'text-purple-400'
+                                                : title.rarity === 'rare' ? 'text-blue-400'
+                                                    : title.rarity === 'admin' ? 'text-red-400'
+                                                        : 'text-gray-500'}`}>
+                                    {title.rarity}
+                                </span>
+                            </div>
+
+                            <div className="flex justify-between items-start pr-10">
                                 <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded ${styleClass} border-0`}>
+                                    {/* Title Name Badge — use the title's own color */}
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                        <span
+                                            className="text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded border"
+                                            style={{
+                                                color: title.color,
+                                                borderColor: title.color + '55',
+                                                backgroundColor: title.color + '18',
+                                                textShadow: `0 0 8px ${title.color}88`
+                                            }}
+                                        >
                                             {title.name}
                                         </span>
-                                        {isEquipped && <CheckCircle2 size={14} className="text-emerald-500" />}
+                                        {isEquipped && <CheckCircle2 size={14} className="text-emerald-400" />}
                                     </div>
-                                    <div className="text-[9px] text-cyber-muted uppercase font-bold tracking-wide">
+                                    <div className="text-[9px] text-cyber-muted uppercase font-bold tracking-wide leading-tight">
                                         {title.description}
                                     </div>
                                 </div>
-                                {!isUnlocked && <Lock size={14} className="text-cyber-muted" />}
-                            </div>
-
-                            {/* Rarity & Condition Tag */}
-                            <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-                                <span className={`text-[8px] font-black uppercase ${title.rarity === 'mythical' ? 'text-fuchsia-500' : 'text-cyber-muted'}`}>
-                                    {title.rarity}
-                                </span>
+                                {!isUnlocked && <Lock size={14} className="text-cyber-muted ml-2 shrink-0" />}
                             </div>
                         </div>
                     );

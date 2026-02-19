@@ -62,6 +62,9 @@ class NetworkManager {
     private onLeaderboardUpdate: ((data: any[]) => void) | null = null;
     private onWaveEvent: ((event: any) => void) | null = null;
     private onProfileUpdate: ((profile: any) => void) | null = null;
+    private onMapVoteStart: ((data: any) => void) | null = null;
+    private onMapVoteUpdate: ((data: any) => void) | null = null;
+    private onMapChange: ((data: any) => void) | null = null;
 
     connect(serverUrl: string): Promise<boolean> {
         return new Promise((resolve) => {
@@ -122,6 +125,9 @@ class NetworkManager {
             this.socket.on('wave_start', (data: any) => this.onWaveEvent?.({ type: 'wave_start', ...data }));
             this.socket.on('boss_spawn', (data: any) => this.onWaveEvent?.({ type: 'boss_spawn', ...data }));
             this.socket.on('profile_update', (profile: any) => this.onProfileUpdate?.(profile));
+            this.socket.on('map_vote_start', (data: any) => this.onMapVoteStart?.(data));
+            this.socket.on('map_vote_update', (data: any) => this.onMapVoteUpdate?.(data));
+            this.socket.on('map_change', (data: any) => this.onMapChange?.(data));
 
             // Debug: Log all incoming events
             this.socket.onAny((ev, ...args) => {
@@ -302,6 +308,19 @@ class NetworkManager {
 
     isConnected(): boolean { return this.connected; }
     getPlayerId(): string | null { return this.playerId; }
+
+    // Map Voting
+    setOnMapVoteStart(cb: (data: any) => void) { this.onMapVoteStart = cb; }
+    setOnMapVoteUpdate(cb: (data: any) => void) { this.onMapVoteUpdate = cb; }
+    setOnMapChange(cb: (data: any) => void) { this.onMapChange = cb; }
+
+    sendVote(mapId: string) {
+        this.socket?.emit('vote_map', { mapId });
+    }
+
+    sendEquipTitle(titleId: string | null) {
+        this.socket?.emit('equip_title', { titleId });
+    }
 }
 
 export const networkManager = new NetworkManager();

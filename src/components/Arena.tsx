@@ -1,9 +1,9 @@
-import { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { gameEngine, type GameState } from '../engine/GameEngine';
-
 import { networkManager } from '../utils/NetworkManager';
 import { TITLES } from '../utils/TitleRegistry';
 import { ATTRIBUTES } from '../utils/AttributeRegistry';
+import { MapVoteOverlay } from './MapVoteOverlay';
 
 export const Arena: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -121,6 +121,20 @@ export const Arena: React.FC = () => {
                     else ctx.lineTo(x + dx, y + dy);
                 }
                 ctx.stroke();
+            }
+
+            // 2.5 Draw Map Walls (from server state)
+            if ((state as any).walls && (state as any).walls.length > 0) {
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#334155';
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 1.5;
+                (state as any).walls.forEach((w: any) => {
+                    ctx.fillRect(w.x, w.y, w.w, w.h);
+                    ctx.strokeRect(w.x, w.y, w.w, w.h);
+                });
+                ctx.shadowBlur = 0;
             }
 
             // 3. Draw Particles (Background layer)
@@ -251,12 +265,17 @@ export const Arena: React.FC = () => {
                             ctx.fillStyle = grad;
                             ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
                         } else if (aura === 'aura_precision') {
+                            // Reset to a clean canvas-space transform to prevent rotation accumulation
+                            ctx.setTransform(1, 0, 0, 1, 0, 0);
+                            ctx.translate(drawX, drawY);
                             ctx.strokeStyle = '#fff'; ctx.lineWidth = (critRecent || dmgRecent) ? 3 : 1;
                             if (critRecent || dmgRecent) { ctx.shadowBlur = 15; ctx.shadowColor = '#fff'; }
                             for (let i = 0; i < 4; i++) {
-                                ctx.rotate(Math.PI / 4);
-                                ctx.beginPath(); ctx.moveTo(-range, 0); ctx.lineTo(range, 0); ctx.stroke();
-                                ctx.beginPath(); ctx.moveTo(0, -range); ctx.lineTo(0, range); ctx.stroke();
+                                const a = (i * Math.PI) / 4;
+                                ctx.beginPath();
+                                ctx.moveTo(Math.cos(a) * -range, Math.sin(a) * -range);
+                                ctx.lineTo(Math.cos(a) * range, Math.sin(a) * range);
+                                ctx.stroke();
                             }
                         } else {
                             // Robust Fallback: Generic Aura Circle
@@ -292,7 +311,11 @@ export const Arena: React.FC = () => {
                     }
                 }
 
-                ctx.globalAlpha = 1.0;
+                // Ghost: semi-transparent when phased
+                const isGhost = (ent as any).enemyType === 'ghost';
+                const isPhased = isGhost && (ent as any).phased;
+
+                ctx.globalAlpha = isPhased ? 0.25 : 1.0;
                 if (ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime) {
                     ctx.globalAlpha = Math.max(0.2, (ent.lifetime || 0) / (ent.maxLifetime || 1));
                 }
@@ -644,6 +667,8 @@ export const Arena: React.FC = () => {
                     filter: 'contrast(1.1) brightness(1.1)',
                 }}
             />
+            {/* Map Vote Overlay — absolute positioned over canvas */}
+            <MapVoteOverlay />
             <div className="absolute top-4 right-4 text-cyber-muted text-xs space-y-1">
                 <div>WASD to Move</div>
                 <div>Click to Fire</div>

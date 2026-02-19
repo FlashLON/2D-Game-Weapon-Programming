@@ -333,6 +333,11 @@ export class GameEngine {
             // CLIENT-SIDE EXTRAPOLATION
             // We move everything locally while waiting for server snapshots
             this.state.entities.forEach(ent => {
+                // Decay highlights locally for smoothness
+                if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
+                    ent.aura_highlight_timer -= dt;
+                }
+
                 ent.x += ent.velocity.x * dt;
                 ent.y += ent.velocity.y * dt;
 
@@ -345,6 +350,42 @@ export class GameEngine {
                 if (isLocal) {
                     ent.aura_type = this.playerStats.aura_type;
                     (ent as any).limits = this.playerStats.limits;
+                }
+
+                // VISUAL AURA PROCESSING (Client-Side Feedback)
+                // We calculate highlights here so they feel responsive, but do NOT apply damage/physics
+                const aura = ent.aura_type;
+                if (ent.type === 'player' && aura) {
+                    const strength = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
+                    const startLimit = ATTRIBUTES[aura]?.startLimit || 1;
+                    const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
+                    const range = 240 * rangeScale;
+
+                    this.state.entities.forEach(target => {
+                        if (target.id === ent.id) return;
+
+                        const dx = target.x - ent.x;
+                        const dy = target.y - ent.y;
+                        const distSq = dx * dx + dy * dy;
+
+                        // Check if in range for visual highlight
+                        if (distSq < range * range) {
+                            if (!target.aura_highlight_timer || target.aura_highlight_timer <= 0) {
+                                target.aura_highlight_timer = 0.2; // 200ms flash
+                                target.aura_highlight_color = ATTRIBUTES[aura]?.category === 'aura' ? '#a855f7' : '#00ff9f';
+
+                                // Match specific aura colors
+                                if (aura === 'aura_damage') target.aura_highlight_color = '#ff4500';
+                                else if (aura === 'aura_gravity') target.aura_highlight_color = '#a855f7';
+                                else if (aura === 'aura_corruption') target.aura_highlight_color = '#22c55e';
+                                else if (aura === 'aura_execution') target.aura_highlight_color = '#fb923c';
+                                else if (aura === 'aura_chaos') target.aura_highlight_color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                                else if (aura === 'aura_control') target.aura_highlight_color = '#0ea5e9';
+                                else if (aura === 'aura_vampire') target.aura_highlight_color = '#ef4444';
+                                else if (aura === 'aura_precision') target.aura_highlight_color = '#ffffff';
+                            }
+                        }
+                    });
                 }
             });
 
@@ -725,7 +766,7 @@ export class GameEngine {
                         }
 
                         if (p.vampirism && p.vampirism > 0) {
-                            const heal = dmg * (p.vampirism / 100);
+                            const heal = dmg * p.vampirism; // vampirism is a direct multiplier (e.g. 0.1 = 10% leech)
                             const player = this.state.entities.find(ent => ent.type === 'player');
                             if (player) {
                                 player.hp = Math.min(player.maxHp, player.hp + heal);
@@ -733,9 +774,10 @@ export class GameEngine {
                         }
 
                         if (p.knockback) {
-                            const angle = Math.atan2(dy, dx);
-                            e.velocity.x -= Math.cos(angle) * p.knockback;
-                            e.velocity.y -= Math.sin(angle) * p.knockback;
+                            // dx/dy is (proj - enemy), so negate to get direction AWAY from impact
+                            const angle = Math.atan2(-dy, -dx);
+                            e.velocity.x += Math.cos(angle) * p.knockback;
+                            e.velocity.y += Math.sin(angle) * p.knockback;
                         }
 
                         if (this.weaponScript && this.weaponScript.on_hit) {
