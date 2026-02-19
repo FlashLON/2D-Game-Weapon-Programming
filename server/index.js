@@ -356,7 +356,7 @@ const MAP_IDS = Object.keys(MAPS);
 
 // MAP VOTING STATE — per room
 // room.mapVote = { options: [], votes: {socketId: mapId}, endTime: ms, active: bool }
-const MAP_VOTE_INTERVAL = 10 * 1000; // DEBUG: 10 seconds
+const MAP_VOTE_INTERVAL = 3 * 60 * 1000; // 3 minutes
 const MAP_VOTE_DURATION = 20 * 1000;  // 20 seconds to vote
 
 function startMapVote(roomId) {
