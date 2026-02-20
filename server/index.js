@@ -356,7 +356,7 @@ const MAP_IDS = Object.keys(MAPS);
 
 // MAP VOTING STATE — per room
 // room.mapVote = { options: [], votes: {socketId: mapId}, endTime: ms, active: bool }
-const MAP_VOTE_INTERVAL = 3 * 60 * 1000; // 3 minutes
+const MAP_VOTE_INTERVAL = 60 * 1000; // 60 seconds between votes
 const MAP_VOTE_DURATION = 20 * 1000;  // 20 seconds to vote
 
 function startMapVote(roomId) {
@@ -1132,945 +1132,948 @@ setInterval(() => {
     lastTick = now;
 
     for (const [roomId, room] of Object.entries(rooms)) {
-        // --- WAVE MODE LOGIC ---
-        if (room.mode === 'coop') {
-            room.waveTimer += dt;
+        try {
+            // --- WAVE MODE LOGIC ---
+            if (room.mode === 'coop') {
+                room.waveTimer += dt;
 
-            if (room.waveState === 'idle' && Object.keys(room.players).length > 0) {
-                room.wave = (room.wave || 0) + 1;
-                room.waveState = 'spawning';
-                room.waveTimer = 0;
-                room.bossSpawned = false; // Reset boss flag
-                io.to(roomId).emit('wave_start', { wave: room.wave });
-            }
+                if (room.waveState === 'idle' && Object.keys(room.players).length > 0) {
+                    room.wave = (room.wave || 0) + 1;
+                    room.waveState = 'spawning';
+                    room.waveTimer = 0;
+                    room.bossSpawned = false; // Reset boss flag
+                    io.to(roomId).emit('wave_start', { wave: room.wave });
+                }
 
-            if (room.waveState === 'spawning') {
-                const maxEnemies = 5 + (room.wave * 2);
-                if (room.enemies.length < maxEnemies && Math.random() < 0.1) {
-                    const side = Math.floor(Math.random() * 4);
-                    let ex = 0, ey = 0;
-                    if (side === 0) { ex = Math.random() * 800; ey = -50; }
-                    else if (side === 1) { ex = 850; ey = Math.random() * 600; }
-                    else if (side === 2) { ex = Math.random() * 800; ey = 650; }
-                    else { ex = -50; ey = Math.random() * 600; }
+                if (room.waveState === 'spawning') {
+                    const maxEnemies = 5 + (room.wave * 2);
+                    if (room.enemies.length < maxEnemies && Math.random() < 0.1) {
+                        const side = Math.floor(Math.random() * 4);
+                        let ex = 0, ey = 0;
+                        if (side === 0) { ex = Math.random() * 800; ey = -50; }
+                        else if (side === 1) { ex = 850; ey = Math.random() * 600; }
+                        else if (side === 2) { ex = Math.random() * 800; ey = 650; }
+                        else { ex = -50; ey = Math.random() * 600; }
 
-                    // Enemy Variety — wave-scaled with new types
-                    const rand = Math.random();
-                    let type = 'standard';
-                    let radius = 20;
-                    let color = '#ff0055';
-                    let speed = 50 + (room.wave * 2);
-                    let hp = 30 + (room.wave * 15);
-                    let extraProps = {};
+                        // Enemy Variety — wave-scaled with new types
+                        const rand = Math.random();
+                        let type = 'standard';
+                        let radius = 20;
+                        let color = '#ff0055';
+                        let speed = 50 + (room.wave * 2);
+                        let hp = 30 + (room.wave * 15);
+                        let extraProps = {};
 
-                    if (room.wave > 2 && rand > 0.88) {
-                        // HEALER — restores HP to nearby enemies
-                        type = 'healer';
-                        radius = 18;
-                        color = '#4ade80';
-                        speed *= 0.7;
-                        hp *= 0.8;
-                        extraProps = { healCooldown: 0, healRadius: 120, healAmount: 8 };
+                        if (room.wave > 2 && rand > 0.88) {
+                            // HEALER — restores HP to nearby enemies
+                            type = 'healer';
+                            radius = 18;
+                            color = '#4ade80';
+                            speed *= 0.7;
+                            hp *= 0.8;
+                            extraProps = { healCooldown: 0, healRadius: 120, healAmount: 8 };
 
-                    } else if (room.wave > 3 && rand > 0.78) {
-                        // TANK
-                        type = 'tank';
-                        radius = 35;
-                        color = '#880022';
-                        speed *= 0.55;
-                        hp *= 3.0;
+                        } else if (room.wave > 3 && rand > 0.78) {
+                            // TANK
+                            type = 'tank';
+                            radius = 35;
+                            color = '#880022';
+                            speed *= 0.55;
+                            hp *= 3.0;
 
-                    } else if (room.wave > 4 && rand > 0.68) {
-                        // BERSERKER — speeds up and deals more damage at low HP
-                        type = 'berserker';
-                        radius = 22;
-                        color = '#f97316';
-                        speed *= 1.0;
-                        hp *= 1.2;
-                        extraProps = { enraged: false };
+                        } else if (room.wave > 4 && rand > 0.68) {
+                            // BERSERKER — speeds up and deals more damage at low HP
+                            type = 'berserker';
+                            radius = 22;
+                            color = '#f97316';
+                            speed *= 1.0;
+                            hp *= 1.2;
+                            extraProps = { enraged: false };
 
-                    } else if (room.wave > 5 && rand > 0.58) {
-                        // GHOST — phases in/out, invulnerable while phased
-                        type = 'ghost';
-                        radius = 18;
-                        color = '#c4b5fd';
-                        speed *= 1.2;
-                        hp *= 0.7;
-                        extraProps = { phased: false, phaseTimer: 0, phaseCycle: 3.0 };
+                        } else if (room.wave > 5 && rand > 0.58) {
+                            // GHOST — phases in/out, invulnerable while phased
+                            type = 'ghost';
+                            radius = 18;
+                            color = '#c4b5fd';
+                            speed *= 1.2;
+                            hp *= 0.7;
+                            extraProps = { phased: false, phaseTimer: 0, phaseCycle: 3.0 };
 
-                    } else if (room.wave > 5 && rand > 0.48) {
-                        // SPEEDSTER
-                        type = 'speedster';
-                        radius = 15;
-                        color = '#ffaa00';
-                        speed *= 1.6;
-                        hp *= 0.55;
+                        } else if (room.wave > 5 && rand > 0.48) {
+                            // SPEEDSTER
+                            type = 'speedster';
+                            radius = 15;
+                            color = '#ffaa00';
+                            speed *= 1.6;
+                            hp *= 0.55;
 
-                    } else if (room.wave > 6 && rand > 0.38) {
-                        // SPLITTER — spawns 2 mini-clones on death
-                        type = 'splitter';
-                        radius = 26;
-                        color = '#fb7185';
-                        speed *= 0.9;
-                        hp *= 1.3;
-                        extraProps = { splits: 2 };
+                        } else if (room.wave > 6 && rand > 0.38) {
+                            // SPLITTER — spawns 2 mini-clones on death
+                            type = 'splitter';
+                            radius = 26;
+                            color = '#fb7185';
+                            speed *= 0.9;
+                            hp *= 1.3;
+                            extraProps = { splits: 2 };
 
-                    } else if (room.wave > 7 && rand > 0.28) {
-                        // SNIPER
-                        type = 'sniper';
-                        radius = 20;
-                        color = '#00ff00';
-                        speed *= 0.8;
-                        hp *= 0.8;
+                        } else if (room.wave > 7 && rand > 0.28) {
+                            // SNIPER
+                            type = 'sniper';
+                            radius = 20;
+                            color = '#00ff00';
+                            speed *= 0.8;
+                            hp *= 0.8;
+                        }
+
+                        room.enemies.push({
+                            id: 'enemy_' + Math.random().toString(36).substr(2, 5),
+                            type: 'enemy',
+                            enemyType: type,
+                            x: ex, y: ey,
+                            radius: radius,
+                            hp: hp,
+                            maxHp: hp,
+                            color: color,
+                            velocity: { x: 0, y: 0 },
+                            speed: speed,
+                            shootTimer: Math.random() * 2,
+                            ...extraProps
+                        });
                     }
+                    if (room.waveTimer > 5) room.waveState = 'fight';
+                }
 
+                // Boss Spawn every 5 waves (ensure only once)
+                if (room.wave > 0 && room.wave % 5 === 0 && room.waveState === 'fight' && !room.enemies.some(e => e.isBoss) && !room.bossSpawned) {
+                    room.bossSpawned = true;
                     room.enemies.push({
-                        id: 'enemy_' + Math.random().toString(36).substr(2, 5),
+                        id: 'boss_' + room.wave,
                         type: 'enemy',
-                        enemyType: type,
-                        x: ex, y: ey,
-                        radius: radius,
-                        hp: hp,
-                        maxHp: hp,
-                        color: color,
+                        isBoss: true,
+                        x: 400, y: -100,
+                        radius: 70,
+                        hp: 800 * (room.wave / 5),
+                        maxHp: 800 * (room.wave / 5),
+                        color: '#ff00ff',
                         velocity: { x: 0, y: 0 },
-                        speed: speed,
-                        shootTimer: Math.random() * 2,
-                        ...extraProps
+                        speed: 45,
+                        bossTimer: 0,
+                        bossState: 'chase' // chase, rapid_fire, charge
+                    });
+                    io.to(roomId).emit('boss_spawn', { wave: room.wave, hp: 800 * (room.wave / 5) });
+                }
+
+                if (room.waveState === 'fight' && room.enemies.length === 0) {
+                    // WAVE COMPLETED
+                    const waveCompleted = room.wave;
+                    room.waveState = 'idle';
+                    room.waveTimer = 0;
+
+                    // Check for Immortal and True King upon completing waves
+                    Object.values(room.players).forEach(p => {
+                        const pSocket = io.sockets.sockets.get(p.id);
+                        // Immortal: Reach Wave 50 without dying
+                        if (waveCompleted >= 50 && (!p.deaths || p.deaths === 0)) {
+                            unlockTitle(p.username, 'immortal', pSocket);
+                        }
+                        // True King: Reach Wave 100
+                        if (waveCompleted >= 100) {
+                            unlockTitle(p.username, 'trueking', pSocket);
+                        }
                     });
                 }
-                if (room.waveTimer > 5) room.waveState = 'fight';
             }
 
-            // Boss Spawn every 5 waves (ensure only once)
-            if (room.wave > 0 && room.wave % 5 === 0 && room.waveState === 'fight' && !room.enemies.some(e => e.isBoss) && !room.bossSpawned) {
-                room.bossSpawned = true;
-                room.enemies.push({
-                    id: 'boss_' + room.wave,
-                    type: 'enemy',
-                    isBoss: true,
-                    x: 400, y: -100,
-                    radius: 70,
-                    hp: 800 * (room.wave / 5),
-                    maxHp: 800 * (room.wave / 5),
-                    color: '#ff00ff',
-                    velocity: { x: 0, y: 0 },
-                    speed: 45,
-                    bossTimer: 0,
-                    bossState: 'chase' // chase, rapid_fire, charge
-                });
-                io.to(roomId).emit('boss_spawn', { wave: room.wave, hp: 800 * (room.wave / 5) });
-            }
+            updateRoomGrid(room);
 
-            if (room.waveState === 'fight' && room.enemies.length === 0) {
-                // WAVE COMPLETED
-                const waveCompleted = room.wave;
-                room.waveState = 'idle';
-                room.waveTimer = 0;
-
-                // Check for Immortal and True King upon completing waves
-                Object.values(room.players).forEach(p => {
-                    const pSocket = io.sockets.sockets.get(p.id);
-                    // Immortal: Reach Wave 50 without dying
-                    if (waveCompleted >= 50 && (!p.deaths || p.deaths === 0)) {
-                        unlockTitle(p.username, 'immortal', pSocket);
+            // Update Physics — iterate in reverse so splice(i,1) does not corrupt loop
+            for (let i = room.projectiles.length - 1; i >= 0; i--) {
+                const proj = room.projectiles[i];
+                proj.lifetime -= dt;
+                if (proj.lifetime <= 0) {
+                    // Split on Death
+                    if (proj.split_on_death > 0) {
+                        for (let s = 0; s < proj.split_on_death; s++) {
+                            const angle = (Math.PI * 2 / proj.split_on_death) * s;
+                            room.projectiles.push({
+                                id: Math.random().toString(36).substr(2, 9),
+                                playerId: proj.playerId,
+                                type: 'projectile',
+                                x: proj.x, y: proj.y,
+                                velocity: { x: Math.cos(angle) * 300, y: Math.sin(angle) * 300 },
+                                lifetime: 2,
+                                maxLifetime: 2,
+                                radius: (proj.radius || 5) * 0.6,
+                                damage: (proj.damage || 10) * 0.5,
+                                color: proj.color
+                            });
+                        }
                     }
-                    // True King: Reach Wave 100
-                    if (waveCompleted >= 100) {
-                        unlockTitle(p.username, 'trueking', pSocket);
-                    }
-                });
-            }
-        }
-
-        updateRoomGrid(room);
-
-        // Update Physics — iterate in reverse so splice(i,1) does not corrupt loop
-        for (let i = room.projectiles.length - 1; i >= 0; i--) {
-            const proj = room.projectiles[i];
-            proj.lifetime -= dt;
-            if (proj.lifetime <= 0) {
-                // Split on Death
-                if (proj.split_on_death > 0) {
-                    for (let s = 0; s < proj.split_on_death; s++) {
-                        const angle = (Math.PI * 2 / proj.split_on_death) * s;
-                        room.projectiles.push({
-                            id: Math.random().toString(36).substr(2, 9),
-                            playerId: proj.playerId,
-                            type: 'projectile',
-                            x: proj.x, y: proj.y,
-                            velocity: { x: Math.cos(angle) * 300, y: Math.sin(angle) * 300 },
-                            lifetime: 2,
-                            maxLifetime: 2,
-                            radius: (proj.radius || 5) * 0.6,
-                            damage: (proj.damage || 10) * 0.5,
-                            color: proj.color
-                        });
-                    }
+                    room.projectiles.splice(i, 1);
+                    continue;
                 }
-                room.projectiles.splice(i, 1);
-                continue;
-            }
 
-            const nearby = getNearbyEntities(room, proj.x, proj.y, proj.radius + 50);
+                const nearby = getNearbyEntities(room, proj.x, proj.y, proj.radius + 50);
 
-            // Orbit logic
-            if (proj.orbit_player) {
-                const owner = room.players[proj.playerId];
-                if (owner) {
-                    if (proj.orbitAngle === undefined) {
-                        proj.orbitAngle = Math.atan2(proj.y - owner.y, proj.x - owner.x);
-                        proj.orbitRadius = Math.sqrt((proj.x - owner.x) ** 2 + (proj.y - owner.y) ** 2) || (proj.orbit_radius || 100);
-                    }
-                    proj.orbitAngle += (proj.orbit_speed || 4.0) * dt;
-                    proj.x = owner.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
-                    proj.y = owner.y + Math.sin(proj.orbitAngle) * proj.orbitRadius;
-                    proj.velocity.x = -proj.orbitRadius * (proj.orbit_speed || 4.0) * Math.sin(proj.orbitAngle);
-                    proj.velocity.y = proj.orbitRadius * (proj.orbit_speed || 4.0) * Math.cos(proj.orbitAngle);
-                } else { proj.orbit_player = false; }
-            } else {
-                if (proj.acceleration) {
-                    proj.velocity.x *= (1 + proj.acceleration * dt);
-                    proj.velocity.y *= (1 + proj.acceleration * dt);
-                }
-                if (proj.spin) {
-                    const spinRad = (proj.spin * Math.PI / 180) * dt;
-                    const cos = Math.cos(spinRad), sin = Math.sin(spinRad);
-                    const nx = proj.velocity.x * cos - proj.velocity.y * sin;
-                    const ny = proj.velocity.x * sin + proj.velocity.y * cos;
-                    proj.velocity.x = nx; proj.velocity.y = ny;
-                }
-                if (proj.homing && proj.homing > 0) {
-                    let nearest = null, minDistSq = Infinity;
-                    nearby.forEach(ent => {
-                        if (ent.id === proj.playerId || ent.type === 'projectile') return;
-                        const dSq = (ent.x - proj.x) ** 2 + (ent.y - proj.y) ** 2;
-                        if (dSq < minDistSq) { minDistSq = dSq; nearest = ent; }
-                    });
-                    if (nearest) {
-                        const cur = Math.atan2(proj.velocity.y, proj.velocity.x);
-                        const tar = Math.atan2(nearest.y - proj.y, nearest.x - proj.x);
-                        let diff = tar - cur;
-                        while (diff > Math.PI) diff -= Math.PI * 2;
-                        while (diff < -Math.PI) diff += Math.PI * 2;
-                        const turn = proj.homing * 5 * dt;
-                        const newAngle = cur + Math.max(-turn, Math.min(turn, diff));
-                        const speed = Math.sqrt(proj.velocity.x ** 2 + proj.velocity.y ** 2);
-                        proj.velocity.x = Math.cos(newAngle) * speed; proj.velocity.y = Math.sin(newAngle) * speed;
-                    }
-                }
-                proj.x += proj.velocity.x * dt;
-                proj.y += proj.velocity.y * dt;
-
-                if (proj.wave_amplitude && proj.wave_amplitude > 0) {
-                    const elapsed = proj.maxLifetime - proj.lifetime;
-                    const offset = Math.sin(elapsed * (proj.wave_frequency || 10)) * proj.wave_amplitude;
-                    const perpX = -proj.velocity.y, perpY = proj.velocity.x;
-                    const mag = Math.sqrt(perpX ** 2 + perpY ** 2) || 1;
-                    proj.renderX = proj.x + (perpX / mag) * offset;
-                    proj.renderY = proj.y + (perpY / mag) * offset;
+                // Orbit logic
+                if (proj.orbit_player) {
+                    const owner = room.players[proj.playerId];
+                    if (owner) {
+                        if (proj.orbitAngle === undefined) {
+                            proj.orbitAngle = Math.atan2(proj.y - owner.y, proj.x - owner.x);
+                            proj.orbitRadius = Math.sqrt((proj.x - owner.x) ** 2 + (proj.y - owner.y) ** 2) || (proj.orbit_radius || 100);
+                        }
+                        proj.orbitAngle += (proj.orbit_speed || 4.0) * dt;
+                        proj.x = owner.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
+                        proj.y = owner.y + Math.sin(proj.orbitAngle) * proj.orbitRadius;
+                        proj.velocity.x = -proj.orbitRadius * (proj.orbit_speed || 4.0) * Math.sin(proj.orbitAngle);
+                        proj.velocity.y = proj.orbitRadius * (proj.orbit_speed || 4.0) * Math.cos(proj.orbitAngle);
+                    } else { proj.orbit_player = false; }
                 } else {
-                    proj.renderX = proj.x;
-                    proj.renderY = proj.y;
-                }
-
-                if (proj.bounciness) {
-                    if (proj.x < proj.radius || proj.x > 800 - proj.radius) proj.velocity.x *= -proj.bounciness;
-                    if (proj.y < proj.radius || proj.y > 600 - proj.radius) proj.velocity.y *= -proj.bounciness;
-                }
-
-                // Attraction Force
-                if (proj.attraction_force > 0) {
-                    nearby.forEach(ent => {
-                        if (ent.id === proj.playerId || ent.type === 'projectile') return;
-                        const dx = proj.x - ent.x;
-                        const dy = proj.y - ent.y;
-                        const dSq = dx * dx + dy * dy;
-                        if (dSq < 200 * 200) {
-                            const mag = Math.sqrt(dSq) || 1;
-                            const force = (proj.attraction_force * 100) / (mag + 1);
-                            ent.velocity.x += (dx / mag) * force * dt;
-                            ent.velocity.y += (dy / mag) * force * dt;
-                        }
-                    });
-                }
-            }
-
-            // Collisions
-            let hitSomething = false;
-            nearby.forEach(ent => {
-                if (ent.id === proj.playerId || ent.type === 'projectile') return;
-                // GHOST: invulnerable while phased
-                if (ent.enemyType === 'ghost' && ent.phased) return;
-                const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
-                if (dist < ent.radius + proj.radius) {
-                    let dmg = (proj.damage || 10);
-                    const now = Date.now();
-                    const shooterId = proj.playerId || 'unknown';
-                    const room = rooms[roomId]; // Room context
-
-                    // CRITICAL: Apply Damage Aura Multiplier if shooter has it
-                    if (room && room.players[shooterId]) {
-                        const shooter = room.players[shooterId];
-                        if (shooter.aura_type === 'aura_damage') {
-                            const mult = shooter.limits?.['aura_damage'] || 1.1;
-                            dmg *= mult;
+                    if (proj.acceleration) {
+                        proj.velocity.x *= (1 + proj.acceleration * dt);
+                        proj.velocity.y *= (1 + proj.acceleration * dt);
+                    }
+                    if (proj.spin) {
+                        const spinRad = (proj.spin * Math.PI / 180) * dt;
+                        const cos = Math.cos(spinRad), sin = Math.sin(spinRad);
+                        const nx = proj.velocity.x * cos - proj.velocity.y * sin;
+                        const ny = proj.velocity.x * sin + proj.velocity.y * cos;
+                        proj.velocity.x = nx; proj.velocity.y = ny;
+                    }
+                    if (proj.homing && proj.homing > 0) {
+                        let nearest = null, minDistSq = Infinity;
+                        nearby.forEach(ent => {
+                            if (ent.id === proj.playerId || ent.type === 'projectile') return;
+                            const dSq = (ent.x - proj.x) ** 2 + (ent.y - proj.y) ** 2;
+                            if (dSq < minDistSq) { minDistSq = dSq; nearest = ent; }
+                        });
+                        if (nearest) {
+                            const cur = Math.atan2(proj.velocity.y, proj.velocity.x);
+                            const tar = Math.atan2(nearest.y - proj.y, nearest.x - proj.x);
+                            let diff = tar - cur;
+                            while (diff > Math.PI) diff -= Math.PI * 2;
+                            while (diff < -Math.PI) diff += Math.PI * 2;
+                            const turn = proj.homing * 5 * dt;
+                            const newAngle = cur + Math.max(-turn, Math.min(turn, diff));
+                            const speed = Math.sqrt(proj.velocity.x ** 2 + proj.velocity.y ** 2);
+                            proj.velocity.x = Math.cos(newAngle) * speed; proj.velocity.y = Math.sin(newAngle) * speed;
                         }
                     }
+                    proj.x += proj.velocity.x * dt;
+                    proj.y += proj.velocity.y * dt;
 
-                    // Initialize tracker fields
-                    if (!ent.last_hit_by) ent.last_hit_by = {};
-                    if (!ent.hit_streak) ent.hit_streak = {};
-                    if (!ent.active_dots) ent.active_dots = [];
-                    if (ent.armor_reduction === undefined) ent.armor_reduction = 0;
-
-                    // --- AURAS: Server Parity ---
-                    let critChanceBonus = 0;
-                    let critDmgBonus = 0;
-                    let focusFireBonus = 0;
-                    let damageMult = 1.0;
-
-                    if (room.players[shooterId]) {
-                        const shooter = room.players[shooterId];
-                        if (shooter.aura_type === 'aura_precision') {
-                            const strength = shooter.limits?.['aura_precision'] || 1.1;
-                            critChanceBonus = (strength - 1) * 40;
-                            critDmgBonus = (strength - 1);
-                            focusFireBonus = (strength - 1) * 0.5;
-                        }
-                        if (shooter.aura_type === 'aura_damage') {
-                            damageMult = shooter.limits?.['aura_damage'] || 1.1;
-                        }
-                    }
-
-                    // 1. Critical Hits
-                    const finalCritChance = (proj.crit_chance || 0) + critChanceBonus;
-                    const isCrit = Math.random() * 100 < finalCritChance;
-
-                    if (isCrit) {
-                        dmg *= ((proj.crit_damage || 2.0) + critDmgBonus);
-                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ffffff', strength: 5, radius: 20 });
-                    }
-
-                    dmg *= damageMult;
-
-                    // 2. Focus Fire
-                    const lastHitTime = ent.last_hit_by[shooterId] || 0;
-                    if (now - lastHitTime < 1000) {
-                        ent.hit_streak[shooterId] = (ent.hit_streak[shooterId] || 0) + 1;
-                        const ffPower = (proj.focus_fire || 0) + focusFireBonus;
-                        if (ffPower > 0) {
-                            dmg *= (1 + (ent.hit_streak[shooterId] * ffPower));
-                        }
+                    if (proj.wave_amplitude && proj.wave_amplitude > 0) {
+                        const elapsed = proj.maxLifetime - proj.lifetime;
+                        const offset = Math.sin(elapsed * (proj.wave_frequency || 10)) * proj.wave_amplitude;
+                        const perpX = -proj.velocity.y, perpY = proj.velocity.x;
+                        const mag = Math.sqrt(perpX ** 2 + perpY ** 2) || 1;
+                        proj.renderX = proj.x + (perpX / mag) * offset;
+                        proj.renderY = proj.y + (perpY / mag) * offset;
                     } else {
-                        ent.hit_streak[shooterId] = 1;
-                    }
-                    ent.last_hit_by[shooterId] = now;
-
-                    // 3. Burst
-                    if (proj.burst_damage && (now - lastHitTime > 3000)) {
-                        dmg += proj.burst_damage;
+                        proj.renderX = proj.x;
+                        proj.renderY = proj.y;
                     }
 
-                    // 4. Execution
-                    if (proj.execution_damage) {
-                        const hpFactor = 1 - (ent.hp / ent.maxHp);
-                        dmg *= (1 + (hpFactor * proj.execution_damage));
+                    if (proj.bounciness) {
+                        if (proj.x < proj.radius || proj.x > 800 - proj.radius) proj.velocity.x *= -proj.bounciness;
+                        if (proj.y < proj.radius || proj.y > 600 - proj.radius) proj.velocity.y *= -proj.bounciness;
                     }
 
-                    // 5. Armor Shred
-                    if (proj.armor_shred) {
-                        ent.armor_reduction = Math.min(0.9, (ent.armor_reduction || 0) + proj.armor_shred);
-                    }
-                    dmg *= (1 + (ent.armor_reduction || 0));
-
-                    // 6. DOT (Corrupt)
-                    if (proj.dot_damage) {
-                        ent.active_dots.push({
-                            damage: proj.dot_damage / 5,
-                            end_time: now + 5000,
-                            attacker_id: shooterId
+                    // Attraction Force
+                    if (proj.attraction_force > 0) {
+                        nearby.forEach(ent => {
+                            if (ent.id === proj.playerId || ent.type === 'projectile') return;
+                            const dx = proj.x - ent.x;
+                            const dy = proj.y - ent.y;
+                            const dSq = dx * dx + dy * dy;
+                            if (dSq < 200 * 200) {
+                                const mag = Math.sqrt(dSq) || 1;
+                                const force = (proj.attraction_force * 100) / (mag + 1);
+                                ent.velocity.x += (dx / mag) * force * dt;
+                                ent.velocity.y += (dy / mag) * force * dt;
+                            }
                         });
                     }
+                }
 
-                    // Logic for Sneaky (One Shot Kill on ANY entity)
-                    if (dmg >= ent.maxHp && ent.hp >= ent.maxHp * 0.99) {
+                // Collisions
+                let hitSomething = false;
+                nearby.forEach(ent => {
+                    if (ent.id === proj.playerId || ent.type === 'projectile') return;
+                    // GHOST: invulnerable while phased
+                    if (ent.enemyType === 'ghost' && ent.phased) return;
+                    const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
+                    if (dist < ent.radius + proj.radius) {
+                        let dmg = (proj.damage || 10);
+                        const now = Date.now();
+                        const shooterId = proj.playerId || 'unknown';
+                        const room = rooms[roomId]; // Room context
+
+                        // CRITICAL: Apply Damage Aura Multiplier if shooter has it
+                        if (room && room.players[shooterId]) {
+                            const shooter = room.players[shooterId];
+                            if (shooter.aura_type === 'aura_damage') {
+                                const mult = shooter.limits?.['aura_damage'] || 1.1;
+                                dmg *= mult;
+                            }
+                        }
+
+                        // Initialize tracker fields
+                        if (!ent.last_hit_by) ent.last_hit_by = {};
+                        if (!ent.hit_streak) ent.hit_streak = {};
+                        if (!ent.active_dots) ent.active_dots = [];
+                        if (ent.armor_reduction === undefined) ent.armor_reduction = 0;
+
+                        // --- AURAS: Server Parity ---
+                        let critChanceBonus = 0;
+                        let critDmgBonus = 0;
+                        let focusFireBonus = 0;
+                        let damageMult = 1.0;
+
+                        if (room.players[shooterId]) {
+                            const shooter = room.players[shooterId];
+                            if (shooter.aura_type === 'aura_precision') {
+                                const strength = shooter.limits?.['aura_precision'] || 1.1;
+                                critChanceBonus = (strength - 1) * 40;
+                                critDmgBonus = (strength - 1);
+                                focusFireBonus = (strength - 1) * 0.5;
+                            }
+                            if (shooter.aura_type === 'aura_damage') {
+                                damageMult = shooter.limits?.['aura_damage'] || 1.1;
+                            }
+                        }
+
+                        // 1. Critical Hits
+                        const finalCritChance = (proj.crit_chance || 0) + critChanceBonus;
+                        const isCrit = Math.random() * 100 < finalCritChance;
+
+                        if (isCrit) {
+                            dmg *= ((proj.crit_damage || 2.0) + critDmgBonus);
+                            io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ffffff', strength: 5, radius: 20 });
+                        }
+
+                        dmg *= damageMult;
+
+                        // 2. Focus Fire
+                        const lastHitTime = ent.last_hit_by[shooterId] || 0;
+                        if (now - lastHitTime < 1000) {
+                            ent.hit_streak[shooterId] = (ent.hit_streak[shooterId] || 0) + 1;
+                            const ffPower = (proj.focus_fire || 0) + focusFireBonus;
+                            if (ffPower > 0) {
+                                dmg *= (1 + (ent.hit_streak[shooterId] * ffPower));
+                            }
+                        } else {
+                            ent.hit_streak[shooterId] = 1;
+                        }
+                        ent.last_hit_by[shooterId] = now;
+
+                        // 3. Burst
+                        if (proj.burst_damage && (now - lastHitTime > 3000)) {
+                            dmg += proj.burst_damage;
+                        }
+
+                        // 4. Execution
+                        if (proj.execution_damage) {
+                            const hpFactor = 1 - (ent.hp / ent.maxHp);
+                            dmg *= (1 + (hpFactor * proj.execution_damage));
+                        }
+
+                        // 5. Armor Shred
+                        if (proj.armor_shred) {
+                            ent.armor_reduction = Math.min(0.9, (ent.armor_reduction || 0) + proj.armor_shred);
+                        }
+                        dmg *= (1 + (ent.armor_reduction || 0));
+
+                        // 6. DOT (Corrupt)
+                        if (proj.dot_damage) {
+                            ent.active_dots.push({
+                                damage: proj.dot_damage / 5,
+                                end_time: now + 5000,
+                                attacker_id: shooterId
+                            });
+                        }
+
+                        // Logic for Sneaky (One Shot Kill on ANY entity)
+                        if (dmg >= ent.maxHp && ent.hp >= ent.maxHp * 0.99) {
+                            if (room.players[proj.playerId]) {
+                                const shooterSocket = io.sockets.sockets.get(proj.playerId);
+                                unlockTitle(room.players[proj.playerId].username, 'sneaky', shooterSocket);
+                            }
+                        }
+
+                        // Sync damage timing for aura effects
                         if (room.players[proj.playerId]) {
-                            const shooterSocket = io.sockets.sockets.get(proj.playerId);
-                            unlockTitle(room.players[proj.playerId].username, 'sneaky', shooterSocket);
+                            room.players[proj.playerId].lastDealtDamageTime = Date.now();
+                            if (isCrit) room.players[proj.playerId].lastCritTime = Date.now();
                         }
-                    }
 
-                    // Sync damage timing for aura effects
-                    if (room.players[proj.playerId]) {
-                        room.players[proj.playerId].lastDealtDamageTime = Date.now();
-                        if (isCrit) room.players[proj.playerId].lastCritTime = Date.now();
-                    }
+                        ent.hp -= dmg;
 
-                    ent.hp -= dmg;
-
-                    // Logic for ThreeForOne (Multikill on Pierce)
-                    if (ent.hp <= 0 && room.players[proj.playerId]) {
-                        proj.hitCount = (proj.hitCount || 0) + 1;
-                        if (proj.hitCount >= 3) {
-                            const shooterSocket = io.sockets.sockets.get(proj.playerId);
-                            unlockTitle(room.players[proj.playerId].username, 'threeforone', shooterSocket);
+                        // Logic for ThreeForOne (Multikill on Pierce)
+                        if (ent.hp <= 0 && room.players[proj.playerId]) {
+                            proj.hitCount = (proj.hitCount || 0) + 1;
+                            if (proj.hitCount >= 3) {
+                                const shooterSocket = io.sockets.sockets.get(proj.playerId);
+                                unlockTitle(room.players[proj.playerId].username, 'threeforone', shooterSocket);
+                            }
                         }
-                    }
 
-                    // Vampirism
-                    if (proj.vampirism > 0 && room.players[proj.playerId]) {
-                        const shooter = room.players[proj.playerId];
-                        shooter.hp = Math.min(shooter.maxHp, shooter.hp + (dmg * proj.vampirism));
-                    }
+                        // Vampirism
+                        if (proj.vampirism > 0 && room.players[proj.playerId]) {
+                            const shooter = room.players[proj.playerId];
+                            shooter.hp = Math.min(shooter.maxHp, shooter.hp + (dmg * proj.vampirism));
+                        }
 
-                    // Knockback
-                    if (proj.knockback > 0) {
-                        const angle = Math.atan2(ent.y - (proj.renderY || proj.y), ent.x - (proj.renderX || proj.x));
-                        ent.velocity.x += Math.cos(angle) * proj.knockback;
-                        ent.velocity.y += Math.sin(angle) * proj.knockback;
-                    }
+                        // Knockback
+                        if (proj.knockback > 0) {
+                            const angle = Math.atan2(ent.y - (proj.renderY || proj.y), ent.x - (proj.renderX || proj.x));
+                            ent.velocity.x += Math.cos(angle) * proj.knockback;
+                            ent.velocity.y += Math.sin(angle) * proj.knockback;
+                        }
 
-                    // Enemy Projectile Collision — damage was already applied above;
-                    // just handle visual + death + removal for enemy projectiles.
-                    if (proj.isEnemyProjectile && room.players[ent.id]) {
-                        // Visual hit
-                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ff0055', strength: 10 });
+                        // Enemy Projectile Collision — damage was already applied above;
+                        // just handle visual + death + removal for enemy projectiles.
+                        if (proj.isEnemyProjectile && room.players[ent.id]) {
+                            // Visual hit
+                            io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#ff0055', strength: 10 });
+
+                            if (ent.hp <= 0) {
+                                ent.hp = ent.maxHp;
+                                ent.deaths = (ent.deaths || 0) + 1;
+                                ent.x = 400; ent.y = 300;
+                            }
+                            hitSomething = true;
+                            return; // Done with this projectile
+                        }
+
+                        // Explosion
+                        if (proj.explosion_radius > 0) {
+                            const exRadius = proj.explosion_radius;
+                            const targets = getNearbyEntities(room, proj.x, proj.y, exRadius);
+                            targets.forEach(t => {
+                                if (t.id === proj.playerId || t.type === 'projectile') return;
+                                const dSq = (t.x - proj.x) ** 2 + (t.y - proj.y) ** 2;
+                                if (dSq < exRadius * exRadius) {
+                                    t.hp -= (proj.explosion_damage || 15);
+
+                                    // Track Multikill for Explosion
+                                    if (t.hp <= 0 && room.players[proj.playerId]) {
+                                        proj.hitCount = (proj.hitCount || 0) + 1;
+                                        if (proj.hitCount >= 3) {
+                                            const shooterSocket = io.sockets.sockets.get(proj.playerId);
+                                            unlockTitle(room.players[proj.playerId].username, 'threeforone', shooterSocket);
+                                        }
+                                    }
+
+                                    const exAngle = Math.atan2(t.y - proj.y, t.x - proj.x);
+                                    t.velocity.x += Math.cos(exAngle) * 50;
+                                    t.velocity.y += Math.sin(exAngle) * 50;
+                                }
+                            });
+                            io.to(roomId).emit('visual_effect', {
+                                type: 'explosion', x: proj.x, y: proj.y, color: proj.color || '#ff6e00', strength: 25, radius: exRadius
+                            });
+                        }
+
+                        // --- CHAIN LIGHTNING LOGIC ---
+                        if (proj.chain_range > 0 && (proj.chain_count || 0) > 0) {
+                            proj.chain_count--;
+
+                            // Find nearest enemy excluding current target
+                            let nearest = null;
+                            let minDistSq = proj.chain_range * proj.chain_range;
+
+                            const candidates = getNearbyEntities(room, ent.x, ent.y, proj.chain_range);
+                            candidates.forEach(c => {
+                                if (c.id === ent.id || c.id === proj.playerId || c.type === 'projectile') return;
+                                const dSq = (c.x - ent.x) ** 2 + (c.y - ent.y) ** 2;
+                                if (dSq < minDistSq) {
+                                    minDistSq = dSq;
+                                    nearest = c;
+                                }
+                            });
+
+                            if (nearest) {
+                                // Redirect projectile to next target
+                                const angle = Math.atan2(nearest.y - ent.y, nearest.x - ent.x);
+                                const speed = Math.sqrt(proj.velocity.x ** 2 + proj.velocity.y ** 2) || 400;
+                                proj.x = ent.x;
+                                proj.y = ent.y;
+                                proj.velocity.x = Math.cos(angle) * speed;
+                                proj.velocity.y = Math.sin(angle) * speed;
+                                hitSomething = false; // Don't destroy yet
+
+                                // Visual Jump Effect
+                                io.to(roomId).emit('visual_effect', {
+                                    type: 'impact', x: ent.x, y: ent.y, color: proj.color, strength: 10
+                                });
+                            } else {
+                                // No more targets to jump to
+                                if (proj.pierce && proj.pierce > 1) {
+                                    proj.pierce--;
+                                    hitSomething = false;
+                                } else {
+                                    hitSomething = true;
+                                }
+                            }
+                        } else if (proj.pierce && proj.pierce > 1) {
+                            proj.pierce--;
+                            hitSomething = false;
+                        } else {
+                            hitSomething = true;
+                        }
+
+                        // Impact FX (if not already handled by explosion)
+                        if (!(proj.explosion_radius > 0)) {
+                            io.to(roomId).emit('visual_effect', {
+                                type: 'impact', x: ent.x, y: ent.y, color: ent.color, strength: 15, radius: 80
+                            });
+                        }
 
                         if (ent.hp <= 0) {
-                            ent.hp = ent.maxHp;
-                            ent.deaths = (ent.deaths || 0) + 1;
-                            ent.x = 400; ent.y = 300;
-                        }
-                        hitSomething = true;
-                        return; // Done with this projectile
-                    }
+                            if (room.mode === 'coop') {
+                                room.enemies.splice(room.enemies.indexOf(ent), 1);
+                            } else {
+                                ent.hp = ent.maxHp;
+                                ent.x = Math.random() * 700 + 50;
+                                ent.y = Math.random() * 500 + 50;
+                            }
+                            if (room.players[proj.playerId]) {
+                                const killer = room.players[proj.playerId];
+                                killer.kills++;
+                                killer.xp += 50;
+                                killer.money += 25;
+                                killer.killstreak = (killer.killstreak || 0) + 1; // Increment streak
 
-                    // Explosion
-                    if (proj.explosion_radius > 0) {
-                        const exRadius = proj.explosion_radius;
-                        const targets = getNearbyEntities(room, proj.x, proj.y, exRadius);
-                        targets.forEach(t => {
-                            if (t.id === proj.playerId || t.type === 'projectile') return;
-                            const dSq = (t.x - proj.x) ** 2 + (t.y - proj.y) ** 2;
-                            if (dSq < exRadius * exRadius) {
-                                t.hp -= (proj.explosion_damage || 15);
+                                console.log(`[KILL] ${killer.username} got a kill! Session kills: ${killer.kills}, Killstreak: ${killer.killstreak}`);
 
-                                // Track Multikill for Explosion
-                                if (t.hp <= 0 && room.players[proj.playerId]) {
-                                    proj.hitCount = (proj.hitCount || 0) + 1;
-                                    if (proj.hitCount >= 3) {
-                                        const shooterSocket = io.sockets.sockets.get(proj.playerId);
-                                        unlockTitle(room.players[proj.playerId].username, 'threeforone', shooterSocket);
+                                // Update persistent kill count
+                                let user = memoryUsers.get(killer.username);
+                                if (user) {
+                                    user.killCount = (user.killCount || 0) + 1;
+                                    console.log(`[KILL] Updated persistent killCount for ${killer.username}: ${user.killCount}`);
+
+                                    // Find socket for this player
+                                    const killerSocket = io.sockets.sockets.get(proj.playerId);
+                                    console.log(`[KILL] Socket lookup for ${proj.playerId}:`, killerSocket ? 'Found' : 'Not found');
+
+                                    // Sync damage timing for aura effects
+                                    killer.lastDealtDamageTime = Date.now();
+                                    if (isCrit) killer.lastCritTime = Date.now();
+
+                                    // Check Titles using PERSISTENT killCount
+                                    if (user.killCount >= 30) unlockTitle(killer.username, 'killer', killerSocket);
+                                    if (killer.killstreak >= 100) unlockTitle(killer.username, 'unstoppable', killerSocket);
+                                    if (killer.killstreak >= 1000) unlockTitle(killer.username, 'monster', killerSocket);
+
+                                    // Check God Slayer (Eliminate a player holding the GOD title)
+                                    if (ent.type === 'player' && room.players[ent.id]) {
+                                        const victim = room.players[ent.id];
+                                        console.log(`[KILL] Checking God Slayer: Victim ${victim.username} equippedTitle: ${victim.equippedTitle}`);
+                                        if (victim.equippedTitle === 'god') {
+                                            unlockTitle(killer.username, 'godkiller', killerSocket);
+                                        }
                                     }
+                                } else {
+                                    console.log(`[KILL] ⚠️ User ${killer.username} not found in memoryUsers!`);
                                 }
 
-                                const exAngle = Math.atan2(t.y - proj.y, t.x - proj.x);
-                                t.velocity.x += Math.cos(exAngle) * 50;
-                                t.velocity.y += Math.sin(exAngle) * 50;
-                            }
-                        });
-                        io.to(roomId).emit('visual_effect', {
-                            type: 'explosion', x: proj.x, y: proj.y, color: proj.color || '#ff6e00', strength: 25, radius: exRadius
-                        });
-                    }
-
-                    // --- CHAIN LIGHTNING LOGIC ---
-                    if (proj.chain_range > 0 && (proj.chain_count || 0) > 0) {
-                        proj.chain_count--;
-
-                        // Find nearest enemy excluding current target
-                        let nearest = null;
-                        let minDistSq = proj.chain_range * proj.chain_range;
-
-                        const candidates = getNearbyEntities(room, ent.x, ent.y, proj.chain_range);
-                        candidates.forEach(c => {
-                            if (c.id === ent.id || c.id === proj.playerId || c.type === 'projectile') return;
-                            const dSq = (c.x - ent.x) ** 2 + (c.y - ent.y) ** 2;
-                            if (dSq < minDistSq) {
-                                minDistSq = dSq;
-                                nearest = c;
-                            }
-                        });
-
-                        if (nearest) {
-                            // Redirect projectile to next target
-                            const angle = Math.atan2(nearest.y - ent.y, nearest.x - ent.x);
-                            const speed = Math.sqrt(proj.velocity.x ** 2 + proj.velocity.y ** 2) || 400;
-                            proj.x = ent.x;
-                            proj.y = ent.y;
-                            proj.velocity.x = Math.cos(angle) * speed;
-                            proj.velocity.y = Math.sin(angle) * speed;
-                            hitSomething = false; // Don't destroy yet
-
-                            // Visual Jump Effect
-                            io.to(roomId).emit('visual_effect', {
-                                type: 'impact', x: ent.x, y: ent.y, color: proj.color, strength: 10
-                            });
-                        } else {
-                            // No more targets to jump to
-                            if (proj.pierce && proj.pierce > 1) {
-                                proj.pierce--;
-                                hitSomething = false;
-                            } else {
-                                hitSomething = true;
-                            }
-                        }
-                    } else if (proj.pierce && proj.pierce > 1) {
-                        proj.pierce--;
-                        hitSomething = false;
-                    } else {
-                        hitSomething = true;
-                    }
-
-                    // Impact FX (if not already handled by explosion)
-                    if (!(proj.explosion_radius > 0)) {
-                        io.to(roomId).emit('visual_effect', {
-                            type: 'impact', x: ent.x, y: ent.y, color: ent.color, strength: 15, radius: 80
-                        });
-                    }
-
-                    if (ent.hp <= 0) {
-                        if (room.mode === 'coop') {
-                            room.enemies.splice(room.enemies.indexOf(ent), 1);
-                        } else {
-                            ent.hp = ent.maxHp;
-                            ent.x = Math.random() * 700 + 50;
-                            ent.y = Math.random() * 500 + 50;
-                        }
-                        if (room.players[proj.playerId]) {
-                            const killer = room.players[proj.playerId];
-                            killer.kills++;
-                            killer.xp += 50;
-                            killer.money += 25;
-                            killer.killstreak = (killer.killstreak || 0) + 1; // Increment streak
-
-                            console.log(`[KILL] ${killer.username} got a kill! Session kills: ${killer.kills}, Killstreak: ${killer.killstreak}`);
-
-                            // Update persistent kill count
-                            let user = memoryUsers.get(killer.username);
-                            if (user) {
-                                user.killCount = (user.killCount || 0) + 1;
-                                console.log(`[KILL] Updated persistent killCount for ${killer.username}: ${user.killCount}`);
-
-                                // Find socket for this player
-                                const killerSocket = io.sockets.sockets.get(proj.playerId);
-                                console.log(`[KILL] Socket lookup for ${proj.playerId}:`, killerSocket ? 'Found' : 'Not found');
-
-                                // Sync damage timing for aura effects
-                                killer.lastDealtDamageTime = Date.now();
-                                if (isCrit) killer.lastCritTime = Date.now();
-
-                                // Check Titles using PERSISTENT killCount
-                                if (user.killCount >= 30) unlockTitle(killer.username, 'killer', killerSocket);
-                                if (killer.killstreak >= 100) unlockTitle(killer.username, 'unstoppable', killerSocket);
-                                if (killer.killstreak >= 1000) unlockTitle(killer.username, 'monster', killerSocket);
-
-                                // Check God Slayer (Eliminate a player holding the GOD title)
-                                if (ent.type === 'player' && room.players[ent.id]) {
-                                    const victim = room.players[ent.id];
-                                    console.log(`[KILL] Checking God Slayer: Victim ${victim.username} equippedTitle: ${victim.equippedTitle}`);
-                                    if (victim.equippedTitle === 'god') {
-                                        unlockTitle(killer.username, 'godkiller', killerSocket);
-                                    }
+                                if (killer.xp >= killer.maxXp) {
+                                    killer.level++;
+                                    killer.xp -= killer.maxXp;
+                                    killer.maxXp = Math.floor(killer.maxXp * 1.5);
+                                    io.to(roomId).emit('visual_effect', {
+                                        type: 'levelup', x: killer.x, y: killer.y, color: '#ffd700',
+                                        level: killer.level, xp: killer.xp, maxXp: killer.maxXp, money: killer.money, playerId: killer.id
+                                    });
                                 }
-                            } else {
-                                console.log(`[KILL] ⚠️ User ${killer.username} not found in memoryUsers!`);
+                                saveProgress(killer.username, killer);
+                            }
+                        }
+                    }
+                });
+
+                // Remove projectile if it hit something and wasn't a pierce/chain
+                if (hitSomething) {
+                    room.projectiles.splice(i, 1);
+                }
+            } // end projectile for loop
+
+            // Standalone Enemy AI & Movement
+            room.enemies.forEach(ent => {
+                const now = Date.now();
+
+                // Decay highlights
+                if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
+                    ent.aura_highlight_timer -= dt;
+                }
+
+                // --- DOT / Aura Effects Processing ---
+                if (ent.active_dots) {
+                    ent.active_dots = ent.active_dots.filter(dot => {
+                        if (now < dot.end_time) {
+                            ent.hp -= (dot.damage * dt);
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+
+                // Auras from nearby players — affect ENEMIES ONLY (not allied players)
+                Object.values(room.players).forEach(p => {
+                    if (p.dead || p.x < -1000) return;
+                    const aura = p.aura_type;
+                    if (!aura) return;
+
+                    // Only target enemies, never allied players
+                    const targets = room.enemies;
+
+                    targets.forEach(target => {
+                        const distSq = (target.x - p.x) ** 2 + (target.y - p.y) ** 2;
+                        const strength = p.limits?.[aura] || 1;
+                        const baseRange = 240;
+                        const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / 1.1) - 1) * 0.5);
+                        const range = baseRange * rangeScale;
+
+                        if (distSq < range * range) {
+                            const dist = Math.sqrt(distSq) || 1;
+
+                            // Highlight targets being affected
+                            if (!target.aura_highlight_timer || target.aura_highlight_timer <= 0) {
+                                target.aura_highlight_timer = 0.2;
+                                const colors = {
+                                    aura_damage: '#ff4500',
+                                    aura_gravity: '#a855f7',
+                                    aura_corruption: '#22c55e',
+                                    aura_execution: '#fb923c',
+                                    aura_chaos: '#ff00ff',
+                                    aura_control: '#0ea5e9',
+                                    aura_vampire: '#ef4444',
+                                    aura_precision: '#ffffff'
+                                };
+                                target.aura_highlight_color = colors[aura] || '#fff';
                             }
 
-                            if (killer.xp >= killer.maxXp) {
-                                killer.level++;
-                                killer.xp -= killer.maxXp;
-                                killer.maxXp = Math.floor(killer.maxXp * 1.5);
-                                io.to(roomId).emit('visual_effect', {
-                                    type: 'levelup', x: killer.x, y: killer.y, color: '#ffd700',
-                                    level: killer.level, xp: killer.xp, maxXp: killer.maxXp, money: killer.money, playerId: killer.id
+                            // Apply gameplay effects
+                            if (aura === 'aura_corruption') {
+                                target.hp -= (strength * dt);
+
+                            } else if (aura === 'aura_execution') {
+                                // Only kicker-in below 30% HP; strength is a damage multiplier (e.g. 1.2 = +20%)
+                                if (target.hp < target.maxHp * 0.3) {
+                                    target.hp -= (target.maxHp * (strength - 1) * 0.1 * dt);
+                                }
+
+                            } else if (aura === 'aura_control') {
+                                // Friction-based slow: strength < 1 (e.g. 0.7 = 30% slow)
+                                // Apply as a damping multiplier each frame, clamped so velocity can't flip sign
+                                const damping = Math.pow(Math.max(0, strength), dt * 3);
+                                target.velocity.x *= damping;
+                                target.velocity.y *= damping;
+
+                            } else if (aura === 'aura_vampire') {
+                                const siph = strength * dt * 50;
+                                target.hp -= siph;
+                                p.hp = Math.min(p.maxHp, p.hp + siph * 0.5); // heal caster
+
+                            } else if (aura === 'aura_gravity') {
+                                const pullX = p.x - target.x;
+                                const pullY = p.y - target.y;
+                                const force = strength * 200 / dist;
+                                target.velocity.x += (pullX / dist) * force * dt;
+                                target.velocity.y += (pullY / dist) * force * dt;
+                            }
+                        }
+                    });
+                });
+
+                // Remove enemies killed by aura/DOT effects (all modes)
+                if (ent.hp <= 0) {
+                    const idx = room.enemies.indexOf(ent);
+                    if (idx !== -1) {
+                        // SPLITTER: spawn mini-clones
+                        if (ent.enemyType === 'splitter' && !ent.hasSplit) {
+                            ent.hasSplit = true;
+                            for (let s = 0; s < (ent.splits || 2); s++) {
+                                const angle = (s / (ent.splits || 2)) * Math.PI * 2;
+                                const miniHp = ent.maxHp * 0.25;
+                                room.enemies.push({
+                                    id: 'mini_' + Math.random().toString(36).substr(2, 5),
+                                    type: 'enemy',
+                                    enemyType: 'standard',
+                                    x: ent.x + Math.cos(angle) * 30,
+                                    y: ent.y + Math.sin(angle) * 30,
+                                    radius: Math.round(ent.radius * 0.55),
+                                    hp: miniHp,
+                                    maxHp: miniHp,
+                                    color: '#fda4af',
+                                    velocity: { x: Math.cos(angle) * 80, y: Math.sin(angle) * 80 },
+                                    speed: (ent.speed || 60) * 1.4,
+                                    shootTimer: 0
                                 });
                             }
-                            saveProgress(killer.username, killer);
+                            io.to(roomId).emit('visual_effect', { type: 'explosion', x: ent.x, y: ent.y, color: '#fb7185', strength: 15, radius: 60 });
                         }
+                        room.enemies.splice(idx, 1);
+                        return; // skip further processing for this enemy
                     }
                 }
-            });
 
-            // Remove projectile if it hit something and wasn't a pierce/chain
-            if (hitSomething) {
-                room.projectiles.splice(i, 1);
-            }
-        } // end projectile for loop
+                let nearestPlayer = null;
+                let minDist = Infinity;
+                Object.values(room.players).forEach(p => {
+                    // Ignore dead players
+                    if (p.dead || p.x < -1000) return;
 
-        // Standalone Enemy AI & Movement
-        room.enemies.forEach(ent => {
-            const now = Date.now();
-
-            // Decay highlights
-            if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {
-                ent.aura_highlight_timer -= dt;
-            }
-
-            // --- DOT / Aura Effects Processing ---
-            if (ent.active_dots) {
-                ent.active_dots = ent.active_dots.filter(dot => {
-                    if (now < dot.end_time) {
-                        ent.hp -= (dot.damage * dt);
-                        return true;
-                    }
-                    return false;
+                    const d = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);
+                    if (d < minDist) { minDist = d; nearestPlayer = p; }
                 });
-            }
 
-            // Auras from nearby players — affect ENEMIES ONLY (not allied players)
-            Object.values(room.players).forEach(p => {
-                if (p.dead || p.x < -1000) return;
-                const aura = p.aura_type;
-                if (!aura) return;
+                if (nearestPlayer) {
+                    if (ent.isBoss) {
+                        // BOSS AI
+                        ent.bossTimer = (ent.bossTimer || 0) + dt;
 
-                // Only target enemies, never allied players
-                const targets = room.enemies;
+                        if (ent.bossState === 'chase') {
+                            const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                            ent.velocity.x += Math.cos(angle) * ent.speed * dt;
+                            ent.velocity.y += Math.sin(angle) * ent.speed * dt;
 
-                targets.forEach(target => {
-                    const distSq = (target.x - p.x) ** 2 + (target.y - p.y) ** 2;
-                    const strength = p.limits?.[aura] || 1;
-                    const baseRange = 240;
-                    const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / 1.1) - 1) * 0.5);
-                    const range = baseRange * rangeScale;
+                            // Switch to attack every 4 seconds
+                            if (ent.bossTimer > 4) {
+                                ent.bossTimer = 0;
+                                ent.bossState = Math.random() < 0.5 ? 'rapid_fire' : 'charge';
+                            }
+                        } else if (ent.bossState === 'rapid_fire') {
+                            ent.velocity.x *= 0.9;
+                            ent.velocity.y *= 0.9;
 
-                    if (distSq < range * range) {
-                        const dist = Math.sqrt(distSq) || 1;
-
-                        // Highlight targets being affected
-                        if (!target.aura_highlight_timer || target.aura_highlight_timer <= 0) {
-                            target.aura_highlight_timer = 0.2;
-                            const colors = {
-                                aura_damage: '#ff4500',
-                                aura_gravity: '#a855f7',
-                                aura_corruption: '#22c55e',
-                                aura_execution: '#fb923c',
-                                aura_chaos: '#ff00ff',
-                                aura_control: '#0ea5e9',
-                                aura_vampire: '#ef4444',
-                                aura_precision: '#ffffff'
-                            };
-                            target.aura_highlight_color = colors[aura] || '#fff';
-                        }
-
-                        // Apply gameplay effects
-                        if (aura === 'aura_corruption') {
-                            target.hp -= (strength * dt);
-
-                        } else if (aura === 'aura_execution') {
-                            // Only kicker-in below 30% HP; strength is a damage multiplier (e.g. 1.2 = +20%)
-                            if (target.hp < target.maxHp * 0.3) {
-                                target.hp -= (target.maxHp * (strength - 1) * 0.1 * dt);
+                            if (ent.bossTimer % 0.2 < dt) { // Fire every 0.2s
+                                const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x) + (Math.random() - 0.5) * 0.5;
+                                room.projectiles.push({
+                                    id: 'bp_' + Math.random(),
+                                    playerId: 'boss',
+                                    type: 'projectile',
+                                    isEnemyProjectile: true,
+                                    x: ent.x, y: ent.y,
+                                    velocity: { x: Math.cos(angle) * 400, y: Math.sin(angle) * 400 },
+                                    lifetime: 3,
+                                    radius: 8,
+                                    damage: 20,
+                                    color: '#ff00ff'
+                                });
+                                io.to(roomId).emit('visual_effect', { type: 'boss_fire', x: ent.x, y: ent.y });
                             }
 
-                        } else if (aura === 'aura_control') {
-                            // Friction-based slow: strength < 1 (e.g. 0.7 = 30% slow)
-                            // Apply as a damping multiplier each frame, clamped so velocity can't flip sign
-                            const damping = Math.pow(Math.max(0, strength), dt * 3);
-                            target.velocity.x *= damping;
-                            target.velocity.y *= damping;
+                            if (ent.bossTimer > 2) {
+                                ent.bossTimer = 0;
+                                ent.bossState = 'chase';
+                            }
+                        } else if (ent.bossState === 'charge') {
+                            if (ent.bossTimer < 0.5) {
+                                // Telegraph (stop and shake?)
+                                ent.velocity.x *= 0.9; ent.velocity.y *= 0.9;
+                            } else if (ent.bossTimer < 0.6) {
+                                // Launch
+                                const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                                ent.velocity.x = Math.cos(angle) * 800;
+                                ent.velocity.y = Math.sin(angle) * 800;
+                            }
 
-                        } else if (aura === 'aura_vampire') {
-                            const siph = strength * dt * 50;
-                            target.hp -= siph;
-                            p.hp = Math.min(p.maxHp, p.hp + siph * 0.5); // heal caster
-
-                        } else if (aura === 'aura_gravity') {
-                            const pullX = p.x - target.x;
-                            const pullY = p.y - target.y;
-                            const force = strength * 200 / dist;
-                            target.velocity.x += (pullX / dist) * force * dt;
-                            target.velocity.y += (pullY / dist) * force * dt;
+                            if (ent.bossTimer > 1.5) {
+                                ent.bossTimer = 0;
+                                ent.bossState = 'chase';
+                            }
                         }
-                    }
-                });
-            });
 
-            // Remove enemies killed by aura/DOT effects (all modes)
-            if (ent.hp <= 0) {
-                const idx = room.enemies.indexOf(ent);
-                if (idx !== -1) {
-                    // SPLITTER: spawn mini-clones
-                    if (ent.enemyType === 'splitter' && !ent.hasSplit) {
-                        ent.hasSplit = true;
-                        for (let s = 0; s < (ent.splits || 2); s++) {
-                            const angle = (s / (ent.splits || 2)) * Math.PI * 2;
-                            const miniHp = ent.maxHp * 0.25;
-                            room.enemies.push({
-                                id: 'mini_' + Math.random().toString(36).substr(2, 5),
-                                type: 'enemy',
-                                enemyType: 'standard',
-                                x: ent.x + Math.cos(angle) * 30,
-                                y: ent.y + Math.sin(angle) * 30,
-                                radius: Math.round(ent.radius * 0.55),
-                                hp: miniHp,
-                                maxHp: miniHp,
-                                color: '#fda4af',
-                                velocity: { x: Math.cos(angle) * 80, y: Math.sin(angle) * 80 },
-                                speed: (ent.speed || 60) * 1.4,
-                                shootTimer: 0
+                    } else if (ent.enemyType === 'sniper') {
+                        // SNIPER AI
+                        const dist = Math.sqrt((nearestPlayer.x - ent.x) ** 2 + (nearestPlayer.y - ent.y) ** 2);
+                        const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+
+                        if (dist > 400) {
+                            // Approach
+                            ent.velocity.x += Math.cos(angle) * ent.speed * dt;
+                            ent.velocity.y += Math.sin(angle) * ent.speed * dt;
+                        } else if (dist < 250) {
+                            // Back away
+                            ent.velocity.x -= Math.cos(angle) * ent.speed * dt;
+                            ent.velocity.y -= Math.sin(angle) * ent.speed * dt;
+                        }
+
+                        // Shoot
+                        ent.shootTimer = (ent.shootTimer || 0) + dt;
+                        if (ent.shootTimer > 3) {
+                            ent.shootTimer = 0;
+                            room.projectiles.push({
+                                id: 'sp_' + Math.random(),
+                                playerId: 'enemy',
+                                type: 'projectile',
+                                isEnemyProjectile: true,
+                                x: ent.x, y: ent.y,
+                                velocity: { x: Math.cos(angle) * 700, y: Math.sin(angle) * 700 },
+                                lifetime: 2,
+                                radius: 6,
+                                damage: 40,
+                                color: '#00ff00'
+                            });
+                            io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#00ff00' });
+                        }
+
+                    } else if (ent.enemyType === 'healer') {
+                        // HEALER AI — stay near allies and heal them
+                        const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                        const distToPlayer = Math.sqrt((nearestPlayer.x - ent.x) ** 2 + (nearestPlayer.y - ent.y) ** 2);
+                        if (distToPlayer > 300) {
+                            ent.velocity.x += Math.cos(angle) * ent.speed * dt;
+                            ent.velocity.y += Math.sin(angle) * ent.speed * dt;
+                        }
+                        // Heal nearby enemies every 2 seconds
+                        ent.healCooldown = (ent.healCooldown || 0) + dt;
+                        if (ent.healCooldown > 2) {
+                            ent.healCooldown = 0;
+                            const healRadius = ent.healRadius || 120;
+                            const healAmount = ent.healAmount || 8;
+                            room.enemies.forEach(ally => {
+                                if (ally.id !== ent.id && ally.hp < ally.maxHp) {
+                                    const d = Math.sqrt((ally.x - ent.x) ** 2 + (ally.y - ent.y) ** 2);
+                                    if (d < healRadius) {
+                                        ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
+                                        io.to(roomId).emit('visual_effect', { type: 'heal', x: ally.x, y: ally.y, color: '#4ade80' });
+                                    }
+                                }
                             });
                         }
-                        io.to(roomId).emit('visual_effect', { type: 'explosion', x: ent.x, y: ent.y, color: '#fb7185', strength: 15, radius: 60 });
-                    }
-                    room.enemies.splice(idx, 1);
-                    return; // skip further processing for this enemy
-                }
-            }
 
-            let nearestPlayer = null;
-            let minDist = Infinity;
-            Object.values(room.players).forEach(p => {
-                // Ignore dead players
-                if (p.dead || p.x < -1000) return;
+                    } else if (ent.enemyType === 'ghost') {
+                        // GHOST AI — phases in/out, invulnerable while phased
+                        ent.phaseTimer = (ent.phaseTimer || 0) + dt;
+                        const cycle = ent.phaseCycle || 3.0;
+                        ent.phased = (ent.phaseTimer % (cycle * 2)) > cycle;
+                        const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                        ent.velocity.x += Math.cos(angle) * ent.speed * (ent.phased ? 1.5 : 0.8) * dt;
+                        ent.velocity.y += Math.sin(angle) * ent.speed * (ent.phased ? 1.5 : 0.8) * dt;
 
-                const d = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);
-                if (d < minDist) { minDist = d; nearestPlayer = p; }
-            });
-
-            if (nearestPlayer) {
-                if (ent.isBoss) {
-                    // BOSS AI
-                    ent.bossTimer = (ent.bossTimer || 0) + dt;
-
-                    if (ent.bossState === 'chase') {
+                    } else if (ent.enemyType === 'berserker') {
+                        // BERSERKER AI — gets faster and more dangerous at low HP
+                        const hpFrac = ent.hp / ent.maxHp;
+                        if (hpFrac < 0.4 && !ent.enraged) {
+                            ent.enraged = true;
+                            ent.speed *= 1.8;
+                            io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#f97316', strength: 20 });
+                        }
                         const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
                         ent.velocity.x += Math.cos(angle) * ent.speed * dt;
                         ent.velocity.y += Math.sin(angle) * ent.speed * dt;
 
-                        // Switch to attack every 4 seconds
-                        if (ent.bossTimer > 4) {
-                            ent.bossTimer = 0;
-                            ent.bossState = Math.random() < 0.5 ? 'rapid_fire' : 'charge';
-                        }
-                    } else if (ent.bossState === 'rapid_fire') {
-                        ent.velocity.x *= 0.9;
-                        ent.velocity.y *= 0.9;
-
-                        if (ent.bossTimer % 0.2 < dt) { // Fire every 0.2s
-                            const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x) + (Math.random() - 0.5) * 0.5;
-                            room.projectiles.push({
-                                id: 'bp_' + Math.random(),
-                                playerId: 'boss',
-                                type: 'projectile',
-                                isEnemyProjectile: true,
-                                x: ent.x, y: ent.y,
-                                velocity: { x: Math.cos(angle) * 400, y: Math.sin(angle) * 400 },
-                                lifetime: 3,
-                                radius: 8,
-                                damage: 20,
-                                color: '#ff00ff'
-                            });
-                            io.to(roomId).emit('visual_effect', { type: 'boss_fire', x: ent.x, y: ent.y });
-                        }
-
-                        if (ent.bossTimer > 2) {
-                            ent.bossTimer = 0;
-                            ent.bossState = 'chase';
-                        }
-                    } else if (ent.bossState === 'charge') {
-                        if (ent.bossTimer < 0.5) {
-                            // Telegraph (stop and shake?)
-                            ent.velocity.x *= 0.9; ent.velocity.y *= 0.9;
-                        } else if (ent.bossTimer < 0.6) {
-                            // Launch
-                            const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
-                            ent.velocity.x = Math.cos(angle) * 800;
-                            ent.velocity.y = Math.sin(angle) * 800;
-                        }
-
-                        if (ent.bossTimer > 1.5) {
-                            ent.bossTimer = 0;
-                            ent.bossState = 'chase';
-                        }
+                    } else {
+                        // STANDARD ENEMY AI
+                        const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                        const force = ent.speed;
+                        ent.velocity.x += Math.cos(angle) * force * dt;
+                        ent.velocity.y += Math.sin(angle) * force * dt;
                     }
+                }
 
-                } else if (ent.enemyType === 'sniper') {
-                    // SNIPER AI
-                    const dist = Math.sqrt((nearestPlayer.x - ent.x) ** 2 + (nearestPlayer.y - ent.y) ** 2);
-                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
+                ent.velocity.x *= 0.95;
+                ent.velocity.y *= 0.95;
+                ent.x += ent.velocity.x * dt;
+                ent.y += ent.velocity.y * dt;
 
-                    if (dist > 400) {
-                        // Approach
-                        ent.velocity.x += Math.cos(angle) * ent.speed * dt;
-                        ent.velocity.y += Math.sin(angle) * ent.speed * dt;
-                    } else if (dist < 250) {
-                        // Back away
-                        ent.velocity.x -= Math.cos(angle) * ent.speed * dt;
-                        ent.velocity.y -= Math.sin(angle) * ent.speed * dt;
-                    }
+                // Player Damage on Touch
+                Object.values(room.players).forEach(p => {
+                    const dist = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);
+                    if (dist < p.radius + ent.radius) {
+                        p.hp -= ent.isBoss ? 1 : 0.5;
+                        if (p.hp <= 0) {
+                            if (room.mode === 'coop') {
+                                p.dead = true;
+                                p.hp = 0;
+                                p.x = -99999; // Move away
+                                p.deaths = (p.deaths || 0) + 1;
 
-                    // Shoot
-                    ent.shootTimer = (ent.shootTimer || 0) + dt;
-                    if (ent.shootTimer > 3) {
-                        ent.shootTimer = 0;
-                        room.projectiles.push({
-                            id: 'sp_' + Math.random(),
-                            playerId: 'enemy',
-                            type: 'projectile',
-                            isEnemyProjectile: true,
-                            x: ent.x, y: ent.y,
-                            velocity: { x: Math.cos(angle) * 700, y: Math.sin(angle) * 700 },
-                            lifetime: 2,
-                            radius: 6,
-                            damage: 40,
-                            color: '#00ff00'
-                        });
-                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#00ff00' });
-                    }
-
-                } else if (ent.enemyType === 'healer') {
-                    // HEALER AI — stay near allies and heal them
-                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
-                    const distToPlayer = Math.sqrt((nearestPlayer.x - ent.x) ** 2 + (nearestPlayer.y - ent.y) ** 2);
-                    if (distToPlayer > 300) {
-                        ent.velocity.x += Math.cos(angle) * ent.speed * dt;
-                        ent.velocity.y += Math.sin(angle) * ent.speed * dt;
-                    }
-                    // Heal nearby enemies every 2 seconds
-                    ent.healCooldown = (ent.healCooldown || 0) + dt;
-                    if (ent.healCooldown > 2) {
-                        ent.healCooldown = 0;
-                        const healRadius = ent.healRadius || 120;
-                        const healAmount = ent.healAmount || 8;
-                        room.enemies.forEach(ally => {
-                            if (ally.id !== ent.id && ally.hp < ally.maxHp) {
-                                const d = Math.sqrt((ally.x - ent.x) ** 2 + (ally.y - ent.y) ** 2);
-                                if (d < healRadius) {
-                                    ally.hp = Math.min(ally.maxHp, ally.hp + healAmount);
-                                    io.to(roomId).emit('visual_effect', { type: 'heal', x: ally.x, y: ally.y, color: '#4ade80' });
+                                // Check Wipe
+                                const alive = Object.values(room.players).filter((pl) => !pl.dead);
+                                if (alive.length === 0) {
+                                    // RESET GAME
+                                    room.wave = 0; // Will increment to 1 next tick
+                                    room.waveState = 'idle';
+                                    room.enemies = [];
+                                    room.projectiles = [];
+                                    Object.values(room.players).forEach((pl) => {
+                                        pl.dead = false;
+                                        pl.hp = pl.maxHp;
+                                        pl.x = 400; pl.y = 300;
+                                        pl.velocity = { x: 0, y: 0 };
+                                    });
+                                    io.to(roomId).emit('visual_effect', { type: 'wave_start', wave: 1 }); // Visual Reset
                                 }
+                            } else {
+                                p.hp = p.maxHp;
+                                p.deaths = (p.deaths || 0) + 1;
+                                p.x = 400; p.y = 300;
                             }
-                        });
+                        }
                     }
+                });
+            });
 
-                } else if (ent.enemyType === 'ghost') {
-                    // GHOST AI — phases in/out, invulnerable while phased
-                    ent.phaseTimer = (ent.phaseTimer || 0) + dt;
-                    const cycle = ent.phaseCycle || 3.0;
-                    ent.phased = (ent.phaseTimer % (cycle * 2)) > cycle;
-                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
-                    ent.velocity.x += Math.cos(angle) * ent.speed * (ent.phased ? 1.5 : 0.8) * dt;
-                    ent.velocity.y += Math.sin(angle) * ent.speed * (ent.phased ? 1.5 : 0.8) * dt;
-
-                } else if (ent.enemyType === 'berserker') {
-                    // BERSERKER AI — gets faster and more dangerous at low HP
-                    const hpFrac = ent.hp / ent.maxHp;
-                    if (hpFrac < 0.4 && !ent.enraged) {
-                        ent.enraged = true;
-                        ent.speed *= 1.8;
-                        io.to(roomId).emit('visual_effect', { type: 'impact', x: ent.x, y: ent.y, color: '#f97316', strength: 20 });
+            if (room.mode !== 'coop') {
+                room.mapVoteTimer = (room.mapVoteTimer || 0) + dt;
+                if (room.mapVoteTimer >= MAP_VOTE_INTERVAL / 1000) {
+                    if (Object.keys(room.players).length >= 1) {
+                        room.mapVoteTimer = 0;
+                        if (!room.mapVote || !room.mapVote.active) {
+                            startMapVote(roomId);
+                        } else {
+                            console.log(`[VOTE] Timer hit but vote already active`);
+                        }
+                    } else {
+                        // Reset timer if 0 players so it doesn't build up forever
+                        if (room.mapVoteTimer > (MAP_VOTE_INTERVAL / 1000) * 2) room.mapVoteTimer = 0;
                     }
-                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
-                    ent.velocity.x += Math.cos(angle) * ent.speed * dt;
-                    ent.velocity.y += Math.sin(angle) * ent.speed * dt;
-
-                } else {
-                    // STANDARD ENEMY AI
-                    const angle = Math.atan2(nearestPlayer.y - ent.y, nearestPlayer.x - ent.x);
-                    const force = ent.speed;
-                    ent.velocity.x += Math.cos(angle) * force * dt;
-                    ent.velocity.y += Math.sin(angle) * force * dt;
                 }
             }
 
-            ent.velocity.x *= 0.95;
-            ent.velocity.y *= 0.95;
-            ent.x += ent.velocity.x * dt;
-            ent.y += ent.velocity.y * dt;
-
-            // Player Damage on Touch
+            // Player movement
             Object.values(room.players).forEach(p => {
-                const dist = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);
-                if (dist < p.radius + ent.radius) {
-                    p.hp -= ent.isBoss ? 1 : 0.5;
-                    if (p.hp <= 0) {
-                        if (room.mode === 'coop') {
-                            p.dead = true;
-                            p.hp = 0;
-                            p.x = -99999; // Move away
-                            p.deaths = (p.deaths || 0) + 1;
+                p.x += p.velocity.x * dt;
+                p.y += p.velocity.y * dt;
+                p.x = Math.max(p.radius, Math.min(800 - p.radius, p.x));
+                p.y = Math.max(p.radius, Math.min(600 - p.radius, p.y));
 
-                            // Check Wipe
-                            const alive = Object.values(room.players).filter((pl) => !pl.dead);
-                            if (alive.length === 0) {
-                                // RESET GAME
-                                room.wave = 0; // Will increment to 1 next tick
-                                room.waveState = 'idle';
-                                room.enemies = [];
-                                room.projectiles = [];
-                                Object.values(room.players).forEach((pl) => {
-                                    pl.dead = false;
-                                    pl.hp = pl.maxHp;
-                                    pl.x = 400; pl.y = 300;
-                                    pl.velocity = { x: 0, y: 0 };
-                                });
-                                io.to(roomId).emit('visual_effect', { type: 'wave_start', wave: 1 }); // Visual Reset
-                            }
-                        } else {
-                            p.hp = p.maxHp;
-                            p.deaths = (p.deaths || 0) + 1;
-                            p.x = 400; p.y = 300;
-                        }
-                    }
+                // Decay highlights
+                if (p.aura_highlight_timer && p.aura_highlight_timer > 0) {
+                    p.aura_highlight_timer -= dt;
+                }
+
+                // --- TIME BASED TITLES CHECK (Every Tick or Periodic) ---
+                const now = Date.now();
+                const pSocket = io.sockets.sockets.get(p.id);
+
+                // 1. Friendly (30 mins without firing)
+                if (!p.hasFired && (now - p.joinedAt) > 30 * 60 * 1000) {
+                    unlockTitle(p.username, 'friendly', pSocket);
+                }
+
+                // 2. Hostile (Fire continuously for 5 mins)
+                // If they haven't fired in 5 seconds, reset continuous start
+                if (p.lastFireTime && (now - p.lastFireTime) > 5000) {
+                    p.continuousFireStartTime = 0;
+                }
+                if (p.continuousFireStartTime && (now - p.continuousFireStartTime) > 5 * 60 * 1000) {
+                    unlockTitle(p.username, 'hostile', pSocket);
+                }
+
+                // 3. ZZZ (AFK 24 hours) - Use 1 min for testing if you want, but sticking to 24h as per request
+                if (p.lastActionTime && (now - p.lastActionTime) > 24 * 60 * 60 * 1000) {
+                    unlockTitle(p.username, 'zzz', pSocket);
                 }
             });
-        });
-
-        if (room.mode !== 'coop') {
-            room.mapVoteTimer = (room.mapVoteTimer || 0) + dt;
-            // console.log(`[VOTE TIMER] ${roomId}: ${room.mapVoteTimer.toFixed(1)} / ${(MAP_VOTE_INTERVAL / 1000)}`);
-            if (room.mapVoteTimer >= MAP_VOTE_INTERVAL / 1000) {
-                if (Object.keys(room.players).length >= 1) {
-                    room.mapVoteTimer = 0;
-                    if (!room.mapVote || !room.mapVote.active) {
-                        startMapVote(roomId);
-                    } else {
-                        console.log(`[VOTE] Timer hit but vote already active`);
-                    }
-                } else {
-                    // Reset timer if 0 players so it doesn't build up forever
-                    if (room.mapVoteTimer > (MAP_VOTE_INTERVAL / 1000) * 2) room.mapVoteTimer = 0;
-                }
-            }
+        } catch (loopErr) {
+            console.error(`[LOOP ERROR] Room ${roomId}:`, loopErr.message);
         }
-
-        // Player movement
-        Object.values(room.players).forEach(p => {
-            p.x += p.velocity.x * dt;
-            p.y += p.velocity.y * dt;
-            p.x = Math.max(p.radius, Math.min(800 - p.radius, p.x));
-            p.y = Math.max(p.radius, Math.min(600 - p.radius, p.y));
-
-            // Decay highlights
-            if (p.aura_highlight_timer && p.aura_highlight_timer > 0) {
-                p.aura_highlight_timer -= dt;
-            }
-
-            // --- TIME BASED TITLES CHECK (Every Tick or Periodic) ---
-            const now = Date.now();
-            const pSocket = io.sockets.sockets.get(p.id);
-
-            // 1. Friendly (30 mins without firing)
-            if (!p.hasFired && (now - p.joinedAt) > 30 * 60 * 1000) {
-                unlockTitle(p.username, 'friendly', pSocket);
-            }
-
-            // 2. Hostile (Fire continuously for 5 mins)
-            // If they haven't fired in 5 seconds, reset continuous start
-            if (p.lastFireTime && (now - p.lastFireTime) > 5000) {
-                p.continuousFireStartTime = 0;
-            }
-            if (p.continuousFireStartTime && (now - p.continuousFireStartTime) > 5 * 60 * 1000) {
-                unlockTitle(p.username, 'hostile', pSocket);
-            }
-
-            // 3. ZZZ (AFK 24 hours) - Use 1 min for testing if you want, but sticking to 24h as per request
-            if (p.lastActionTime && (now - p.lastActionTime) > 24 * 60 * 60 * 1000) {
-                unlockTitle(p.username, 'zzz', pSocket);
-            }
-        });
     }
 
     if (now - lastBroadcast > BROADCAST_INTERVAL) {
@@ -2085,7 +2088,17 @@ setInterval(() => {
                 waveState: room.waveState,
                 walls: room.walls || [],
                 currentMap: room.currentMap || 'arena_open',
-                mapVote: room.mapVote || null
+                mapVote: (room.mapVote && room.mapVote.active) ? {
+                    active: true,
+                    endTime: room.mapVote.endTime,
+                    options: room.mapVote.options.map(id => ({ id, ...MAPS[id] })),
+                    tally: (() => {
+                        const t = {};
+                        room.mapVote.options.forEach(id => { t[id] = 0; });
+                        Object.values(room.mapVote.votes).forEach(v => { if (t[v] !== undefined) t[v]++; });
+                        return t;
+                    })()
+                } : null
             });
         }
     }

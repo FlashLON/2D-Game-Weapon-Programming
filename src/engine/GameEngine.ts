@@ -126,6 +126,12 @@ export interface GameState {
     waveState?: string;
     walls?: { x: number; y: number; w: number; h: number }[];
     currentMap?: string;
+    mapVote?: {
+        active: boolean;
+        options: { id: string; name: string; color: string; description: string }[];
+        tally: Record<string, number>;
+        endTime: number;
+    } | null;
 }
 
 /**
@@ -1225,6 +1231,7 @@ export class GameEngine {
         this.state.waveState = snapshot.waveState || 'idle';
         this.state.walls = snapshot.walls || [];
         this.state.currentMap = snapshot.currentMap || 'arena_open';
+        this.state.mapVote = snapshot.mapVote || null;
 
         // 4. Leaderboard
         const leaderboard = Object.values(snapshot.players || {}).map((p: any) => ({

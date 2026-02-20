@@ -46,6 +46,16 @@ function App() {
   const [currentRoom, setCurrentRoom] = useState<string | null>(null);
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
   const [waveInfo, setWaveInfo] = useState<{ wave: number; status: string } | null>(null);
+
+  // Map Vote State (managed at App level to avoid race conditions)
+  const [mapVoteData, setMapVoteData] = useState<{
+    options: { id: string; name: string; color: string; description: string }[];
+    tally: Record<string, number>;
+    endTime: number;
+  } | null>(null);
+  const [mapVoteMyVote, setMapVoteMyVote] = useState<string | null>(null);
+  const [mapChangeResult, setMapChangeResult] = useState<{ name: string; color: string } | null>(null);
+  const mapVoteActiveRef = useRef(false);
   const [serverUrl, setServerUrl] = useState(() => {
     return localStorage.getItem('relay_server_url') || "http://localhost:3000";
   });
@@ -447,7 +457,50 @@ function App() {
           gameEngine.setMultiplayerMode(true, myId);
         }
         gameEngine.updateFromSnapshot(state);
+
+        // *** MAP VOTE FALLBACK: detect active vote from periodic state ***
+        const sv = (state as any).mapVote;
+        if (sv?.active && sv.options?.length > 0) {
+          if (!mapVoteActiveRef.current) {
+            mapVoteActiveRef.current = true;
+            setMapVoteMyVote(null);
+            setMapChangeResult(null);
+          }
+          setMapVoteData({
+            options: sv.options,
+            tally: sv.tally || {},
+            endTime: sv.endTime
+          });
+        } else if (!sv?.active && mapVoteActiveRef.current) {
+          // Vote ended (server cleared it) but we missed map_change event
+          mapVoteActiveRef.current = false;
+          setMapVoteData(null);
+        }
       }
+    });
+
+    // *** MAP VOTE EVENTS (fast path — fires immediately) ***
+    networkManager.setOnMapVoteStart((data) => {
+      mapVoteActiveRef.current = true;
+      setMapVoteMyVote(null);
+      setMapChangeResult(null);
+      setMapVoteData({
+        options: data.options || [],
+        tally: {},
+        endTime: Date.now() + (data.duration || 20000)
+      });
+    });
+
+    networkManager.setOnMapVoteUpdate((data) => {
+      setMapVoteData(prev => prev ? { ...prev, tally: data.tally || {} } : null);
+    });
+
+    networkManager.setOnMapChange((data) => {
+      mapVoteActiveRef.current = false;
+      setMapVoteData(null);
+      const result = { name: data.map?.name || data.mapId, color: data.map?.color || '#00ff9f' };
+      setMapChangeResult(result);
+      setTimeout(() => setMapChangeResult(null), 3000);
     });
 
     const handleVisualEffect = (effect: any) => {
@@ -745,10 +798,24 @@ function App() {
         />
       )}
 
-      {/* Map Vote Overlay — fixed, full-screen, above everything */}
+      {/* Map Vote Overlay — fixed, full-screen, above everything — always rendered when in multiplayer */}
       {currentRoom && currentRoom !== 'offline' && (
         <div className="fixed inset-0 pointer-events-none z-[9999]">
-          <MapVoteOverlay />
+          <MapVoteOverlay
+            voteData={mapVoteData}
+            myVote={mapVoteMyVote}
+            mapChangeResult={mapChangeResult}
+            onVote={(mapId) => {
+              if (mapVoteMyVote) return;
+              setMapVoteMyVote(mapId);
+              networkManager.sendVote(mapId);
+              // Optimistic local tally update
+              setMapVoteData(prev => prev
+                ? { ...prev, tally: { ...prev.tally, [mapId]: (prev.tally[mapId] || 0) + 1 } }
+                : null
+              );
+            }}
+          />
         </div>
       )}
 
