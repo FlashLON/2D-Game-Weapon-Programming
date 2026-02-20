@@ -369,6 +369,22 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // Auto-clear vote overlay when endTime passes (handles missed map_change events)
+  useEffect(() => {
+    if (!mapVoteData) return;
+    const msLeft = mapVoteData.endTime - Date.now();
+    if (msLeft <= 0) {
+      setMapVoteData(null);
+      mapVoteActiveRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      setMapVoteData(null);
+      mapVoteActiveRef.current = false;
+    }, msLeft + 1000); // 1s grace after endTime
+    return () => clearTimeout(timer);
+  }, [mapVoteData?.endTime]);
+
   // Saved Code Handlers
   async function loadSavedCodes(user: string) {
     if (!user) return;
@@ -481,8 +497,9 @@ function App() {
         gameEngine.updateFromSnapshot(state);
 
         // *** MAP VOTE FALLBACK: detect active vote from periodic state ***
+        // Only SET data from state — never CLEAR it (clearing is handled by map_change event / expiry)
         const sv = (state as any).mapVote;
-        if (sv?.active && sv.options?.length > 0) {
+        if (sv?.active && sv.options?.length > 0 && sv.endTime > Date.now()) {
           if (!mapVoteActiveRef.current) {
             mapVoteActiveRef.current = true;
             setMapVoteMyVote(null);
@@ -493,10 +510,6 @@ function App() {
             tally: sv.tally || {},
             endTime: sv.endTime
           });
-        } else if (!sv?.active && mapVoteActiveRef.current) {
-          // Vote ended (server cleared it) but we missed map_change event
-          mapVoteActiveRef.current = false;
-          setMapVoteData(null);
         }
       }
     });
