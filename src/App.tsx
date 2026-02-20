@@ -347,6 +347,28 @@ function App() {
     currentRoomRef.current = currentRoom;
   }, [currentRoom]);
 
+  // DEBUG: Press Shift+V to test the vote overlay (remove after confirming it works)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key === 'V' && currentRoomRef.current && currentRoomRef.current !== 'offline') {
+        setMapVoteMyVote(null);
+        setMapChangeResult(null);
+        setMapVoteData({
+          options: [
+            { id: 'arena_open', name: 'Open Field', description: 'No obstacles', color: '#00ff9f' },
+            { id: 'arena_cross', name: 'Cross Roads', description: 'Two intersecting walls', color: '#ff6b6b' },
+            { id: 'arena_maze', name: 'Maze Runner', description: 'Complex maze structure', color: '#a78bfa' },
+          ],
+          tally: { arena_open: 0, arena_cross: 0, arena_maze: 0 },
+          endTime: Date.now() + 20000
+        });
+        mapVoteActiveRef.current = true;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   // Saved Code Handlers
   async function loadSavedCodes(user: string) {
     if (!user) return;
