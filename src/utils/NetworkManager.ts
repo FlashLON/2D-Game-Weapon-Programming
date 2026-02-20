@@ -65,6 +65,7 @@ class NetworkManager {
     private onMapVoteStart: ((data: any) => void) | null = null;
     private onMapVoteUpdate: ((data: any) => void) | null = null;
     private onMapChange: ((data: any) => void) | null = null;
+    private onInit: ((data: { isSpectator: boolean }) => void) | null = null;
 
     connect(serverUrl: string): Promise<boolean> {
         return new Promise((resolve) => {
@@ -110,9 +111,10 @@ class NetworkManager {
                 this.connectionListeners.forEach(fn => fn(false));
             });
 
-            this.socket.on('init', (data: { playerId: string; gameState: GameState }) => {
+            this.socket.on('init', (data: { playerId: string; isSpectator?: boolean; gameState: GameState }) => {
                 this.playerId = data.playerId;
                 this.onStateUpdate?.(data.gameState);
+                this.onInit?.({ isSpectator: data.isSpectator ?? false });
             });
 
             this.socket.on('state', (state: GameState) => {
@@ -189,10 +191,16 @@ class NetworkManager {
     setOnLeaderboardUpdate(cb: (data: any[]) => void) { this.onLeaderboardUpdate = cb; }
     setOnWaveEvent(cb: (event: any) => void) { this.onWaveEvent = cb; }
     setOnProfileUpdate(cb: (profile: any) => void) { this.onProfileUpdate = cb; }
+    setOnInit(cb: (data: { isSpectator: boolean }) => void) { this.onInit = cb; }
 
     // Emitters
     joinRoom(roomId: string, settings?: any, profile?: any) {
         if (this.socket && this.connected) this.socket.emit('join_room', { roomId, settings, profile });
+    }
+
+    spectateRoom(roomId: string, profile?: any) {
+        if (this.socket && this.connected)
+            this.socket.emit('join_room', { roomId, settings: { spectator: true }, profile });
     }
 
     saveProfile(profile: any) {

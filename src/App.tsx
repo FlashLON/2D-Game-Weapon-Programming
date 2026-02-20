@@ -44,6 +44,7 @@ function App() {
   // Multiplayer State
   const [isConnected, setIsConnected] = useState(false);
   const [currentRoom, setCurrentRoom] = useState<string | null>(null);
+  const [isSpectator, setIsSpectator] = useState(false);
   const [globalLeaderboard, setGlobalLeaderboard] = useState<any[]>([]);
   const [waveInfo, setWaveInfo] = useState<{ wave: number; status: string } | null>(null);
 
@@ -325,6 +326,7 @@ function App() {
 
   const handleJoinRoom = (roomId: string, settings?: any) => {
     setCurrentRoom(roomId);
+    setIsSpectator(false);
     currentRoomRef.current = roomId;
     if (roomId === 'offline') {
       gameEngine.setMultiplayerMode(false);
@@ -335,8 +337,17 @@ function App() {
     }
   };
 
+  const handleSpectate = (roomId: string) => {
+    setCurrentRoom(roomId);
+    setIsSpectator(true);
+    currentRoomRef.current = roomId;
+    networkManager.spectateRoom(roomId, userProfile);
+    addLog(`Spectating room: ${roomId.toUpperCase()}`, "info");
+  };
+
   const handleLeaveRoom = () => {
     setCurrentRoom(null);
+    setIsSpectator(false);
     currentRoomRef.current = null;
     networkManager.joinRoom('');
     addLog("Returned to lobby", "info");
@@ -485,6 +496,11 @@ function App() {
     };
 
     networkManager.addConnectionListener(handleGlobalConn);
+
+    networkManager.setOnInit(({ isSpectator: spec }) => {
+      setIsSpectator(spec);
+      if (spec) addLog('👁 Joined as Spectator — watching mode active', 'info');
+    });
 
     networkManager.setOnStateUpdate((state) => {
       const activeRoom = currentRoomRef.current;
@@ -755,6 +771,7 @@ function App() {
             onRenameCode={handleRenameCode}
             loadingSavedCodes={loadingSavedCodes}
             onEquipTitle={handleEquipTitle}
+            onSpectate={handleSpectate}
           />
         ) : (
           <>
@@ -764,7 +781,16 @@ function App() {
 
             <div className="flex-1 h-full relative flex flex-col min-w-0">
               <div className="flex-1 relative bg-black/50 overflow-hidden">
-                <Arena />
+                <Arena isSpectator={isSpectator} />
+
+                {/* Spectator HUD */}
+                {isSpectator && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                    <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-purple-500/60 bg-purple-900/40 backdrop-blur-sm">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-purple-300 animate-pulse">👁 SPECTATING</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Wave Overlay */}
                 {waveInfo && (

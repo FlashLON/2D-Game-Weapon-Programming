@@ -1105,11 +1105,17 @@ io.on('connection', (socket) => {
 
     function leaveRoom(id) {
         for (const roomId in rooms) {
-            if (rooms[roomId].players[id]) {
-                delete rooms[roomId].players[id];
-                if (Object.keys(rooms[roomId].players).length === 0) {
-                    delete rooms[roomId];
-                }
+            const room = rooms[roomId];
+            if (room.players[id]) {
+                delete room.players[id];
+            }
+            if (room.spectators && room.spectators[id]) {
+                delete room.spectators[id];
+            }
+            const totalPeople = Object.keys(room.players).length +
+                Object.keys(room.spectators || {}).length;
+            if (totalPeople === 0) {
+                delete rooms[roomId];
             }
         }
     }

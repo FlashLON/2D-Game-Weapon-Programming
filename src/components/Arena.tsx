@@ -4,7 +4,7 @@ import { networkManager } from '../utils/NetworkManager';
 import { TITLES } from '../utils/TitleRegistry';
 import { ATTRIBUTES } from '../utils/AttributeRegistry';
 
-export const Arena: React.FC = () => {
+export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -20,7 +20,7 @@ export const Arena: React.FC = () => {
         // Keyboard event handlers for player movement
         const handleKeyDown = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase();
-            if (['w', 'a', 's', 'd'].includes(key)) {
+            if (!isSpectator && ['w', 'a', 's', 'd'].includes(key)) {
                 e.preventDefault();
                 keysPressed.add(key);
                 updatePlayerVelocity();
@@ -29,7 +29,7 @@ export const Arena: React.FC = () => {
 
         const handleKeyUp = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase();
-            if (['w', 'a', 's', 'd'].includes(key)) {
+            if (!isSpectator && ['w', 'a', 's', 'd'].includes(key)) {
                 keysPressed.delete(key);
                 updatePlayerVelocity();
             }
@@ -633,6 +633,7 @@ export const Arena: React.FC = () => {
 
     // Handle mouse clicks to fire weapon
     const handleClick = (e: React.MouseEvent) => {
+        if (isSpectator) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
 
@@ -661,7 +662,7 @@ export const Arena: React.FC = () => {
                 width={800}
                 height={600}
                 onClick={handleClick}
-                className="border border-cyber-accent/50 shadow-[0_0_50px_rgba(0,255,159,0.15)] bg-cyber-dark cursor-crosshair transition-all duration-300"
+                className={`border border-cyber-accent/50 shadow-[0_0_50px_rgba(0,255,159,0.15)] bg-cyber-dark transition-all duration-300 ${isSpectator ? 'cursor-default' : 'cursor-crosshair'}`}
                 style={{
                     filter: 'contrast(1.1) brightness(1.1)',
                 }}

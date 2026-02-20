@@ -8,6 +8,7 @@ import type { SavedCode } from '../utils/NetworkManager';
 
 interface LobbyProps {
     onJoinRoom: (roomId: string, settings?: any) => void;
+    onSpectate: (roomId: string) => void;
     onConnect: () => void;
     isConnected: boolean;
     serverUrl: string;
@@ -39,6 +40,7 @@ interface LobbyProps {
 
 export const Lobby: React.FC<LobbyProps> = ({
     onJoinRoom,
+    onSpectate,
     onConnect,
     isConnected,
     serverUrl,
@@ -207,6 +209,13 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         >
                                             <Lock size={16} /> CREATE PRIVATE SQUAD
                                         </button>
+                                        <button
+                                            onClick={() => onSpectate('coop-main')}
+                                            disabled={!isConnected}
+                                            className={`w-full py-2 rounded-xl font-black transition-all text-xs flex items-center justify-center gap-2 ${isConnected ? 'bg-purple-900/30 text-purple-400 border border-purple-700/40 hover:bg-purple-900/50' : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'}`}
+                                        >
+                                            👁 SPECTATE CO-OP
+                                        </button>
                                     </div>
 
                                     <ul className="space-y-2 mb-2">
@@ -262,16 +271,27 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         </div>
 
                                         {activeTab === 'join' ? (
-                                            <form onSubmit={handleJoin} className="flex gap-2">
-                                                <input
-                                                    value={roomCode}
-                                                    onChange={(e) => setRoomCode(e.target.value)}
-                                                    placeholder="CODE"
-                                                    className="flex-1 bg-black/60 border border-cyber-muted/30 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-blue-400 transition-all font-mono"
-                                                />
-                                                <button type="submit" className="bg-blue-500 text-white font-black px-6 rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20">
-                                                    JOIN
-                                                </button>
+                                            <form onSubmit={handleJoin} className="space-y-2">
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        value={roomCode}
+                                                        onChange={(e) => setRoomCode(e.target.value)}
+                                                        placeholder="ROOM CODE"
+                                                        className="flex-1 bg-black/60 border border-cyber-muted/30 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-blue-400 transition-all font-mono"
+                                                    />
+                                                    <button type="submit" className="bg-blue-500 text-white font-black px-5 rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 text-xs">
+                                                        JOIN
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => roomCode.trim() && onSpectate(roomCode.trim().toLowerCase())}
+                                                        className="bg-purple-700/60 text-purple-300 border border-purple-500/50 font-black px-4 rounded-xl hover:bg-purple-700/90 transition-all text-xs"
+                                                        title="Watch without playing"
+                                                    >
+                                                        👁 WATCH
+                                                    </button>
+                                                </div>
+                                                <p className="text-[9px] text-white/30 text-center uppercase tracking-widest">👁 WATCH to spectate without playing</p>
                                             </form>
                                         ) : (
                                             <form onSubmit={handleCreate} className="space-y-2">
@@ -281,9 +301,22 @@ export const Lobby: React.FC<LobbyProps> = ({
                                                     placeholder="NAME (OPTIONAL)"
                                                     className="w-full bg-black/60 border border-cyber-muted/30 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-blue-400 transition-all font-mono"
                                                 />
-                                                <button type="submit" className="w-full bg-blue-500 text-white font-black py-3 rounded-xl hover:bg-blue-400 transition-all">
-                                                    CREATE PARTY
-                                                </button>
+                                                <div className="flex gap-2">
+                                                    <button type="submit" className="flex-1 bg-blue-500 text-white font-black py-3 rounded-xl hover:bg-blue-400 transition-all text-xs">
+                                                        CREATE PARTY
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const id = createName.trim() || Math.random().toString(36).substr(2, 6);
+                                                            onSpectate(id.toLowerCase());
+                                                        }}
+                                                        className="bg-purple-700/60 text-purple-300 border border-purple-500/50 font-black px-4 rounded-xl hover:bg-purple-700/90 transition-all text-xs"
+                                                        title="Create room but spectate instead of playing"
+                                                    >
+                                                        👁 WATCH
+                                                    </button>
+                                                </div>
                                             </form>
                                         )}
                                     </div>
