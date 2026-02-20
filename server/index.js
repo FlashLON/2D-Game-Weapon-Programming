@@ -650,66 +650,89 @@ io.on('connection', (socket) => {
         if (!rooms[roomId]) {
             rooms[roomId] = {
                 id: roomId,
-                mode: settings?.mode || 'pvp', // 'pvp' or 'coop'
+                mode: settings?.mode || 'pvp',
                 players: {},
+                spectators: {},
                 projectiles: [],
                 enemies: [],
                 grid: {},
                 lastUpdate: Date.now(),
                 score: 0,
                 wave: 0,
-                waveState: 'idle', // 'idle', 'spawning', 'fight', 'boss'
-                waveTimer: 0
+                waveState: 'idle',
+                waveTimer: 0,
+                currentMap: 'arena_open',
+                walls: MAPS['arena_open'].walls
             };
         }
 
         const room = rooms[roomId];
-        room.players[socket.id] = {
-            id: socket.id,
-            username: socket.data.username || 'Guest',
-            x: 400,
-            y: 300,
-            radius: 20,
-            hp: 100,
-            maxHp: 100,
-            color: '#00ff9f',
-            type: 'player', // CRITICAL: Explicitly set type for client-side rendering
-            velocity: { x: 0, y: 0 },
-            kills: 0,
-            deaths: 0,
-            // Sync progression values to room state
-            level: profile?.level || 1,
-            xp: profile?.xp || 0,
-            maxXp: profile?.maxXp || 100,
-            money: profile?.money || 0,
-            unlocks: profile?.unlocks || ['speed', 'damage'],
-            limits: profile?.limits || { speed: 200, damage: 5 },
-            titles: profile?.titles || [],
-            equippedTitle: profile?.equippedTitle || null,
-            aura_type: profile?.aura_type || null,
-            // --- SESSION TRACKING ---
-            joinedAt: Date.now(),
-            lastFireTime: 0,
-            hasFired: false,
-            lastActionTime: Date.now(),
-            continuousFireStartTime: 0
-        };
+        const isSpectator = settings?.spectator === true;
 
-        socket.emit('init', {
-            playerId: socket.id,
-            gameState: {
-                entities: [...Object.values(room.players), ...room.enemies],
-                projectiles: room.projectiles,
-                score: room.score
-            }
-        });
-
-        checkTitles(socket.data.username, {
-            ...profile,
-            killstreak: 0 // Reset on join
-        }, socket);
-
-        console.log(`Player ${socket.id} joined room ${currentRoomId}`);
+        if (isSpectator) {
+            // SPECTATOR — no player entity, just observe
+            room.spectators = room.spectators || {};
+            room.spectators[socket.id] = {
+                id: socket.id,
+                username: socket.data.username || 'Guest',
+                joinedAt: Date.now()
+            };
+            socket.emit('init', {
+                playerId: socket.id,
+                isSpectator: true,
+                gameState: {
+                    entities: [...Object.values(room.players), ...room.enemies],
+                    projectiles: room.projectiles,
+                    score: room.score,
+                    walls: room.walls || [],
+                    currentMap: room.currentMap || 'arena_open'
+                }
+            });
+            console.log(`👁 Spectator ${socket.id} (${socket.data.username}) joined room ${currentRoomId}`);
+        } else {
+            // PLAYER — full entity
+            room.players[socket.id] = {
+                id: socket.id,
+                username: socket.data.username || 'Guest',
+                x: 400,
+                y: 300,
+                radius: 20,
+                hp: 100,
+                maxHp: 100,
+                color: '#00ff9f',
+                type: 'player',
+                velocity: { x: 0, y: 0 },
+                kills: 0,
+                deaths: 0,
+                level: profile?.level || 1,
+                xp: profile?.xp || 0,
+                maxXp: profile?.maxXp || 100,
+                money: profile?.money || 0,
+                unlocks: profile?.unlocks || ['speed', 'damage'],
+                limits: profile?.limits || { speed: 200, damage: 5 },
+                titles: profile?.titles || [],
+                equippedTitle: profile?.equippedTitle || null,
+                aura_type: profile?.aura_type || null,
+                joinedAt: Date.now(),
+                lastFireTime: 0,
+                hasFired: false,
+                lastActionTime: Date.now(),
+                continuousFireStartTime: 0
+            };
+            socket.emit('init', {
+                playerId: socket.id,
+                isSpectator: false,
+                gameState: {
+                    entities: [...Object.values(room.players), ...room.enemies],
+                    projectiles: room.projectiles,
+                    score: room.score,
+                    walls: room.walls || [],
+                    currentMap: room.currentMap || 'arena_open'
+                }
+            });
+            checkTitles(socket.data.username, { ...profile, killstreak: 0 }, socket);
+            console.log(`Player ${socket.id} joined room ${currentRoomId}`);
+        }
     });
 
     socket.on('save_profile', ({ profile }) => {
