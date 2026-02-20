@@ -661,12 +661,19 @@ io.on('connection', (socket) => {
                 wave: 0,
                 waveState: 'idle',
                 waveTimer: 0,
-                currentMap: 'arena_open',
-                walls: MAPS['arena_open'].walls
+                currentMap: 'arena_pillars',
+                walls: MAPS['arena_pillars'].walls
             };
         }
 
         const room = rooms[roomId];
+
+        // Ensure room has walls if it's an existing one from a previous server version
+        if (!room.walls || room.walls.length === 0) {
+            room.currentMap = room.currentMap || 'arena_pillars';
+            room.walls = MAPS[room.currentMap]?.walls || MAPS['arena_pillars'].walls;
+        }
+
         const isSpectator = settings?.spectator === true;
 
         if (isSpectator) {
@@ -1404,9 +1411,48 @@ setInterval(() => {
                         proj.renderY = proj.y;
                     }
 
+                    // Projectile Wall Collision
+                    if (room.walls && room.walls.length > 0) {
+                        for (const w of room.walls) {
+                            if (proj.x > w.x && proj.x < w.x + w.w &&
+                                proj.y > w.y && proj.y < w.y + w.h) {
+
+                                if (proj.bounciness) {
+                                    const dxLeft = Math.abs(proj.x - w.x);
+                                    const dxRight = Math.abs(proj.x - (w.x + w.w));
+                                    const dyTop = Math.abs(proj.y - w.y);
+                                    const dyBottom = Math.abs(proj.y - (w.y + w.h));
+                                    const min = Math.min(dxLeft, dxRight, dyTop, dyBottom);
+
+                                    if (min === dxLeft || min === dxRight) proj.velocity.x *= -proj.bounciness;
+                                    else proj.velocity.y *= -proj.bounciness;
+
+                                    if (min === dxLeft) proj.x = w.x - 1;
+                                    else if (min === dxRight) proj.x = w.x + w.w + 1;
+                                    else if (min === dyTop) proj.y = w.y - 1;
+                                    else if (min === dyBottom) proj.y = w.y + w.h + 1;
+                                } else {
+                                    io.to(roomId).emit('visual_effect', {
+                                        type: 'impact', x: proj.x, y: proj.y, color: '#666', strength: 5
+                                    });
+                                    room.projectiles.splice(i, 1);
+                                    i--;
+                                    return;
+                                }
+                                break;
+                            }
+                        }
+                    }
+
                     if (proj.bounciness) {
-                        if (proj.x < proj.radius || proj.x > 800 - proj.radius) proj.velocity.x *= -proj.bounciness;
-                        if (proj.y < proj.radius || proj.y > 600 - proj.radius) proj.velocity.y *= -proj.bounciness;
+                        if (proj.x < proj.radius || proj.x > 800 - proj.radius) {
+                            proj.velocity.x *= -proj.bounciness;
+                            proj.x = proj.x < proj.radius ? proj.radius : 800 - proj.radius;
+                        }
+                        if (proj.y < proj.radius || proj.y > 600 - proj.radius) {
+                            proj.velocity.y *= -proj.bounciness;
+                            proj.y = proj.y < proj.radius ? proj.radius : 600 - proj.radius;
+                        }
                     }
 
                     // Attraction Force
@@ -2065,12 +2111,46 @@ setInterval(() => {
                 }
             }
 
-            // Player movement
+            // Player movement & Wall Collision
             Object.values(room.players).forEach(p => {
-                p.x += p.velocity.x * dt;
-                p.y += p.velocity.y * dt;
-                p.x = Math.max(p.radius, Math.min(800 - p.radius, p.x));
-                p.y = Math.max(p.radius, Math.min(600 - p.radius, p.y));
+                const nextX = p.x + p.velocity.x * dt;
+                const nextY = p.y + p.velocity.y * dt;
+
+                let finalX = nextX;
+                let finalY = nextY;
+
+                // Collide with map walls
+                if (room.walls && room.walls.length > 0) {
+                    room.walls.forEach(w => {
+                        const buffer = p.radius;
+                        // Check if p.x, p.y is already inside (unlikely) or if next position is inside
+                        const rect = {
+                            left: w.x - buffer,
+                            right: w.x + w.w + buffer,
+                            top: w.y - buffer,
+                            bottom: w.y + w.h + buffer
+                        };
+
+                        if (finalX > rect.left && finalX < rect.right &&
+                            finalY > rect.top && finalY < rect.bottom) {
+
+                            // Simple resolution: push to nearest edge
+                            const dxLeft = Math.abs(finalX - rect.left);
+                            const dxRight = Math.abs(finalX - rect.right);
+                            const dyTop = Math.abs(finalY - rect.top);
+                            const dyBottom = Math.abs(finalY - rect.bottom);
+                            const min = Math.min(dxLeft, dxRight, dyTop, dyBottom);
+
+                            if (min === dxLeft) finalX = rect.left;
+                            else if (min === dxRight) finalX = rect.right;
+                            else if (min === dyTop) finalY = rect.top;
+                            else if (min === dyBottom) finalY = rect.bottom;
+                        }
+                    });
+                }
+
+                p.x = Math.max(p.radius, Math.min(800 - p.radius, finalX));
+                p.y = Math.max(p.radius, Math.min(600 - p.radius, finalY));
 
                 // Decay highlights
                 if (p.aura_highlight_timer && p.aura_highlight_timer > 0) {
