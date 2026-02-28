@@ -892,14 +892,42 @@ io.on('connection', (socket) => {
                     }
                 }
                 break;
-            case 'wipe_db':
-                const flashlonData = memoryUsers.get('flashlon');
-                memoryUsers.clear();
-                if (flashlonData) memoryUsers.set('flashlon', flashlonData);
-                try {
-                    fs.writeFileSync(DB_FILE, JSON.stringify(Object.fromEntries(memoryUsers), null, 2));
-                    io.emit('notification', { type: 'error', message: 'Database completely wiped by Admin!' });
-                } catch (e) { }
+            case 'set_user_stats':
+                if (payload.targetUser) {
+                    const user = memoryUsers.get(payload.targetUser);
+                    if (user) {
+                        if (payload.level !== undefined) user.level = payload.level;
+                        if (payload.xp !== undefined) user.xp = payload.xp;
+                        upsertUser(payload.targetUser, user).then(() => {
+                            for (const s of io.sockets.sockets.values()) {
+                                if (s.data.username === payload.targetUser) {
+                                    s.emit('profile_update', user);
+                                    s.emit('notification', { type: 'unlock', message: `Admin updated your stats.` });
+                                }
+                            }
+                        });
+                    } else {
+                        socket.emit('notification', { type: 'error', message: `User ${payload.targetUser} not found.` });
+                    }
+                }
+                break;
+            case 'unlock_all_titles':
+                if (payload.targetUser) {
+                    const user = memoryUsers.get(payload.targetUser);
+                    if (user) {
+                        user.titles = [...TITLES_LIST];
+                        upsertUser(payload.targetUser, user).then(() => {
+                            for (const s of io.sockets.sockets.values()) {
+                                if (s.data.username === payload.targetUser) {
+                                    s.emit('profile_update', user);
+                                    s.emit('notification', { type: 'unlock', message: `Admin unlocked all titles for you.` });
+                                }
+                            }
+                        });
+                    } else {
+                        socket.emit('notification', { type: 'error', message: `User ${payload.targetUser} not found.` });
+                    }
+                }
                 break;
             case 'spawn_boss':
                 const targetRoom = rooms[payload.roomId];

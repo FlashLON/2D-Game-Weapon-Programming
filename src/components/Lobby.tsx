@@ -576,12 +576,26 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         </button>
                                         <button
                                             onClick={() => {
-                                                if (window.confirm('WIPE ENTIRE DATABASE? THIS CANNOT BE UNDONE.')) {
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_db'));
+                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
+                                                const levelStr = window.prompt('Enter new level (leave blank to skip):');
+                                                const xpStr = window.prompt('Enter new xp (leave blank to skip):');
+                                                const payload: any = { targetUser };
+                                                if (levelStr) payload.level = parseInt(levelStr, 10);
+                                                if (xpStr) payload.xp = parseInt(xpStr, 10);
+                                                import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('set_user_stats', payload));
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Set Target Stats
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
+                                                if (targetUser) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_titles', { targetUser }));
                                                 }
                                             }}
                                             className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Shield size={18} className="text-red-500 group-hover:animate-pulse" /> Wipe DB
+                                            <Shield size={18} className="text-red-500 group-hover:animate-pulse" /> Unlock All Titles
                                         </button>
                                         <button
                                             onClick={() => {
