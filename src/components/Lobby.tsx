@@ -535,9 +535,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     onEquip={(id) => onEquipTitle?.(id)}
                                 />
                             ) : inventoryTab === 'admin' && username?.toLowerCase() === 'flashlon' ? (
-                                <div className="h-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300 relative overflow-hidden">
+                                <div className="flex flex-col items-center justify-start py-8 px-4 animate-in fade-in zoom-in duration-300 relative w-full min-h-full">
                                     {/* Background glow for admin panel */}
-                                    <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
+                                    <div className="absolute inset-0 bg-red-500/5 pointer-events-none rounded-2xl" />
                                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red-500/20 rounded-full blur-[100px] pointer-events-none" />
 
                                     <Shield size={64} className="text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] z-10" />
@@ -596,6 +596,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                                             }}
                                             className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
                                             <Shield size={18} className="text-red-500 group-hover:animate-pulse" /> Unlock All Titles
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
+                                                if (targetUser) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('max_limits', { targetUser }));
+                                                }
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Cpu size={18} className="text-red-500 group-hover:animate-pulse" /> Max Out Limits / UI
                                         </button>
                                         <button
                                             onClick={() => {

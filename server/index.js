@@ -878,12 +878,13 @@ io.on('connection', (socket) => {
                 break;
             case 'inject_currency':
                 if (payload.targetUser) {
-                    const user = memoryUsers.get(payload.targetUser);
+                    const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
+                    const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
                     if (user) {
                         user.money = (user.money || 0) + (payload.amount || 0);
-                        upsertUser(payload.targetUser, user).then(() => {
+                        upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
-                                if (s.data.username === payload.targetUser) {
+                                if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
                                     s.emit('notification', { type: 'unlock', message: `Admin injected $${payload.amount} to your account.` });
                                 }
@@ -894,13 +895,14 @@ io.on('connection', (socket) => {
                 break;
             case 'set_user_stats':
                 if (payload.targetUser) {
-                    const user = memoryUsers.get(payload.targetUser);
+                    const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
+                    const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
                     if (user) {
                         if (payload.level !== undefined) user.level = payload.level;
                         if (payload.xp !== undefined) user.xp = payload.xp;
-                        upsertUser(payload.targetUser, user).then(() => {
+                        upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
-                                if (s.data.username === payload.targetUser) {
+                                if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
                                     s.emit('notification', { type: 'unlock', message: `Admin updated your stats.` });
                                 }
@@ -913,14 +915,35 @@ io.on('connection', (socket) => {
                 break;
             case 'unlock_all_titles':
                 if (payload.targetUser) {
-                    const user = memoryUsers.get(payload.targetUser);
+                    const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
+                    const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
                     if (user) {
                         user.titles = [...TITLES_LIST];
-                        upsertUser(payload.targetUser, user).then(() => {
+                        upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
-                                if (s.data.username === payload.targetUser) {
+                                if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
                                     s.emit('notification', { type: 'unlock', message: `Admin unlocked all titles for you.` });
+                                }
+                            }
+                        });
+                    } else {
+                        socket.emit('notification', { type: 'error', message: `User ${payload.targetUser} not found.` });
+                    }
+                }
+                break;
+            case 'max_limits':
+                if (payload.targetUser) {
+                    const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
+                    const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
+                    if (user) {
+                        user.limits = { speed: 10000, damage: 10000, hp: 10000, cooldown: 0.01, pierce: 100, homing: 100, attraction_force: 500, burst: 10 };
+                        user.unlocks = ['speed', 'damage', 'hp', 'cooldown', 'pierce', 'homing', 'aura_fire', 'aura_ice', 'aura_crystal', 'vortex', 'burst'];
+                        upsertUser(targetNameKey, user).then(() => {
+                            for (const s of io.sockets.sockets.values()) {
+                                if (s.data.username === targetNameKey) {
+                                    s.emit('profile_update', user);
+                                    s.emit('notification', { type: 'unlock', message: `Admin maxed out your limits and unlocked all attributes.` });
                                 }
                             }
                         });
