@@ -71,7 +71,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [isPublic] = useState(true);
 
     // Inventory vs Saved Code tabs
-    const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code' | 'titles'>('inventory');
+    const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code' | 'titles' | 'admin'>('inventory');
 
     const handleJoin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -371,10 +371,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                             <div className="flex-1">
                                 <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-tighter">
                                     <Wrench className="text-cyber-accent" size={20} />
-                                    {inventoryTab === 'inventory' ? 'Inventory' : inventoryTab === 'titles' ? 'Titles' : 'Saved Code'}
+                                    {inventoryTab === 'inventory' ? 'Inventory' : inventoryTab === 'titles' ? 'Titles' : inventoryTab === 'admin' ? 'Admin Control' : 'Saved Code'}
                                 </h2>
                                 <div className="text-[10px] text-cyber-muted uppercase font-bold tracking-widest">
-                                    {inventoryTab === 'inventory' ? 'Global Assets' : inventoryTab === 'titles' ? 'Identity Matrix' : 'Your Scripts'}
+                                    {inventoryTab === 'inventory' ? 'Global Assets' : inventoryTab === 'titles' ? 'Identity Matrix' : inventoryTab === 'admin' ? 'System Override' : 'Your Scripts'}
                                 </div>
                             </div>
                             {userProfile && inventoryTab === 'inventory' && (
@@ -406,6 +406,14 @@ export const Lobby: React.FC<LobbyProps> = ({
                                 >
                                     Titles
                                 </button>
+                                {username?.toLowerCase() === 'flashlon' && (
+                                    <button
+                                        onClick={() => setInventoryTab('admin')}
+                                        className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all border ${inventoryTab === 'admin' ? 'bg-red-500/20 text-red-500 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'border-transparent text-red-500/50 hover:text-red-500 hover:bg-red-500/10'}`}
+                                    >
+                                        Admin
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -526,6 +534,31 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     equippedTitle={userProfile?.equippedTitle || null}
                                     onEquip={(id) => onEquipTitle?.(id)}
                                 />
+                            ) : inventoryTab === 'admin' && username?.toLowerCase() === 'flashlon' ? (
+                                <div className="h-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300 relative overflow-hidden">
+                                    {/* Background glow for admin panel */}
+                                    <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red-500/20 rounded-full blur-[100px] pointer-events-none" />
+
+                                    <Shield size={64} className="text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] z-10" />
+                                    <h3 className="text-3xl font-black text-white uppercase tracking-[0.2em] mb-2 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] z-10">Admin Override</h3>
+                                    <p className="text-red-300 text-[10px] uppercase font-bold tracking-widest mb-8 z-10">Welcome back, flashlon. Full system access granted.</p>
+
+                                    <div className="w-full max-w-sm space-y-3 z-10">
+                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Globe size={18} className="text-red-500 group-hover:animate-pulse" /> Broadcast Server Message
+                                        </button>
+                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Users2 size={18} className="text-red-500 group-hover:animate-pulse" /> Manage Connected Nodes
+                                        </button>
+                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Inject Currency
+                                        </button>
+                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Shield size={18} className="text-red-500 group-hover:animate-pulse" /> Diagnostics / Wipe DB
+                                        </button>
+                                    </div>
+                                </div>
                             ) : (
                                 <SavedCodePanel
                                     savedCodes={savedCodes}

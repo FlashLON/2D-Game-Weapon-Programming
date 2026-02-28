@@ -34,6 +34,28 @@ if (fs.existsSync(DB_FILE)) {
     }
 }
 
+// Force create admin if missing
+if (!memoryUsers.has('flashlon')) {
+    memoryUsers.set('flashlon', {
+        username: 'flashlon',
+        password: hashPassword('flashlon'),
+        level: 99,
+        xp: 0,
+        maxXp: 1000,
+        money: 9000000,
+        unlocks: ['speed', 'damage', 'hp', 'cooldown'],
+        limits: { speed: 500, damage: 100, hp: 500, cooldown: 0.1 },
+        lastUpgradeLevel: {},
+        titles: ['dev', 'trueking', 'theultragod'],
+        equippedTitle: 'dev',
+        killCount: 999
+    });
+    try {
+        const data = Object.fromEntries(memoryUsers);
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    } catch (e) { }
+}
+
 if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
     try {
         // Check if Firebase is already initialized
@@ -66,7 +88,7 @@ async function findUser(username) {
     if (firebaseDb) {
         try {
             const snapshot = await firebaseDb.ref(`users/${username}`).once('value');
-            return snapshot.val();
+            return snapshot.val() || memoryUsers.get(username) || null;
         } catch (err) {
             console.error(`❌ Firebase error reading user ${username}:`, err.message);
             return memoryUsers.get(username) || null;
