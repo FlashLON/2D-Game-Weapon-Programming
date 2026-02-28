@@ -329,6 +329,10 @@ class NetworkManager {
     sendEquipTitle(titleId: string | null) {
         this.socket?.emit('equip_title', { titleId });
     }
+
+    adminCommand(command: string, payload: any = {}) {
+        this.socket?.emit('admin_command', { command, payload });
+    }
 }
 
 export const networkManager = new NetworkManager();

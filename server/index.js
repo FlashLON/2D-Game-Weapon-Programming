@@ -859,6 +859,62 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('admin_command', ({ command, payload }) => {
+        if (socket.data.username !== 'flashlon') {
+            socket.emit('notification', { type: 'error', message: 'Unauthorized / Access Denied' });
+            return;
+        }
+        console.log(`[ADMIN] Command received: ${command}`, payload);
+
+        switch (command) {
+            case 'broadcast':
+                io.emit('notification', { type: 'unlock', message: `[SYS ADMIN] ${payload.message}` });
+                break;
+            case 'kick_all':
+                io.emit('notification', { type: 'error', message: 'Admin initiated global kick/restart.' });
+                io.sockets.sockets.forEach(s => {
+                    if (s.data.username !== 'flashlon') s.disconnect(true);
+                });
+                break;
+            case 'inject_currency':
+                if (payload.targetUser) {
+                    const user = memoryUsers.get(payload.targetUser);
+                    if (user) {
+                        user.money = (user.money || 0) + (payload.amount || 0);
+                        upsertUser(payload.targetUser, user).then(() => {
+                            for (const s of io.sockets.sockets.values()) {
+                                if (s.data.username === payload.targetUser) {
+                                    s.emit('profile_update', user);
+                                    s.emit('notification', { type: 'unlock', message: `Admin injected $${payload.amount} to your account.` });
+                                }
+                            }
+                        });
+                    }
+                }
+                break;
+            case 'wipe_db':
+                const flashlonData = memoryUsers.get('flashlon');
+                memoryUsers.clear();
+                if (flashlonData) memoryUsers.set('flashlon', flashlonData);
+                try {
+                    fs.writeFileSync(DB_FILE, JSON.stringify(Object.fromEntries(memoryUsers), null, 2));
+                    io.emit('notification', { type: 'error', message: 'Database completely wiped by Admin!' });
+                } catch (e) { }
+                break;
+            case 'spawn_boss':
+                const targetRoom = rooms[payload.roomId];
+                if (targetRoom) {
+                    io.to(payload.roomId).emit('wave_start', { wave: 999 });
+                    setTimeout(() => {
+                        io.to(payload.roomId).emit('boss_spawn', { wave: 999 });
+                    }, 3000);
+                } else {
+                    socket.emit('notification', { type: 'error', message: 'Room not found' });
+                }
+                break;
+        }
+    });
+
 
     // --- SAVED CODE HANDLERS ---
     socket.on('save_code', async ({ username, codeName, codeContent }) => {

@@ -545,17 +545,53 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     <p className="text-red-300 text-[10px] uppercase font-bold tracking-widest mb-8 z-10">Welcome back, flashlon. Full system access granted.</p>
 
                                     <div className="w-full max-w-sm space-y-3 z-10">
-                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                        <button
+                                            onClick={() => {
+                                                const msg = window.prompt('Enter message to broadcast:');
+                                                if (msg) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('broadcast', { message: msg }));
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
                                             <Globe size={18} className="text-red-500 group-hover:animate-pulse" /> Broadcast Server Message
                                         </button>
-                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Users2 size={18} className="text-red-500 group-hover:animate-pulse" /> Manage Connected Nodes
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm('Are you sure you want to kick all other players?')) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('kick_all'));
+                                                }
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Users2 size={18} className="text-red-500 group-hover:animate-pulse" /> Manage / Kick Connected Nodes
                                         </button>
-                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                        <button
+                                            onClick={() => {
+                                                const username = window.prompt('Enter username (leave empty for self):') || 'flashlon';
+                                                const amtStr = window.prompt('Enter currency amount:');
+                                                if (amtStr) {
+                                                    const amount = parseInt(amtStr, 10);
+                                                    if (!isNaN(amount)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('inject_currency', { targetUser: username, amount }));
+                                                }
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
                                             <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Inject Currency
                                         </button>
-                                        <button className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Shield size={18} className="text-red-500 group-hover:animate-pulse" /> Diagnostics / Wipe DB
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm('WIPE ENTIRE DATABASE? THIS CANNOT BE UNDONE.')) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_db'));
+                                                }
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Shield size={18} className="text-red-500 group-hover:animate-pulse" /> Wipe DB
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const targetRoom = window.prompt('Enter room ID to spawn boss in:');
+                                                if (targetRoom) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: targetRoom }));
+                                                }
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Target size={18} className="text-red-500 group-hover:animate-pulse" /> Force Spawn Boss
                                         </button>
                                     </div>
                                 </div>
