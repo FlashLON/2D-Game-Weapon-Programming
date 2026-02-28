@@ -952,6 +952,42 @@ io.on('connection', (socket) => {
                     }
                 }
                 break;
+            case 'unlock_all_values':
+                if (payload.targetUser) {
+                    const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
+                    const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
+                    if (user) {
+                        user.level = 999;
+                        user.xp = 0;
+                        user.maxXp = 9999999;
+                        user.money = 99999999;
+                        user.killCount = 99999;
+                        user.titles = [...TITLES_LIST];
+                        user.limits = { speed: 10000, damage: 10000, hp: 10000, cooldown: 0.01, pierce: 100, homing: 100, attraction_force: 500, burst: 10 };
+                        user.unlocks = ['speed', 'damage', 'hp', 'cooldown', 'pierce', 'homing', 'aura_fire', 'aura_ice', 'aura_crystal', 'vortex', 'burst'];
+
+                        upsertUser(targetNameKey, user).then(() => {
+                            for (const s of io.sockets.sockets.values()) {
+                                if (s.data.username === targetNameKey) {
+                                    s.emit('profile_update', user);
+                                    s.emit('notification', { type: 'unlock', message: `Admin unlocked ALL VALUES and MAXED your account.` });
+                                }
+                            }
+                        });
+                    } else {
+                        socket.emit('notification', { type: 'error', message: `User ${payload.targetUser} not found.` });
+                    }
+                }
+                break;
+            case 'nuke_enemies':
+                const roomToNuke = rooms[payload.roomId];
+                if (roomToNuke) {
+                    roomToNuke.enemies = []; // clears all enemies instantly
+                    io.to(payload.roomId).emit('notification', { type: 'unlock', message: '[SYS] Admin Nuked All Enemies!' });
+                } else {
+                    socket.emit('notification', { type: 'error', message: 'Room not found' });
+                }
+                break;
             case 'spawn_boss':
                 const targetRoom = rooms[payload.roomId];
                 if (targetRoom) {

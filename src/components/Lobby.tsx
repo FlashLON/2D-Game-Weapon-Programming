@@ -609,6 +609,26 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         </button>
                                         <button
                                             onClick={() => {
+                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
+                                                if (targetUser) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_values', { targetUser }));
+                                                }
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <DollarSign size={18} className="text-red-500 group-hover:animate-pulse" /> Unlock All VALUES (Max Everything)
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const targetRoom = window.prompt('Enter room ID to nuke enemies in:');
+                                                if (targetRoom) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('nuke_enemies', { roomId: targetRoom }));
+                                                }
+                                            }}
+                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                            <Swords size={18} className="text-red-500 group-hover:animate-pulse" /> Nuke All Enemies
+                                        </button>
+                                        <button
+                                            onClick={() => {
                                                 const targetRoom = window.prompt('Enter room ID to spawn boss in:');
                                                 if (targetRoom) {
                                                     import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: targetRoom }));
