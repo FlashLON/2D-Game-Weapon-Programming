@@ -2214,7 +2214,7 @@ setInterval(() => {
                     targets.forEach(target => {
                         const distSq = (target.x - p.x) ** 2 + (target.y - p.y) ** 2;
                         const strength = p.limits?.[aura] || 1;
-                        const baseRange = 240;
+                        const baseRange = 100;
                         const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / 1.1) - 1) * 0.5);
                         const range = baseRange * rangeScale;
 

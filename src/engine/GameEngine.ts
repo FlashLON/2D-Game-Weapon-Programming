@@ -367,7 +367,7 @@ export class GameEngine {
                     const strength = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
                     const startLimit = ATTRIBUTES[aura]?.startLimit || 1;
                     const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
-                    const range = 240 * rangeScale;
+                    const range = 100 * rangeScale;
 
                     this.state.entities.forEach(target => {
                         if (target.id === ent.id) return;
@@ -472,7 +472,7 @@ export class GameEngine {
                     const strength = (ent as any).limits?.[aura] || ATTRIBUTES[aura]?.startLimit || 1;
                     const startLimit = ATTRIBUTES[aura]?.startLimit || 1;
                     const rangeScale = 1 + Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
-                    const range = 240 * rangeScale;
+                    const range = 100 * rangeScale;
 
                     this.state.entities.forEach(target => {
                         // Auras affect everyone except the owner

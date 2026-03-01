@@ -173,7 +173,7 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                         const strength = (ent as any).limits?.[ent.aura_type] || attrDef.startLimit || 1;
                         const startLimit = attrDef.startLimit || 1;
                         const scaleFactor = Math.min(0.3, Math.max(0, (strength / startLimit) - 1) * 0.5);
-                        const range = 240 * (1 + scaleFactor);
+                        const range = 100 * (1 + scaleFactor);
 
                         ctx.save();
                         ctx.translate(drawX, drawY);
