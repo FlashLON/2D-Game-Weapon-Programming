@@ -105,6 +105,19 @@ function App() {
   const [loadCodeModalOpen, setLoadCodeModalOpen] = useState(false);
   const [loadingSavedCodes, setLoadingSavedCodes] = useState(false);
 
+  // Matchmaking & Party State
+  const [queueStatus, setQueueStatus] = useState<any>(null);
+  const [partyData, setPartyData] = useState<any>(null);
+  const [matchResult, setMatchResult] = useState<any>(null);
+  const [gameSettings, setGameSettings] = useState(() => {
+    const saved = localStorage.getItem('game_settings');
+    return saved ? JSON.parse(saved) : { screenshake: true, damageNumbers: true, showFps: false };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('game_settings', JSON.stringify(gameSettings));
+  }, [gameSettings]);
+
   useEffect(() => {
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
     gameEngine.setPlayerStats(userProfile);
@@ -623,6 +636,32 @@ function App() {
       }
     });
 
+    // Matchmaking events
+    networkManager.setOnQueueUpdate((data) => {
+      setQueueStatus(data);
+      if (data.status === 'left') setQueueStatus(null);
+    });
+
+    networkManager.setOnMatchFound((data) => {
+      addLog(`⚡ MATCH FOUND! Team ${data.team.toUpperCase()}`, 'success');
+      setQueueStatus(null);
+      // Auto-join the match room
+      networkManager.joinMatch(data.roomId, data.team);
+      setCurrentRoom(data.roomId);
+      gameEngine.setMultiplayerMode(true, networkManager.getPlayerId());
+    });
+
+    networkManager.setOnMatchResult((data) => {
+      setMatchResult(data);
+      addLog(`🏆 Match Over! Team ${data.winner.toUpperCase()} wins!`, 'success');
+      setTimeout(() => setMatchResult(null), 8000);
+    });
+
+    // Party events
+    networkManager.setOnPartyUpdate((data) => {
+      setPartyData(data);
+    });
+
     return () => {
       networkManager.removeConnectionListener(handleGlobalConn);
     };
@@ -790,6 +829,16 @@ function App() {
             loadingSavedCodes={loadingSavedCodes}
             onEquipTitle={handleEquipTitle}
             onSpectate={handleSpectate}
+            queueStatus={queueStatus}
+            partyData={partyData}
+            onQueue2v2={() => networkManager.queue2v2()}
+            onLeaveQueue={() => networkManager.leaveQueue()}
+            onCreateParty={() => networkManager.createParty()}
+            onJoinParty={(id) => networkManager.joinParty(id)}
+            onLeaveParty={() => networkManager.leaveParty()}
+            onSetCoopDifficulty={(diff) => networkManager.setCoopDifficulty(diff)}
+            gameSettings={gameSettings}
+            onUpdateSettings={(key, val) => setGameSettings((prev: any) => ({ ...prev, [key]: val }))}
           />
         ) : (
           <>
@@ -820,6 +869,36 @@ function App() {
                       <div className={`text-xl font-bold uppercase tracking-[0.5em] ${waveInfo.status === 'INCOMING' ? 'text-cyber-accent' : 'text-cyber-danger'}`}>
                         {waveInfo.status}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2v2 Match Result Overlay */}
+                {matchResult && (
+                  <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/70 backdrop-blur-sm">
+                    <div className="text-center p-8 bg-black/80 rounded-3xl border-2 border-white/20 max-w-md w-full mx-4">
+                      <div className="text-sm font-black text-white/40 uppercase tracking-[0.3em] mb-2">MATCH OVER</div>
+                      <div className={`text-4xl font-black uppercase mb-4 ${matchResult.winner === 'red' ? 'text-red-400' : 'text-blue-400'}`}>
+                        TEAM {matchResult.winner?.toUpperCase()} WINS
+                      </div>
+                      <div className="space-y-2 mb-6">
+                        {matchResult.players?.map((p: any, i: number) => (
+                          <div key={i} className={`flex items-center justify-between p-2 rounded-lg ${p.team === 'red' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
+                            <span className={`text-xs font-bold ${p.team === 'red' ? 'text-red-300' : 'text-blue-300'}`}>
+                              {p.username}
+                            </span>
+                            <span className="text-[10px] text-white/50">
+                              {p.kills} kills / {p.deaths} deaths
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={handleLeaveRoom}
+                        className="w-full py-3 rounded-xl font-black bg-white/10 text-white hover:bg-white/20 transition-all text-sm"
+                      >
+                        RETURN TO LOBBY
+                      </button>
                     </div>
                   </div>
                 )}

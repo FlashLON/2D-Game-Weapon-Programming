@@ -461,6 +461,104 @@ function resolveMapVote(roomId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MATCHMAKING & 2v2 SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Matchmaking queue: array of { socketId, username, partyId, queuedAt }
+const matchmakingQueue = [];
+
+// Party system: partyId -> { leader, members: [socketId, ...] }
+const parties = {};
+
+function generatePartyId() {
+    return 'party-' + Math.random().toString(36).substr(2, 6);
+}
+
+function generate2v2RoomId() {
+    return '2v2-' + Math.random().toString(36).substr(2, 8);
+}
+
+function tryMatchmake() {
+    // Need at least 4 players (or 2 parties of 2, etc.)
+    if (matchmakingQueue.length < 4) return;
+
+    // Simple approach: take the first 4 players from the queue
+    // If parties exist, try to keep party members together
+    const matched = matchmakingQueue.splice(0, 4);
+    const roomId = generate2v2RoomId();
+
+    console.log(`[MATCHMAKING] Creating 2v2 room: ${roomId} with ${matched.map(p => p.username).join(', ')}`);
+
+    // Create the 2v2 room
+    rooms[roomId] = {
+        id: roomId,
+        mode: '2v2',
+        players: {},
+        spectators: {},
+        projectiles: [],
+        enemies: [],
+        grid: {},
+        lastUpdate: Date.now(),
+        score: 0,
+        wave: 0,
+        waveState: 'idle',
+        waveTimer: 0,
+        currentMap: 'arena_cross',
+        walls: MAPS['arena_cross'].walls,
+        teams: { red: [], blue: [] },
+        matchState: 'active',   // 'active' | 'finished'
+        matchWinner: null
+    };
+
+    // Assign teams: first 2 = red, last 2 = blue
+    // If there's a party, keep them on the same team
+    const teamRed = matched.slice(0, 2);
+    const teamBlue = matched.slice(2, 4);
+
+    rooms[roomId].teams.red = teamRed.map(p => p.socketId);
+    rooms[roomId].teams.blue = teamBlue.map(p => p.socketId);
+
+    // Notify all matched players
+    matched.forEach((player, idx) => {
+        const sock = io.sockets.sockets.get(player.socketId);
+        if (sock) {
+            const team = idx < 2 ? 'red' : 'blue';
+            sock.emit('match_found', {
+                roomId,
+                team,
+                teammates: (idx < 2 ? teamRed : teamBlue).map(p => p.username),
+                opponents: (idx < 2 ? teamBlue : teamRed).map(p => p.username)
+            });
+        }
+    });
+}
+
+// Check matchmaking queue periodically
+setInterval(() => {
+    if (matchmakingQueue.length >= 4) {
+        tryMatchmake();
+    }
+    // Notify queue members of their position
+    matchmakingQueue.forEach((entry, idx) => {
+        const sock = io.sockets.sockets.get(entry.socketId);
+        if (sock) {
+            sock.emit('queue_update', {
+                position: idx + 1,
+                total: matchmakingQueue.length,
+                waitTime: Math.floor((Date.now() - entry.queuedAt) / 1000)
+            });
+        }
+    });
+}, 2000);
+
+// CO-OP DIFFICULTY SETTINGS
+const COOP_DIFFICULTY = {
+    easy: { hpMultiplier: 0.6, speedMultiplier: 0.7, spawnMultiplier: 0.7, scoreMultiplier: 0.5 },
+    normal: { hpMultiplier: 1.0, speedMultiplier: 1.0, spawnMultiplier: 1.0, scoreMultiplier: 1.0 },
+    hard: { hpMultiplier: 1.8, speedMultiplier: 1.3, spawnMultiplier: 1.5, scoreMultiplier: 2.0 }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.get('/api/status', (req, res) => {
     const totalPlayers = Object.values(rooms).reduce((sum, r) => sum + Object.keys(r.players).length, 0);
@@ -1553,7 +1651,208 @@ io.on('connection', (socket) => {
         io.to(currentRoomId).emit('map_vote_update', { tally });
     });
 
+    // =================== MATCHMAKING & 2v2 ===================
+    socket.on('queue_2v2', () => {
+        // Remove from queue if already in it
+        const existingIdx = matchmakingQueue.findIndex(e => e.socketId === socket.id);
+        if (existingIdx !== -1) {
+            socket.emit('queue_update', { status: 'already_queued' });
+            return;
+        }
+
+        matchmakingQueue.push({
+            socketId: socket.id,
+            username: socket.data.username || 'Guest',
+            partyId: socket.data.partyId || null,
+            queuedAt: Date.now()
+        });
+
+        console.log(`[MATCHMAKING] ${socket.data.username || socket.id} joined queue. Queue: ${matchmakingQueue.length}`);
+        socket.emit('queue_update', {
+            status: 'queued',
+            position: matchmakingQueue.length,
+            total: matchmakingQueue.length
+        });
+
+        // Immediately try to matchmake
+        if (matchmakingQueue.length >= 4) tryMatchmake();
+    });
+
+    socket.on('leave_queue', () => {
+        const idx = matchmakingQueue.findIndex(e => e.socketId === socket.id);
+        if (idx !== -1) {
+            matchmakingQueue.splice(idx, 1);
+            console.log(`[MATCHMAKING] ${socket.data.username || socket.id} left queue. Queue: ${matchmakingQueue.length}`);
+        }
+        socket.emit('queue_update', { status: 'left' });
+    });
+
+    socket.on('join_match', ({ roomId, team }) => {
+        // Player confirmed match — auto-join the 2v2 room
+        leaveRoom(socket.id);
+        if (currentRoomId) socket.leave(currentRoomId);
+
+        currentRoomId = roomId;
+        socket.join(roomId);
+
+        const room = rooms[roomId];
+        if (!room) {
+            socket.emit('notification', { type: 'error', message: 'Match room expired.' });
+            return;
+        }
+
+        const teamColor = team === 'red' ? '#ff4444' : '#4488ff';
+        const spawnX = team === 'red' ? 150 : 650;
+        const spawnY = 300;
+
+        const user = memoryUsers.get(socket.data.username);
+        room.players[socket.id] = {
+            id: socket.id,
+            type: 'player',
+            x: spawnX, y: spawnY,
+            radius: 16,
+            color: teamColor,
+            hp: user?.limits?.hp || 100,
+            maxHp: user?.limits?.hp || 100,
+            velocity: { x: 0, y: 0 },
+            kills: 0, deaths: 0,
+            username: socket.data.username || 'Guest',
+            level: user?.level || 1,
+            equippedTitle: user?.equippedTitle || null,
+            aura_type: user?.aura_type || null,
+            limits: user?.limits || {},
+            joinedAt: Date.now(),
+            hasFired: false,
+            lastActionTime: Date.now(),
+            team: team
+        };
+
+        socket.emit('init', {
+            playerId: socket.id,
+            gameState: {
+                entities: [...Object.values(room.players)],
+                projectiles: room.projectiles,
+                walls: room.walls || [],
+                currentMap: room.currentMap,
+                mode: '2v2',
+                team: team
+            }
+        });
+    });
+
+    // =================== PARTY SYSTEM ===================
+    socket.on('create_party', () => {
+        const partyId = generatePartyId();
+        parties[partyId] = {
+            id: partyId,
+            leader: socket.id,
+            leaderName: socket.data.username || 'Guest',
+            members: [{ socketId: socket.id, username: socket.data.username || 'Guest' }]
+        };
+        socket.data.partyId = partyId;
+        socket.emit('party_update', {
+            partyId,
+            isLeader: true,
+            members: parties[partyId].members.map(m => m.username)
+        });
+        console.log(`[PARTY] ${socket.data.username} created party ${partyId}`);
+    });
+
+    socket.on('join_party', ({ partyId }) => {
+        const party = parties[partyId];
+        if (!party) {
+            socket.emit('notification', { type: 'error', message: 'Party not found.' });
+            return;
+        }
+        if (party.members.length >= 2) {
+            socket.emit('notification', { type: 'error', message: 'Party is full (max 2 for 2v2).' });
+            return;
+        }
+        if (party.members.find(m => m.socketId === socket.id)) {
+            socket.emit('notification', { type: 'error', message: 'Already in this party.' });
+            return;
+        }
+
+        party.members.push({ socketId: socket.id, username: socket.data.username || 'Guest' });
+        socket.data.partyId = partyId;
+
+        // Notify all party members
+        party.members.forEach(m => {
+            const s = io.sockets.sockets.get(m.socketId);
+            if (s) s.emit('party_update', {
+                partyId,
+                isLeader: m.socketId === party.leader,
+                members: party.members.map(mm => mm.username)
+            });
+        });
+        console.log(`[PARTY] ${socket.data.username} joined party ${partyId}`);
+    });
+
+    socket.on('leave_party', () => {
+        const partyId = socket.data.partyId;
+        if (!partyId || !parties[partyId]) return;
+
+        const party = parties[partyId];
+        party.members = party.members.filter(m => m.socketId !== socket.id);
+        socket.data.partyId = null;
+
+        if (party.members.length === 0) {
+            delete parties[partyId];
+        } else {
+            // Transfer leadership
+            party.leader = party.members[0].socketId;
+            party.members.forEach(m => {
+                const s = io.sockets.sockets.get(m.socketId);
+                if (s) s.emit('party_update', {
+                    partyId,
+                    isLeader: m.socketId === party.leader,
+                    members: party.members.map(mm => mm.username)
+                });
+            });
+        }
+        socket.emit('party_update', null);
+    });
+
+    // =================== CO-OP DIFFICULTY ===================
+    socket.on('set_coop_difficulty', ({ difficulty }) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const room = rooms[currentRoomId];
+        if (room.mode !== 'coop') return;
+        const validDiffs = ['easy', 'normal', 'hard'];
+        if (!validDiffs.includes(difficulty)) return;
+        room.difficulty = difficulty;
+        io.to(currentRoomId).emit('notification', {
+            type: 'unlock',
+            message: `Difficulty set to ${difficulty.toUpperCase()}`
+        });
+        console.log(`[COOP] Room ${currentRoomId} difficulty set to ${difficulty}`);
+    });
+
     socket.on('disconnect', () => {
+        // Remove from matchmaking queue
+        const qIdx = matchmakingQueue.findIndex(e => e.socketId === socket.id);
+        if (qIdx !== -1) matchmakingQueue.splice(qIdx, 1);
+
+        // Remove from party
+        const partyId = socket.data?.partyId;
+        if (partyId && parties[partyId]) {
+            const party = parties[partyId];
+            party.members = party.members.filter(m => m.socketId !== socket.id);
+            if (party.members.length === 0) {
+                delete parties[partyId];
+            } else {
+                party.leader = party.members[0].socketId;
+                party.members.forEach(m => {
+                    const s = io.sockets.sockets.get(m.socketId);
+                    if (s) s.emit('party_update', {
+                        partyId,
+                        isLeader: m.socketId === party.leader,
+                        members: party.members.map(mm => mm.username)
+                    });
+                });
+            }
+        }
+
         leaveRoom(socket.id);
     });
 });
@@ -1595,7 +1894,8 @@ setInterval(() => {
                 }
 
                 if (room.waveState === 'spawning') {
-                    const maxEnemies = 5 + (room.wave * 2);
+                    const diffSettings = COOP_DIFFICULTY[room.difficulty || 'normal'] || COOP_DIFFICULTY.normal;
+                    const maxEnemies = Math.floor((5 + (room.wave * 2)) * diffSettings.spawnMultiplier);
                     if (room.enemies.length < maxEnemies && Math.random() < 0.1) {
                         const side = Math.floor(Math.random() * 4);
                         let ex = 0, ey = 0;
@@ -1609,8 +1909,9 @@ setInterval(() => {
                         let type = 'standard';
                         let radius = 20;
                         let color = '#ff0055';
-                        let speed = 50 + (room.wave * 2);
-                        let hp = 30 + (room.wave * 15);
+                        const diff = COOP_DIFFICULTY[room.difficulty || 'normal'] || COOP_DIFFICULTY.normal;
+                        let speed = (50 + (room.wave * 2)) * diff.speedMultiplier;
+                        let hp = (30 + (room.wave * 15)) * diff.hpMultiplier;
                         let extraProps = {};
 
                         if (room.wave > 2 && rand > 0.88) {
@@ -1891,6 +2192,8 @@ setInterval(() => {
                     if (ent.id === proj.playerId || ent.type === 'projectile') return;
                     // GHOST: invulnerable while phased
                     if (ent.enemyType === 'ghost' && ent.phased) return;
+                    // 2v2: No friendly fire — skip teammates
+                    if (room.mode === '2v2' && ent.team && room.players[proj.playerId]?.team === ent.team) return;
                     const dist = Math.sqrt((ent.x - (proj.renderX || proj.x)) ** 2 + (ent.y - (proj.renderY || proj.y)) ** 2);
                     if (dist < ent.radius + proj.radius) {
                         let dmg = (proj.damage || 10);
@@ -2121,6 +2424,50 @@ setInterval(() => {
 
                         if (ent.hp <= 0) {
                             if (room.mode === 'coop') {
+                                room.enemies.splice(room.enemies.indexOf(ent), 1);
+                            } else if (room.mode === '2v2' && ent.type === 'player') {
+                                // 2v2: Eliminate player (don't respawn)
+                                ent.dead = true;
+                                ent.hp = 0;
+                                ent.x = -99999;
+                                ent.deaths = (ent.deaths || 0) + 1;
+
+                                // Check if entire team is eliminated
+                                const victimTeam = ent.team;
+                                const winnerTeam = victimTeam === 'red' ? 'blue' : 'red';
+                                const teamIds = room.teams?.[victimTeam] || [];
+                                const allDead = teamIds.every(id => {
+                                    const p = room.players[id];
+                                    return !p || p.dead;
+                                });
+
+                                if (allDead && room.matchState === 'active') {
+                                    room.matchState = 'finished';
+                                    room.matchWinner = winnerTeam;
+                                    io.to(roomId).emit('match_result', {
+                                        winner: winnerTeam,
+                                        teams: room.teams,
+                                        players: Object.values(room.players).map(p => ({
+                                            username: p.username,
+                                            team: p.team,
+                                            kills: p.kills,
+                                            deaths: p.deaths
+                                        }))
+                                    });
+                                    // Reward winners
+                                    const winnerIds = room.teams[winnerTeam] || [];
+                                    winnerIds.forEach(id => {
+                                        const p = room.players[id];
+                                        if (p) {
+                                            p.xp = (p.xp || 0) + 100;
+                                            p.money = (p.money || 0) + 50;
+                                            saveProgress(p.username, p);
+                                        }
+                                    });
+                                    console.log(`[2v2] Match ${roomId} won by Team ${winnerTeam.toUpperCase()}`);
+                                }
+                            } else if (room.mode === '2v2') {
+                                // Non-player entity in 2v2 (shouldn't happen normally)
                                 room.enemies.splice(room.enemies.indexOf(ent), 1);
                             } else {
                                 ent.hp = ent.maxHp;
@@ -2639,6 +2986,11 @@ setInterval(() => {
                 waveState: room.waveState,
                 walls: room.walls || [],
                 currentMap: room.currentMap || 'arena_open',
+                mode: room.mode || 'pvp',
+                teams: room.teams || null,
+                difficulty: room.difficulty || 'normal',
+                matchState: room.matchState || null,
+                matchWinner: room.matchWinner || null,
                 mapVote: (room.mapVote && room.mapVote.active) ? {
                     active: true,
                     timeLeft: Math.max(0, room.mapVote.endTime - now),

@@ -66,6 +66,10 @@ class NetworkManager {
     private onMapVoteUpdate: ((data: any) => void) | null = null;
     private onMapChange: ((data: any) => void) | null = null;
     private onInit: ((data: { isSpectator: boolean }) => void) | null = null;
+    private onQueueUpdate: ((data: any) => void) | null = null;
+    private onMatchFound: ((data: any) => void) | null = null;
+    private onMatchResult: ((data: any) => void) | null = null;
+    private onPartyUpdate: ((data: any) => void) | null = null;
 
     connect(serverUrl: string): Promise<boolean> {
         return new Promise((resolve) => {
@@ -130,6 +134,10 @@ class NetworkManager {
             this.socket.on('map_vote_start', (data: any) => this.onMapVoteStart?.(data));
             this.socket.on('map_vote_update', (data: any) => this.onMapVoteUpdate?.(data));
             this.socket.on('map_change', (data: any) => this.onMapChange?.(data));
+            this.socket.on('queue_update', (data: any) => this.onQueueUpdate?.(data));
+            this.socket.on('match_found', (data: any) => this.onMatchFound?.(data));
+            this.socket.on('match_result', (data: any) => this.onMatchResult?.(data));
+            this.socket.on('party_update', (data: any) => this.onPartyUpdate?.(data));
 
             // Debug: Log all incoming events
             this.socket.onAny((ev, ...args) => {
@@ -333,6 +341,24 @@ class NetworkManager {
     adminCommand(command: string, payload: any = {}) {
         this.socket?.emit('admin_command', { command, payload });
     }
+
+    // Matchmaking
+    setOnQueueUpdate(cb: (data: any) => void) { this.onQueueUpdate = cb; }
+    setOnMatchFound(cb: (data: any) => void) { this.onMatchFound = cb; }
+    setOnMatchResult(cb: (data: any) => void) { this.onMatchResult = cb; }
+
+    queue2v2() { this.socket?.emit('queue_2v2'); }
+    leaveQueue() { this.socket?.emit('leave_queue'); }
+    joinMatch(roomId: string, team: string) { this.socket?.emit('join_match', { roomId, team }); }
+
+    // Party
+    setOnPartyUpdate(cb: (data: any) => void) { this.onPartyUpdate = cb; }
+    createParty() { this.socket?.emit('create_party'); }
+    joinParty(partyId: string) { this.socket?.emit('join_party', { partyId }); }
+    leaveParty() { this.socket?.emit('leave_party'); }
+
+    // Co-op Difficulty
+    setCoopDifficulty(difficulty: string) { this.socket?.emit('set_coop_difficulty', { difficulty }); }
 }
 
 export const networkManager = new NetworkManager();
