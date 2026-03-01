@@ -267,9 +267,22 @@ function App() {
       addLog(msg, 'info');
     },
     get_enemies: () => gameEngine.getEnemies().map(e => ({ id: e.id, x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp })),
-    get_players: () => gameEngine.getPlayers().map(p => ({ id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp })),
-    get_self: () => gameEngine.getPlayer(),
-    get_player: () => gameEngine.getPlayer(), // Alias for Python wrapper
+    get_players: () => gameEngine.getPlayers()
+      .filter(p => p.id !== gameEngine.getPlayer()?.id)
+      .map(p => ({ id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp })),
+    get_self: () => {
+      const p = gameEngine.getPlayer();
+      return p ? { id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp } : null;
+    },
+    get_player: () => {
+      const p = gameEngine.getPlayer();
+      return p ? { id: p.id, x: p.x, y: p.y, hp: p.hp, maxHp: p.maxHp } : null;
+    },
+    get_nearest_enemy: (x: number, y: number) => {
+      const nearest = gameEngine.getNearestEnemy(x, y);
+      if (!nearest) return null;
+      return { id: nearest.id, x: nearest.x, y: nearest.y, hp: nearest.hp, dist: nearest.dist };
+    },
     get_arena_size: () => gameEngine.getArenaBounds(),
     spawn_projectile: (params: any, shouldNetwork: boolean = true) => {
       let jsParams = params;

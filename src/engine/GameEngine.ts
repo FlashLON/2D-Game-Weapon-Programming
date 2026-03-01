@@ -1016,10 +1016,10 @@ export class GameEngine {
     }
 
     getEntitiesInRange(x: number, y: number, range: number) {
-        return this.state.entities.filter(e => e.type === 'enemy')
+        return this.state.entities.filter(e => e.type === 'enemy' || e.type === 'player')
             .map(e => {
                 const dist = Math.sqrt((e.x - x) ** 2 + (e.y - y) ** 2);
-                return { id: e.id, x: e.x, y: e.y, hp: e.hp, dist };
+                return { id: e.id, x: e.x, y: e.y, hp: e.hp, dist, type: e.type, maxHp: e.maxHp };
             })
             .filter(e => e.dist <= range);
     }
