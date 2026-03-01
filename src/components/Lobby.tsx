@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords, Zap, Clock, UserPlus, X, Volume2, Eye, Monitor } from 'lucide-react';
+import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords, Zap, Clock, UserPlus, X, Volume2, Eye, Monitor, Copy } from 'lucide-react';
 import { Tutorial } from './Tutorial';
 import { SavedCodePanel } from './SavedCodePanel';
 import { TitlesPanel } from './TitlesPanel';
@@ -37,7 +37,6 @@ interface LobbyProps {
     onRenameCode?: (codeId: string, newName: string) => void;
     loadingSavedCodes?: boolean;
     onEquipTitle?: (titleId: string | null) => void;
-    // New: Matchmaking & Party
     queueStatus?: any;
     partyData?: any;
     onQueue2v2?: () => void;
@@ -46,7 +45,6 @@ interface LobbyProps {
     onJoinParty?: (partyId: string) => void;
     onLeaveParty?: () => void;
     onSetCoopDifficulty?: (diff: string) => void;
-    // Settings
     gameSettings?: { screenshake: boolean; damageNumbers: boolean; showFps: boolean };
     onUpdateSettings?: (key: string, value: any) => void;
 }
@@ -89,21 +87,18 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [showSettings, setShowSettings] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
 
-    // Multiplayer Creation State
     const [activeTab, setActiveTab] = useState<'join' | 'create'>('join');
     const [createName, setCreateName] = useState('');
     const [isPublic] = useState(true);
 
-    // Inventory vs Saved Code tabs
     const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code' | 'titles' | 'admin'>('inventory');
 
-    // New state
     const [partyCodeInput, setPartyCodeInput] = useState('');
     const [coopDifficulty, setCoopDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
     const [searchTimer, setSearchTimer] = useState(0);
+    const [copiedPartyId, setCopiedPartyId] = useState(false);
     const isQueued = queueStatus?.status === 'queued' || queueStatus?.status === 'already_queued';
 
-    // Searchtime timer
     useEffect(() => {
         if (!isQueued) { setSearchTimer(0); return; }
         const id = setInterval(() => setSearchTimer(t => t + 1), 1000);
@@ -112,9 +107,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
     const handleJoin = (e: React.FormEvent) => {
         e.preventDefault();
-        if (roomCode.trim()) {
-            onJoinRoom(roomCode.trim().toLowerCase());
-        }
+        if (roomCode.trim()) onJoinRoom(roomCode.trim().toLowerCase());
     };
 
     const handleCreate = (e: React.FormEvent) => {
@@ -123,624 +116,546 @@ export const Lobby: React.FC<LobbyProps> = ({
         onJoinRoom(id.toLowerCase(), { public: isPublic });
     };
 
+    const copyPartyId = () => {
+        if (partyData?.partyId) {
+            navigator.clipboard.writeText(partyData.partyId);
+            setCopiedPartyId(true);
+            setTimeout(() => setCopiedPartyId(false), 2000);
+        }
+    };
+
     return (
-        <div className="flex-1 bg-[#0a0a0c] flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">
+        <div className="flex-1 bg-[#060608] flex items-center justify-center p-4 lg:p-6 relative overflow-hidden">
             {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
 
-            {/* Dynamic Background */}
+            {/* Background */}
             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-cyber-accent/10 rounded-full blur-[140px] animate-pulse" />
-                <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-500/10 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }} />
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
+                <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-cyber-accent/5 rounded-full blur-[160px]" />
+                <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-500/5 rounded-full blur-[160px]" />
+                <div className="absolute top-[30%] right-[20%] w-[30%] h-[30%] bg-purple-500/5 rounded-full blur-[120px]" />
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5" />
+                {/* Subtle grid overlay */}
+                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.02) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
             </div>
 
-            <div className="max-w-7xl w-full flex flex-col gap-8 z-10 h-full max-h-[90vh]">
-                {/* Header Section */}
-                <div className="text-center shrink-0">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyber-accent/10 border border-cyber-accent/20 text-cyber-accent text-[10px] font-bold tracking-[0.2em] uppercase mb-2">
-                        <Cpu size={12} />
-                        Neural Combat v2.5
-                    </div>
-                    <h1 className="text-5xl lg:text-6xl font-black text-white tracking-tighter">
-                        CYBER<span className="text-cyber-accent">CORE</span>
-                    </h1>
+            <div className="max-w-[1400px] w-full flex flex-col gap-5 z-10 h-full max-h-[95vh]">
 
-                    {!isLoggedIn && (
-                        <div className="flex flex-col items-center justify-center gap-4 my-2">
-                            <div className="flex flex-col gap-2">
-                                <div className="flex gap-2">
-                                    <input
-                                        value={loginName}
-                                        onChange={(e) => setLoginName(e.target.value)}
-                                        placeholder="USERNAME"
-                                        className="bg-black/40 border border-cyber-muted rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-cyber-accent font-mono uppercase w-32"
-                                    />
-                                    <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="PASSWORD"
-                                        className="bg-black/40 border border-cyber-muted rounded-lg px-3 py-2 text-white text-xs outline-none focus:border-cyber-accent font-mono uppercase w-32"
-                                    />
+                {/* ═══════════════════════════════════════════ */}
+                {/* HEADER: Title + Login + Status */}
+                {/* ═══════════════════════════════════════════ */}
+                <div className="flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter leading-none">
+                                CYBER<span className="text-cyber-accent">CORE</span>
+                            </h1>
+                            <div className="flex items-center gap-2 mt-1">
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyber-accent/10 border border-cyber-accent/20 text-cyber-accent text-[8px] font-bold tracking-[0.2em] uppercase">
+                                    <Cpu size={10} /> v2.5
                                 </div>
-                                <div className="flex gap-2 justify-center">
-                                    <button
-                                        onClick={() => onLogin?.(loginName, password)}
-                                        className="bg-cyber-accent text-black font-bold px-6 py-2 rounded-lg hover:bg-emerald-400 transition-colors text-xs uppercase flex-1"
-                                    >
-                                        Login
-                                    </button>
-                                    <button
-                                        onClick={() => onSignup?.(loginName, password)}
-                                        className="bg-blue-500 text-white font-bold px-6 py-2 rounded-lg hover:bg-blue-400 transition-colors text-xs uppercase flex-1"
-                                    >
-                                        Signup
-                                    </button>
+                                <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-bold tracking-widest ${isConnected ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                                    {isConnected ? 'ONLINE' : 'OFFLINE'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Login or Profile */}
+                    {!isLoggedIn ? (
+                        <div className="flex items-center gap-2">
+                            <input value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder="USERNAME"
+                                className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-white text-[10px] outline-none focus:border-cyber-accent font-mono uppercase w-28" />
+                            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="PASSWORD"
+                                className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-white text-[10px] outline-none focus:border-cyber-accent font-mono uppercase w-28" />
+                            <button onClick={() => onLogin?.(loginName, password)}
+                                className="bg-cyber-accent text-black font-black px-4 py-2 rounded-lg hover:bg-emerald-400 transition-all text-[10px] uppercase">Login</button>
+                            <button onClick={() => onSignup?.(loginName, password)}
+                                className="bg-blue-500/20 text-blue-400 border border-blue-500/30 font-black px-4 py-2 rounded-lg hover:bg-blue-500/30 transition-all text-[10px] uppercase">Sign Up</button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-4">
+                            {userProfile && (
+                                <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/5">
+                                    <div className="text-[10px] font-bold text-cyber-muted uppercase">LVL <span className="text-white text-xs">{userProfile.level}</span></div>
+                                    <div className="w-px h-4 bg-white/10" />
+                                    <div className="flex items-center gap-1 text-emerald-400">
+                                        <DollarSign size={12} />
+                                        <span className="text-xs font-black">{userProfile.money.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyber-accent/30 to-blue-500/30 border border-white/10 flex items-center justify-center font-black text-white text-[10px] uppercase">
+                                    {username?.slice(0, 2)}
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-[10px] font-black text-white uppercase leading-none">{username}</div>
+                                    <div className="text-[8px] font-bold text-cyber-accent uppercase">Active</div>
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* Main Content: 2-Column Layout */}
-                <div className="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
+                {/* ═══════════════════════════════════════════ */}
+                {/* PARTY BAR — Global, mode-independent */}
+                {/* ═══════════════════════════════════════════ */}
+                {isLoggedIn && isConnected && (
+                    <div className="shrink-0 bg-black/40 border border-white/5 rounded-2xl p-3 flex items-center gap-3 backdrop-blur-sm">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5">
+                            <Users2 size={14} className="text-cyber-accent" />
+                            <span className="text-[10px] font-black text-white uppercase tracking-wider">Party</span>
+                        </div>
 
-                    {/* LEFT: Arena Selection (60% width) */}
-                    <div className="flex-[3] flex flex-col gap-6 overflow-y-auto pr-2">
-                        <h2 className="text-2xl font-black text-white flex items-center gap-2 uppercase tracking-widest">
-                            <Target className="text-cyber-accent" />
-                            Select Arena
-                        </h2>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
-                            {/* Solo Sandbox Card */}
-                            <div className="bg-cyber-light/40 border-2 border-cyber-muted/30 rounded-3xl p-6 flex flex-col relative overflow-hidden group hover:border-cyber-accent/50 transition-all">
-                                <div className="absolute top-0 right-0 p-4 text-cyber-muted/10 group-hover:text-cyber-accent/10 transition-colors">
-                                    <Cpu size={140} />
+                        {partyData ? (
+                            <>
+                                <div className="flex-1 flex items-center gap-2">
+                                    {partyData.members?.map((m: string, i: number) => (
+                                        <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyber-accent/10 border border-cyber-accent/20">
+                                            <div className="w-2 h-2 bg-cyber-accent rounded-full animate-pulse" />
+                                            <span className="text-[10px] font-bold text-white">{m}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="z-10">
-                                    <h3 className="text-2xl font-black text-white mb-2">SANDBOX</h3>
-                                    <p className="text-cyber-muted text-sm mb-6">Test your Python scripts offline with AI targets.</p>
-
-                                    <ul className="space-y-2 mb-8">
-                                        <li className="flex items-center gap-2 text-[10px] font-bold text-cyber-muted uppercase font-mono">
-                                            <CheckCircle2 size={12} className="text-emerald-500" /> No Connection Needed
-                                        </li>
-                                        <li className="flex items-center gap-2 text-[10px] font-bold text-cyber-muted uppercase font-mono">
-                                            <CheckCircle2 size={12} className="text-emerald-500" /> Unlimited Retries
-                                        </li>
-                                    </ul>
+                                <button onClick={copyPartyId}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-[9px] font-bold text-white/50 hover:text-white">
+                                    <Copy size={10} />
+                                    {copiedPartyId ? 'COPIED!' : partyData.partyId}
+                                </button>
+                                <button onClick={onLeaveParty}
+                                    className="px-2.5 py-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all">
+                                    <X size={14} />
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex-1 flex items-center gap-2 text-[10px] text-white/30 font-bold uppercase tracking-wider">
+                                    No party — invite friends to play together in any mode
                                 </div>
-                                <button
-                                    onClick={() => onJoinRoom('offline')}
-                                    className="mt-auto w-full bg-cyber-accent text-black font-black py-4 rounded-2xl hover:bg-emerald-400 transition-all shadow-lg shadow-cyber-accent/20 flex items-center justify-center gap-3 z-10"
-                                >
-                                    <Play size={20} fill="currentColor" /> ENTER SANDBOX
+                                <button onClick={onCreateParty}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/20 hover:bg-cyber-accent/20 transition-all text-[10px] font-black uppercase">
+                                    <UserPlus size={12} /> Create Party
+                                </button>
+                                <div className="flex items-center gap-1.5">
+                                    <input value={partyCodeInput} onChange={e => setPartyCodeInput(e.target.value)} placeholder="PARTY CODE"
+                                        className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] text-white outline-none font-mono w-28 focus:border-cyber-accent/50" />
+                                    <button onClick={() => partyCodeInput.trim() && onJoinParty?.(partyCodeInput.trim())}
+                                        disabled={!partyCodeInput.trim()}
+                                        className="px-3 py-1.5 text-[10px] font-black bg-white/5 text-white/60 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white transition-all disabled:opacity-30">
+                                        JOIN
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* ═══════════════════════════════════════════ */}
+                {/* MAIN CONTENT: 2-column layout */}
+                {/* ═══════════════════════════════════════════ */}
+                <div className="flex-1 flex flex-col lg:flex-row gap-5 overflow-hidden min-h-0">
+
+                    {/* ──── LEFT COLUMN: Game Modes ──── */}
+                    <div className="flex-[3] flex flex-col gap-4 overflow-y-auto pr-1 scrollbar-thin">
+
+                        {/* Section Title */}
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest">
+                                <Target className="text-cyber-accent" size={18} /> Game Modes
+                            </h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowTutorial(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-[10px] font-bold text-white/50 hover:text-white">
+                                    <BookOpen size={12} /> Guide
+                                </button>
+                                <button onClick={() => setShowSettings(!showSettings)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-bold ${showSettings ? 'bg-cyber-accent/10 text-cyber-accent border-cyber-accent/30' : 'bg-white/5 border-white/5 text-white/50 hover:text-white hover:bg-white/10'}`}>
+                                    <Settings size={12} /> Settings
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Settings Panel (collapsible) */}
+                        {showSettings && (
+                            <div className="bg-black/50 border border-white/5 rounded-2xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-[9px] text-white/30 uppercase font-black mb-2 tracking-widest">Game Settings</div>
+                                        <div className="space-y-1.5">
+                                            {[
+                                                { key: 'screenshake', label: 'Screen Shake', icon: <Monitor size={12} />, val: gameSettings?.screenshake ?? true },
+                                                { key: 'damageNumbers', label: 'Damage Numbers', icon: <Eye size={12} />, val: gameSettings?.damageNumbers ?? true },
+                                                { key: 'showFps', label: 'FPS Counter', icon: <Volume2 size={12} />, val: gameSettings?.showFps ?? false },
+                                            ].map(s => (
+                                                <div key={s.key} className="flex items-center justify-between p-2 rounded-lg bg-white/3 hover:bg-white/5 transition-all">
+                                                    <div className="flex items-center gap-2 text-[10px] text-white/60">{s.icon} {s.label}</div>
+                                                    <button onClick={() => onUpdateSettings?.(s.key, !s.val)}
+                                                        className={`w-9 h-[18px] rounded-full relative transition-all ${s.val ? 'bg-cyber-accent' : 'bg-white/15'}`}>
+                                                        <div className={`w-3.5 h-3.5 bg-white rounded-full absolute top-[2px] transition-all ${s.val ? 'left-[18px]' : 'left-[2px]'}`} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[9px] text-white/30 uppercase font-black mb-2 tracking-widest">Network</div>
+                                        <label className="text-[9px] text-white/30 uppercase font-bold mb-1.5 block">Relay Server URL</label>
+                                        <input type="text" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)}
+                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-white text-[10px] outline-none focus:border-cyber-accent font-mono" />
+                                        {!isConnected && (
+                                            <button onClick={onConnect}
+                                                className="mt-2 w-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-black py-2 rounded-lg hover:bg-blue-500/30 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <LinkIcon size={12} /> CONNECT
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ──── Game Mode Cards Grid ──── */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                            {/* ── SANDBOX ── */}
+                            <div className="bg-gradient-to-br from-emerald-500/5 to-transparent border border-white/5 rounded-2xl p-5 flex flex-col relative overflow-hidden group hover:border-cyber-accent/30 transition-all">
+                                <div className="absolute top-2 right-2 text-white/[0.03] group-hover:text-cyber-accent/[0.06] transition-colors">
+                                    <Cpu size={100} />
+                                </div>
+                                <div className="z-10 flex-1">
+                                    <h3 className="text-lg font-black text-white mb-1">SANDBOX</h3>
+                                    <p className="text-[11px] text-white/30 mb-4 leading-relaxed">Test Python scripts offline with AI targets.</p>
+                                    <div className="flex gap-3 mb-4">
+                                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400/60 uppercase">
+                                            <CheckCircle2 size={10} /> Offline
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-400/60 uppercase">
+                                            <CheckCircle2 size={10} /> No Limits
+                                        </div>
+                                    </div>
+                                </div>
+                                <button onClick={() => onJoinRoom('offline')}
+                                    className="w-full bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/20 font-black py-3 rounded-xl hover:bg-cyber-accent hover:text-black transition-all flex items-center justify-center gap-2 text-xs z-10">
+                                    <Play size={14} fill="currentColor" /> ENTER SANDBOX
                                 </button>
                             </div>
 
-                            {/* Co-op Mode Card — Improved */}
-                            <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/10 border-2 border-purple-500/30 rounded-3xl p-6 flex flex-col relative overflow-hidden group hover:border-purple-400/50 transition-all">
-                                <div className="absolute top-0 right-0 p-4 text-purple-500/10 group-hover:text-purple-400/10 transition-colors">
-                                    <Swords size={120} />
+                            {/* ── CO-OP SURVIVAL ── */}
+                            <div className="bg-gradient-to-br from-purple-500/5 to-transparent border border-white/5 rounded-2xl p-5 flex flex-col relative overflow-hidden group hover:border-purple-500/30 transition-all">
+                                <div className="absolute top-2 right-2 text-white/[0.03] group-hover:text-purple-500/[0.06] transition-colors">
+                                    <Swords size={100} />
                                 </div>
-                                <div className="z-10">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <h3 className="text-2xl font-black text-white">CO-OP SURVIVAL</h3>
-                                        <span className="bg-purple-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded animate-pulse">IMPROVED</span>
+                                <div className="z-10 flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-lg font-black text-white">CO-OP</h3>
+                                        <span className="bg-purple-500/20 text-purple-400 text-[7px] font-black px-1.5 py-0.5 rounded border border-purple-500/30">SURVIVAL</span>
                                     </div>
-                                    <p className="text-cyber-muted text-sm mb-4">Team up with friends to survive endless waves and massive bosses.</p>
+                                    <p className="text-[11px] text-white/30 mb-3 leading-relaxed">Team up and survive endless waves and bosses.</p>
 
-                                    {/* Difficulty Selector */}
-                                    <div className="flex gap-1 mb-4 p-1 bg-black/40 rounded-xl">
+                                    {/* Difficulty */}
+                                    <div className="flex gap-0.5 mb-3 p-0.5 bg-black/30 rounded-lg">
                                         {(['easy', 'normal', 'hard'] as const).map(diff => (
-                                            <button
-                                                key={diff}
+                                            <button key={diff}
                                                 onClick={() => { setCoopDifficulty(diff); onSetCoopDifficulty?.(diff); }}
-                                                className={`flex-1 py-1.5 text-[9px] font-black uppercase rounded-lg transition-all ${coopDifficulty === diff
-                                                    ? diff === 'easy' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
-                                                        : diff === 'normal' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
-                                                            : 'bg-red-500/20 text-red-400 border border-red-500/50'
-                                                    : 'text-cyber-muted hover:text-white'
-                                                    }`}
-                                            >
+                                                className={`flex-1 py-1 text-[8px] font-black uppercase rounded transition-all ${coopDifficulty === diff
+                                                    ? diff === 'easy' ? 'bg-emerald-500/15 text-emerald-400'
+                                                        : diff === 'normal' ? 'bg-yellow-500/15 text-yellow-400'
+                                                            : 'bg-red-500/15 text-red-400'
+                                                    : 'text-white/20 hover:text-white/40'
+                                                    }`}>
                                                 {diff === 'easy' ? '😊' : diff === 'normal' ? '⚔️' : '💀'} {diff}
                                             </button>
                                         ))}
                                     </div>
 
-                                    <div className="space-y-2 mb-4">
-                                        <button
-                                            onClick={() => onJoinRoom('coop-main', { mode: 'coop', public: true })}
-                                            disabled={!isConnected}
-                                            className={`w-full py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 text-xs ${isConnected ? 'bg-purple-600/20 text-purple-400 border border-purple-500/50 hover:bg-purple-600/40 hover:text-white' : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'}`}
-                                        >
-                                            <Globe size={14} /> JOIN PUBLIC SECTOR
-                                        </button>
-                                        <button
-                                            onClick={() => onJoinRoom(`coop-private-${Math.floor(Math.random() * 10000)}`, { mode: 'coop', public: false })}
-                                            disabled={!isConnected}
-                                            className={`w-full py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 text-xs ${isConnected ? 'bg-purple-600 text-white hover:bg-purple-500 shadow-lg shadow-purple-600/20' : 'bg-gray-800 text-gray-500 cursor-not-allowed grayscale'}`}
-                                        >
-                                            <Lock size={14} /> CREATE PRIVATE SQUAD
-                                        </button>
-                                    </div>
-
-                                    <ul className="space-y-1.5">
-                                        <li className="flex items-center gap-2 text-[10px] font-bold text-purple-300 uppercase font-mono">
-                                            <Users2 size={12} /> Mutual Defense
-                                        </li>
-                                        <li className="flex items-center gap-2 text-[10px] font-bold text-purple-300 uppercase font-mono">
-                                            <Shield size={12} /> Shared Objectives
-                                        </li>
-                                        <li className="flex items-center gap-2 text-[10px] font-bold text-purple-300 uppercase font-mono">
-                                            <TrendingUp size={12} /> {coopDifficulty === 'easy' ? '0.5x' : coopDifficulty === 'hard' ? '2x' : '1x'} Score Multiplier
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-
-                            {/* 2v2 ARENA Card — NEW */}
-                            <div className="bg-gradient-to-br from-red-500/15 to-blue-500/15 border-2 border-red-500/30 rounded-3xl p-6 flex flex-col relative overflow-hidden group hover:border-red-400/50 transition-all md:col-span-2">
-                                <div className="absolute top-0 right-0 p-4 text-red-500/10 group-hover:text-red-400/10 transition-colors">
-                                    <Zap size={140} />
-                                </div>
-                                <div className="z-10">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <h3 className="text-2xl font-black text-white">2v2 ARENA</h3>
-                                        <span className="bg-gradient-to-r from-red-500 to-blue-500 text-white text-[8px] font-black px-2 py-0.5 rounded animate-pulse">NEW</span>
-                                    </div>
-                                    <p className="text-cyber-muted text-sm mb-4">Team up with a partner and battle another duo. No respawns — eliminate both to win!</p>
-
-                                    <div className="flex gap-3 mb-4">
-                                        {/* Team Colors Preview */}
-                                        <div className="flex-1 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-center">
-                                            <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mb-1" />
-                                            <div className="text-[9px] font-black text-red-400 uppercase">TEAM RED</div>
+                                    <div className="flex gap-3 mb-3">
+                                        <div className="flex items-center gap-1 text-[9px] font-bold text-purple-400/50 uppercase">
+                                            <Users2 size={10} /> Team Play
                                         </div>
-                                        <div className="flex items-center text-cyber-muted text-xs font-black">VS</div>
-                                        <div className="flex-1 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 text-center">
-                                            <div className="w-3 h-3 bg-blue-500 rounded-full mx-auto mb-1" />
-                                            <div className="text-[9px] font-black text-blue-400 uppercase">TEAM BLUE</div>
+                                        <div className="flex items-center gap-1 text-[9px] font-bold text-purple-400/50 uppercase">
+                                            <TrendingUp size={10} /> {coopDifficulty === 'easy' ? '0.5x' : coopDifficulty === 'hard' ? '2x' : '1x'}
                                         </div>
                                     </div>
-
-                                    {/* Party Section */}
-                                    <div className="mb-4 p-3 bg-black/30 rounded-xl border border-white/5">
-                                        <div className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Party</div>
-                                        {partyData ? (
-                                            <div className="space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="text-[10px] text-white/70">
-                                                        {partyData.members?.map((m: string, i: number) => (
-                                                            <span key={i} className="mr-2">
-                                                                <span className="text-cyber-accent">●</span> {m}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                    <button onClick={onLeaveParty} className="text-[9px] text-red-400 hover:text-red-300 font-bold">
-                                                        <X size={12} />
-                                                    </button>
-                                                </div>
-                                                <div className="text-[9px] text-white/30 font-mono">ID: {partyData.partyId}</div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={onCreateParty}
-                                                    disabled={!isConnected || !isLoggedIn}
-                                                    className="flex-1 py-2 text-[10px] font-black bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all text-white/60 hover:text-white flex items-center justify-center gap-1"
-                                                >
-                                                    <UserPlus size={12} /> CREATE
-                                                </button>
-                                                <input
-                                                    value={partyCodeInput}
-                                                    onChange={e => setPartyCodeInput(e.target.value)}
-                                                    placeholder="PARTY ID"
-                                                    className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] text-white outline-none font-mono"
-                                                />
-                                                <button
-                                                    onClick={() => partyCodeInput.trim() && onJoinParty?.(partyCodeInput.trim())}
-                                                    disabled={!isConnected || !partyCodeInput.trim()}
-                                                    className="px-3 py-2 text-[10px] font-black bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded-lg hover:bg-cyber-accent/30 transition-all"
-                                                >
-                                                    JOIN
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Queue Button */}
-                                    {isQueued ? (
-                                        <div className="space-y-2">
-                                            <div className="w-full py-4 rounded-xl bg-gradient-to-r from-red-500/20 to-blue-500/20 border border-white/10 flex flex-col items-center gap-1">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-                                                    <span className="text-xs font-black text-white uppercase tracking-widest">
-                                                        Searching for Match...
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-3 text-[10px] text-white/40">
-                                                    <span><Clock size={10} className="inline mr-1" />{searchTimer}s</span>
-                                                    <span>Queue: {queueStatus?.total || '?'} players</span>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={onLeaveQueue}
-                                                className="w-full py-2 rounded-xl text-[10px] font-black text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-all"
-                                            >
-                                                CANCEL SEARCH
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            onClick={onQueue2v2}
-                                            disabled={!isConnected || !isLoggedIn}
-                                            className={`w-full py-4 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${isConnected && isLoggedIn
-                                                ? 'bg-gradient-to-r from-red-600 to-blue-600 text-white hover:from-red-500 hover:to-blue-500 shadow-lg shadow-red-500/20'
-                                                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                                }`}
-                                        >
-                                            <Zap size={18} /> FIND MATCH
-                                        </button>
-                                    )}
-
-                                    <ul className="flex gap-4 mt-3">
-                                        <li className="flex items-center gap-1.5 text-[10px] font-bold text-white/40 uppercase font-mono">
-                                            <CheckCircle2 size={10} className="text-red-400" /> No Respawns
-                                        </li>
-                                        <li className="flex items-center gap-1.5 text-[10px] font-bold text-white/40 uppercase font-mono">
-                                            <CheckCircle2 size={10} className="text-blue-400" /> Team Tactics
-                                        </li>
-                                        <li className="flex items-center gap-1.5 text-[10px] font-bold text-white/40 uppercase font-mono">
-                                            <CheckCircle2 size={10} className="text-yellow-400" /> Ranked XP
-                                        </li>
-                                    </ul>
                                 </div>
-                            </div>
-
-                            {/* Multiplayer Card */}
-                            <div className="bg-cyber-light/40 border-2 border-cyber-muted/30 rounded-3xl p-6 flex flex-col relative overflow-hidden group hover:border-blue-500/50 transition-all">
-                                <div className="absolute top-0 right-0 p-4 text-cyber-muted/10 group-hover:text-blue-500/10 transition-colors">
-                                    <Globe size={140} />
-                                </div>
-
-                                <div className="z-10">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="text-2xl font-black text-white">MULTIPLAYER</h3>
-                                        <div className={`px-2 py-0.5 rounded-full text-[8px] font-bold tracking-widest flex items-center gap-1.5 ${isConnected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-cyber-danger/10 text-cyber-danger'}`}>
-                                            <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-cyber-danger'} ${isConnected ? 'animate-pulse' : ''}`} />
-                                            {isConnected ? 'ONLINE' : 'OFFLINE'}
-                                        </div>
-                                    </div>
-                                    <p className="text-cyber-muted text-sm mb-4">Compete against other engineers in real-time.</p>
-                                </div>
-
-                                {!isConnected ? (
-                                    <button
-                                        onClick={onConnect}
-                                        className="mt-auto w-full bg-blue-500 text-white font-black py-4 rounded-2xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-3 z-10"
-                                    >
-                                        <LinkIcon size={20} /> INITIALIZE LINK
+                                <div className="space-y-1.5 z-10">
+                                    <button onClick={() => onJoinRoom('coop-main', { mode: 'coop', public: true })} disabled={!isConnected}
+                                        className={`w-full py-2.5 rounded-xl font-black transition-all flex items-center justify-center gap-2 text-[10px] ${isConnected ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:text-white' : 'bg-white/3 text-white/20 cursor-not-allowed'}`}>
+                                        <Globe size={12} /> PUBLIC SERVER
                                     </button>
-                                ) : (
-                                    <div className="mt-auto z-10 space-y-4">
-                                        <div className="flex p-1 bg-black/40 rounded-xl">
-                                            <button
-                                                onClick={() => setActiveTab('join')}
-                                                className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${activeTab === 'join' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
-                                            >
-                                                Join Room
-                                            </button>
-                                            <button
-                                                onClick={() => setActiveTab('create')}
-                                                className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${activeTab === 'create' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
-                                            >
-                                                Create Room
-                                            </button>
-                                        </div>
+                                    <button onClick={() => onJoinRoom(`coop-private-${Math.floor(Math.random() * 10000)}`, { mode: 'coop', public: false })} disabled={!isConnected}
+                                        className={`w-full py-2.5 rounded-xl font-black transition-all flex items-center justify-center gap-2 text-[10px] ${isConnected ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30' : 'bg-white/3 text-white/20 cursor-not-allowed'}`}>
+                                        <Lock size={12} /> PRIVATE SQUAD
+                                    </button>
+                                </div>
+                            </div>
 
-                                        {activeTab === 'join' ? (
-                                            <form onSubmit={handleJoin} className="space-y-2">
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        value={roomCode}
-                                                        onChange={(e) => setRoomCode(e.target.value)}
-                                                        placeholder="ROOM CODE"
-                                                        className="flex-1 bg-black/60 border border-cyber-muted/30 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-blue-400 transition-all font-mono"
-                                                    />
-                                                    <button type="submit" className="bg-blue-500 text-white font-black px-5 rounded-xl hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 text-xs">
-                                                        JOIN
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => roomCode.trim() && onSpectate(roomCode.trim().toLowerCase())}
-                                                        className="bg-purple-700/60 text-purple-300 border border-purple-500/50 font-black px-4 rounded-xl hover:bg-purple-700/90 transition-all text-xs"
-                                                        title="Watch without playing"
-                                                    >
-                                                        👁 WATCH
-                                                    </button>
-                                                </div>
-                                                <p className="text-[9px] text-white/30 text-center uppercase tracking-widest">👁 WATCH to spectate without playing</p>
-                                            </form>
-                                        ) : (
-                                            <form onSubmit={handleCreate} className="space-y-2">
-                                                <input
-                                                    value={createName}
-                                                    onChange={(e) => setCreateName(e.target.value)}
-                                                    placeholder="NAME (OPTIONAL)"
-                                                    className="w-full bg-black/60 border border-cyber-muted/30 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-blue-400 transition-all font-mono"
-                                                />
-                                                <div className="flex gap-2">
-                                                    <button type="submit" className="flex-1 bg-blue-500 text-white font-black py-3 rounded-xl hover:bg-blue-400 transition-all text-xs">
-                                                        CREATE PARTY
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const id = createName.trim() || Math.random().toString(36).substr(2, 6);
-                                                            onSpectate(id.toLowerCase());
-                                                        }}
-                                                        className="bg-purple-700/60 text-purple-300 border border-purple-500/50 font-black px-4 rounded-xl hover:bg-purple-700/90 transition-all text-xs"
-                                                        title="Create room but spectate instead of playing"
-                                                    >
-                                                        👁 WATCH
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        )}
+                            {/* ── 2v2 ARENA ── */}
+                            <div className="bg-gradient-to-br from-red-500/5 via-transparent to-blue-500/5 border border-white/5 rounded-2xl p-5 flex flex-col relative overflow-hidden group hover:border-red-500/30 transition-all">
+                                <div className="absolute top-2 right-2 text-white/[0.03] group-hover:text-red-500/[0.06] transition-colors">
+                                    <Zap size={100} />
+                                </div>
+                                <div className="z-10 flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-lg font-black text-white">2v2 ARENA</h3>
+                                        <span className="bg-gradient-to-r from-red-500/20 to-blue-500/20 text-white text-[7px] font-black px-1.5 py-0.5 rounded border border-white/10">NEW</span>
                                     </div>
+                                    <p className="text-[11px] text-white/30 mb-3 leading-relaxed">Elimination duel — no respawns.</p>
+
+                                    {/* Teams Preview */}
+                                    <div className="flex gap-2 mb-3">
+                                        <div className="flex-1 bg-red-500/5 border border-red-500/10 rounded-lg py-1.5 text-center">
+                                            <div className="w-2 h-2 bg-red-500 rounded-full mx-auto mb-0.5" />
+                                            <div className="text-[7px] font-black text-red-400/60 uppercase">RED</div>
+                                        </div>
+                                        <div className="flex items-center text-white/15 text-[8px] font-black">VS</div>
+                                        <div className="flex-1 bg-blue-500/5 border border-blue-500/10 rounded-lg py-1.5 text-center">
+                                            <div className="w-2 h-2 bg-blue-500 rounded-full mx-auto mb-0.5" />
+                                            <div className="text-[7px] font-black text-blue-400/60 uppercase">BLUE</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 mb-3">
+                                        <div className="flex items-center gap-1 text-[9px] font-bold text-red-400/40 uppercase">
+                                            <CheckCircle2 size={9} /> No Respawn
+                                        </div>
+                                        <div className="flex items-center gap-1 text-[9px] font-bold text-blue-400/40 uppercase">
+                                            <CheckCircle2 size={9} /> Ranked XP
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Queue Button */}
+                                {isQueued ? (
+                                    <div className="space-y-1.5 z-10">
+                                        <div className="w-full py-3 rounded-xl bg-gradient-to-r from-red-500/10 to-blue-500/10 border border-white/5 flex flex-col items-center gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">Searching...</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[9px] text-white/30">
+                                                <span><Clock size={9} className="inline mr-0.5" />{searchTimer}s</span>
+                                                <span>{queueStatus?.total || '?'} in queue</span>
+                                            </div>
+                                        </div>
+                                        <button onClick={onLeaveQueue}
+                                            className="w-full py-1.5 rounded-lg text-[9px] font-black text-red-400/60 border border-red-500/15 hover:bg-red-500/10 hover:text-red-400 transition-all">
+                                            CANCEL
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button onClick={onQueue2v2} disabled={!isConnected || !isLoggedIn}
+                                        className={`w-full py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 text-xs z-10 ${isConnected && isLoggedIn
+                                            ? 'bg-gradient-to-r from-red-500/20 to-blue-500/20 text-white border border-white/10 hover:from-red-500/30 hover:to-blue-500/30 hover:border-white/20 shadow-lg shadow-red-500/5'
+                                            : 'bg-white/3 text-white/20 cursor-not-allowed'
+                                            }`}>
+                                        <Zap size={14} /> FIND MATCH
+                                    </button>
                                 )}
                             </div>
                         </div>
 
-                        {/* Tutorial Links */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <button
-                                onClick={() => setShowTutorial(true)}
-                                className="bg-cyber-light/20 border border-cyber-muted/20 rounded-2xl p-4 flex items-center gap-3 hover:bg-cyber-light/40 transition-all text-left"
-                            >
-                                <div className="bg-cyber-accent/10 p-2 rounded-lg text-cyber-accent">
-                                    <BookOpen size={20} />
+                        {/* ──── Custom Room Section ──── */}
+                        <div className="bg-black/30 border border-white/5 rounded-2xl p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Globe size={14} className="text-blue-400/60" />
+                                    <span className="text-xs font-black text-white uppercase tracking-wider">Custom Room</span>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
                                 </div>
-                                <div>
-                                    <div className="text-xs font-black text-white uppercase">Operational Guide</div>
-                                    <div className="text-[10px] text-cyber-muted uppercase">Learn the basics</div>
-                                </div>
-                            </button>
-                            <button
-                                onClick={() => setShowSettings(!showSettings)}
-                                className="bg-cyber-light/20 border border-cyber-muted/20 rounded-2xl p-4 flex items-center gap-3 hover:bg-cyber-light/40 transition-all text-left"
-                            >
-                                <div className="bg-blue-500/10 p-2 rounded-lg text-blue-400">
-                                    <Settings size={20} />
-                                </div>
-                                <div>
-                                    <div className="text-xs font-black text-white uppercase">Network Config</div>
-                                    <div className="text-[10px] text-cyber-muted uppercase">Server settings</div>
-                                </div>
-                            </button>
-                        </div>
-
-                        {showSettings && (
-                            <div className="p-4 bg-black/60 rounded-2xl border border-cyber-muted/30 animate-in fade-in slide-in-from-top-2 space-y-4">
-                                {/* Game Settings */}
-                                <div>
-                                    <div className="text-[10px] text-cyber-muted uppercase font-black mb-3 flex items-center gap-2">
-                                        <Settings size={12} /> Game Settings
-                                    </div>
-                                    <div className="space-y-2">
-                                        {[
-                                            { key: 'screenshake', label: 'Screen Shake', icon: <Monitor size={14} />, val: gameSettings?.screenshake ?? true },
-                                            { key: 'damageNumbers', label: 'Damage Numbers', icon: <Eye size={14} />, val: gameSettings?.damageNumbers ?? true },
-                                            { key: 'showFps', label: 'FPS Counter', icon: <Volume2 size={14} />, val: gameSettings?.showFps ?? false },
-                                        ].map(setting => (
-                                            <div key={setting.key} className="flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all">
-                                                <div className="flex items-center gap-2 text-xs text-white/70">
-                                                    {setting.icon} {setting.label}
-                                                </div>
-                                                <button
-                                                    onClick={() => onUpdateSettings?.(setting.key, !setting.val)}
-                                                    className={`w-10 h-5 rounded-full relative transition-all ${setting.val ? 'bg-cyber-accent' : 'bg-white/20'}`}
-                                                >
-                                                    <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all ${setting.val ? 'left-5' : 'left-0.5'}`} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                {/* Network Config */}
-                                <div>
-                                    <label className="text-[10px] text-cyber-muted uppercase font-black mb-2 block">Relay Server URL</label>
-                                    <input
-                                        type="text"
-                                        value={serverUrl}
-                                        onChange={(e) => setServerUrl(e.target.value)}
-                                        className="w-full bg-black border border-cyber-muted/50 rounded-xl px-4 py-3 text-white text-xs outline-none focus:border-cyber-accent font-mono"
-                                    />
-                                </div>
+                                {!isConnected && (
+                                    <button onClick={onConnect}
+                                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all text-[10px] font-black uppercase">
+                                        <LinkIcon size={10} /> Connect
+                                    </button>
+                                )}
                             </div>
-                        )}
-                    </div>
 
-                    {/* RIGHT: Inventory & Upgrades (40% width) */}
-                    <div className="flex-[2] bg-cyber-dark/80 border-2 border-cyber-accent/20 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl backdrop-blur-xl">
-                        <div className="p-6 border-b border-cyber-accent/10 flex justify-between items-center shrink-0">
-                            <div className="flex-1">
-                                <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-tighter">
-                                    <Wrench className="text-cyber-accent" size={20} />
-                                    {inventoryTab === 'inventory' ? 'Inventory' : inventoryTab === 'titles' ? 'Titles' : inventoryTab === 'admin' ? 'Admin Control' : 'Saved Code'}
-                                </h2>
-                                <div className="text-[10px] text-cyber-muted uppercase font-bold tracking-widest">
-                                    {inventoryTab === 'inventory' ? 'Global Assets' : inventoryTab === 'titles' ? 'Identity Matrix' : inventoryTab === 'admin' ? 'System Override' : 'Your Scripts'}
-                                </div>
-                            </div>
-                            {userProfile && inventoryTab === 'inventory' && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-xl flex items-center gap-2">
-                                    <DollarSign className="text-emerald-400" size={16} />
-                                    <span className="text-xl font-black text-emerald-400">{userProfile.money.toLocaleString()}</span>
+                            {isConnected && (
+                                <div className="flex gap-3">
+                                    <div className="flex p-0.5 bg-white/5 rounded-lg shrink-0">
+                                        <button onClick={() => setActiveTab('join')}
+                                            className={`px-3 py-1.5 text-[9px] font-bold uppercase rounded transition-all ${activeTab === 'join' ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/60'}`}>
+                                            Join
+                                        </button>
+                                        <button onClick={() => setActiveTab('create')}
+                                            className={`px-3 py-1.5 text-[9px] font-bold uppercase rounded transition-all ${activeTab === 'create' ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/60'}`}>
+                                            Create
+                                        </button>
+                                    </div>
+
+                                    {activeTab === 'join' ? (
+                                        <form onSubmit={handleJoin} className="flex-1 flex gap-2">
+                                            <input value={roomCode} onChange={(e) => setRoomCode(e.target.value)} placeholder="ROOM CODE"
+                                                className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-[10px] outline-none focus:border-blue-400 font-mono" />
+                                            <button type="submit" className="bg-blue-500/20 text-blue-400 border border-blue-500/30 font-black px-4 rounded-lg hover:bg-blue-500/30 transition-all text-[10px]">JOIN</button>
+                                            <button type="button" onClick={() => roomCode.trim() && onSpectate(roomCode.trim().toLowerCase())}
+                                                className="bg-purple-500/10 text-purple-400 border border-purple-500/20 font-black px-3 rounded-lg hover:bg-purple-500/20 transition-all text-[10px]">👁</button>
+                                        </form>
+                                    ) : (
+                                        <form onSubmit={handleCreate} className="flex-1 flex gap-2">
+                                            <input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="NAME (OPTIONAL)"
+                                                className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-[10px] outline-none focus:border-blue-400 font-mono" />
+                                            <button type="submit" className="bg-blue-500/20 text-blue-400 border border-blue-500/30 font-black px-4 rounded-lg hover:bg-blue-500/30 transition-all text-[10px]">CREATE</button>
+                                            <button type="button" onClick={() => { const id = createName.trim() || Math.random().toString(36).substr(2, 6); onSpectate(id.toLowerCase()); }}
+                                                className="bg-purple-500/10 text-purple-400 border border-purple-500/20 font-black px-3 rounded-lg hover:bg-purple-500/20 transition-all text-[10px]">👁</button>
+                                        </form>
+                                    )}
                                 </div>
                             )}
                         </div>
 
+                        {/* ──── Leaderboard ──── */}
+                        <div className="bg-black/20 border border-white/5 rounded-2xl p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Trophy size={14} className="text-yellow-500/60" />
+                                <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Global Leaderboard</span>
+                            </div>
+                            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
+                                {leaderboard.length > 0 ? leaderboard.map((player: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-2.5 shrink-0 px-3 py-2 rounded-xl bg-white/3 border border-white/5 hover:border-white/10 transition-all">
+                                        <span className={`text-xs font-black ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-600' : 'text-white/30'}`}>#{i + 1}</span>
+                                        <div>
+                                            <div className="text-[10px] font-black text-white uppercase">{player.username}</div>
+                                            <div className="text-[8px] font-bold text-white/20 uppercase">Lvl {player.level}</div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="text-[10px] font-bold text-white/20 uppercase tracking-widest py-1">
+                                        Establishing Satellite Uplink... 📡
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ──── RIGHT COLUMN: Inventory & Upgrades ──── */}
+                    <div className="flex-[2] bg-black/30 border border-white/5 rounded-2xl flex flex-col overflow-hidden backdrop-blur-sm">
+                        <div className="p-5 pb-3 border-b border-white/5 flex justify-between items-center shrink-0">
+                            <div className="flex-1">
+                                <h2 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-tight">
+                                    <Wrench className="text-cyber-accent" size={16} />
+                                    {inventoryTab === 'inventory' ? 'Inventory' : inventoryTab === 'titles' ? 'Titles' : inventoryTab === 'admin' ? 'Admin' : 'Saved Code'}
+                                </h2>
+                                <div className="text-[9px] text-white/20 uppercase font-bold tracking-widest">
+                                    {inventoryTab === 'inventory' ? 'Upgrades & Equipment' : inventoryTab === 'titles' ? 'Identity Matrix' : inventoryTab === 'admin' ? 'System Override' : 'Your Scripts'}
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Tab Buttons */}
                         {isLoggedIn && (
-                            <div className="px-6 py-3 border-b border-cyber-accent/10 flex gap-2">
-                                <button
-                                    onClick={() => setInventoryTab('inventory')}
-                                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'inventory' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
-                                >
-                                    Inventory
-                                </button>
-                                <button
-                                    onClick={() => setInventoryTab('saved-code')}
-                                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'saved-code' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
-                                >
-                                    Saved Code
-                                </button>
-                                <button
-                                    onClick={() => setInventoryTab('titles')}
-                                    className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'titles' ? 'bg-white/10 text-white' : 'text-cyber-muted hover:text-white'}`}
-                                >
-                                    Titles
-                                </button>
+                            <div className="px-4 py-2 border-b border-white/5 flex gap-1">
+                                {(['inventory', 'saved-code', 'titles'] as const).map(tab => (
+                                    <button key={tab} onClick={() => setInventoryTab(tab)}
+                                        className={`flex-1 py-1.5 text-[9px] font-bold uppercase rounded-lg transition-all ${inventoryTab === tab ? 'bg-white/8 text-white' : 'text-white/25 hover:text-white/50'}`}>
+                                        {tab === 'saved-code' ? 'Code' : tab}
+                                    </button>
+                                ))}
                                 {username?.toLowerCase() === 'flashlon' && (
-                                    <button
-                                        onClick={() => setInventoryTab('admin')}
-                                        className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all border ${inventoryTab === 'admin' ? 'bg-red-500/20 text-red-500 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'border-transparent text-red-500/50 hover:text-red-500 hover:bg-red-500/10'}`}
-                                    >
+                                    <button onClick={() => setInventoryTab('admin')}
+                                        className={`flex-1 py-1.5 text-[9px] font-bold uppercase rounded-lg transition-all ${inventoryTab === 'admin' ? 'bg-red-500/15 text-red-400' : 'text-red-500/30 hover:text-red-400/60'}`}>
                                         Admin
                                     </button>
                                 )}
                             </div>
                         )}
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
                             {inventoryTab === 'inventory' ? (
                                 <>
                                     {!isLoggedIn ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40 grayscale">
-                                            <Lock size={48} className="mb-4 text-cyber-muted" />
-                                            <div className="text-sm font-black text-white uppercase mb-2">Systems Locked</div>
-                                            <div className="text-[10px] text-cyber-muted uppercase">Login to access inventory & upgrades</div>
+                                        <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-30">
+                                            <Lock size={40} className="mb-3 text-white/30" />
+                                            <div className="text-xs font-black text-white uppercase mb-1">Systems Locked</div>
+                                            <div className="text-[10px] text-white/30 uppercase">Login to access upgrades</div>
                                         </div>
                                     ) : userProfile ? (
                                         <>
-                                            {/* Aura Status Card */}
+                                            {/* Aura Status */}
                                             {userProfile.aura_type && (
-                                                <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 border-2 border-purple-500/40 rounded-2xl p-4 mb-4 relative overflow-hidden">
-                                                    <div className="flex items-center gap-4 relative z-10">
-                                                        <div className="bg-purple-500/30 p-3 rounded-xl border border-purple-500/50">
-                                                            {React.createElement(ATTRIBUTES[userProfile.aura_type]?.icon || Shield, { size: 32, className: "text-purple-400" })}
+                                                <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 rounded-xl p-3 mb-2 relative overflow-hidden">
+                                                    <div className="flex items-center gap-3 relative z-10">
+                                                        <div className="bg-purple-500/20 p-2 rounded-lg border border-purple-500/30">
+                                                            {React.createElement(ATTRIBUTES[userProfile.aura_type]?.icon || Shield, { size: 24, className: "text-purple-400" })}
                                                         </div>
                                                         <div>
-                                                            <div className="text-[10px] font-black text-purple-400 uppercase tracking-[0.2em]">Active Aura</div>
-                                                            <div className="text-lg font-black text-white uppercase">{ATTRIBUTES[userProfile.aura_type]?.name}</div>
-                                                            <div className="text-[10px] text-cyber-muted uppercase leading-tight">{ATTRIBUTES[userProfile.aura_type]?.description}</div>
+                                                            <div className="text-[8px] font-black text-purple-400/60 uppercase tracking-[0.2em]">Active Aura</div>
+                                                            <div className="text-sm font-black text-white uppercase">{ATTRIBUTES[userProfile.aura_type]?.name}</div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            <div className="grid grid-cols-1 gap-4 pb-4">
+                                            <div className="grid grid-cols-1 gap-3 pb-2">
                                                 {Object.values(ATTRIBUTES).map((attr) => {
                                                     const isUnlocked = attr.isBase || userProfile.unlocks.includes(attr.id);
                                                     const currentLimit = userProfile.limits[attr.id] ?? attr.startLimit;
-                                                    const isInverted = attr.upgradeStep < 0; // lower is better (cooldown, aura_control)
+                                                    const isInverted = attr.upgradeStep < 0;
                                                     const isMaxed = isInverted ? currentLimit <= attr.maxLimit : currentLimit >= attr.maxLimit;
                                                     const upgradeCost = getUpgradeCost(attr.id, currentLimit);
                                                     const canAfford = userProfile.money >= upgradeCost;
                                                     const Icon = attr.icon;
 
-                                                    // Show all auras, don't hide non-equipped ones
-
                                                     if (!isUnlocked) return (
-                                                        <div key={attr.id} className="bg-black/20 border border-cyber-muted/10 rounded-2xl p-4 opacity-50 flex items-center gap-4">
-                                                            <div className="bg-cyber-muted/10 p-3 rounded-xl grayscale">
-                                                                <Icon size={24} className="text-cyber-muted" />
-                                                            </div>
+                                                        <div key={attr.id} className="bg-white/[0.02] border border-white/5 rounded-xl p-3 opacity-40 flex items-center gap-3">
+                                                            <div className="bg-white/5 p-2 rounded-lg"><Icon size={18} className="text-white/20" /></div>
                                                             <div className="flex-1">
-                                                                <div className="text-xs font-bold text-cyber-muted uppercase tracking-wider">{attr.name}</div>
-                                                                <div className="text-[8px] text-cyber-muted uppercase">Locked (Level {userProfile.level + 1}+)</div>
+                                                                <div className="text-[10px] font-bold text-white/30 uppercase">{attr.name}</div>
+                                                                <div className="text-[8px] text-white/15 uppercase">Locked</div>
                                                             </div>
-                                                            <Lock size={16} className="text-cyber-muted" />
+                                                            <Lock size={12} className="text-white/15" />
                                                         </div>
                                                     );
 
                                                     return (
-                                                        <div key={attr.id} className="bg-cyber-light/30 border border-cyber-accent/20 rounded-2xl p-4 hover:border-cyber-accent/40 transition-all group">
-                                                            <div className="flex items-center gap-3 mb-3">
-                                                                <div className="bg-cyber-accent/10 p-2.5 rounded-xl text-cyber-accent group-hover:bg-cyber-accent/20 transition-all">
-                                                                    <Icon size={20} />
+                                                        <div key={attr.id} className="bg-white/[0.02] border border-white/5 rounded-xl p-3 hover:border-cyber-accent/20 transition-all group">
+                                                            <div className="flex items-center gap-2.5 mb-2">
+                                                                <div className="bg-cyber-accent/8 p-2 rounded-lg text-cyber-accent group-hover:bg-cyber-accent/15 transition-all">
+                                                                    <Icon size={16} />
                                                                 </div>
-                                                                <div className="flex-1">
-                                                                    <div className="flex justify-between items-center mb-0.5">
-                                                                        <h3 className="text-sm font-black text-white uppercase tracking-tight">{attr.name}</h3>
-                                                                        <div className="text-[8px] font-bold text-cyber-accent border border-cyber-accent/20 px-1.5 py-0.5 rounded uppercase">LVL MAX: {attr.maxLimit}</div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <h3 className="text-[11px] font-black text-white uppercase tracking-tight">{attr.name}</h3>
+                                                                        <span className="text-[10px] font-black text-white/60">{currentLimit}</span>
                                                                     </div>
-                                                                    <div className="flex justify-between items-end">
-                                                                        <div className="text-[8px] text-cyber-muted uppercase max-w-[140px] leading-tight line-clamp-1">{attr.description}</div>
-                                                                        <div className="text-xs font-black text-white">{currentLimit}</div>
-                                                                    </div>
+                                                                    <div className="text-[8px] text-white/20 uppercase truncate">{attr.description}</div>
                                                                 </div>
                                                             </div>
 
-                                                            <div className="w-full bg-black/40 rounded-full h-1 mb-4 overflow-hidden">
-                                                                <div
-                                                                    className="bg-cyber-accent h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,255,159,0.5)]"
-                                                                    style={{
-                                                                        width: `${isInverted
-                                                                            ? ((attr.startLimit - currentLimit) / (attr.startLimit - attr.maxLimit)) * 100
-                                                                            : (currentLimit / attr.maxLimit) * 100}%`
-                                                                    }}
-                                                                />
+                                                            <div className="w-full bg-white/5 rounded-full h-1 mb-2.5 overflow-hidden">
+                                                                <div className="bg-cyber-accent/60 h-full rounded-full transition-all duration-500"
+                                                                    style={{ width: `${isInverted ? ((attr.startLimit - currentLimit) / (attr.startLimit - attr.maxLimit)) * 100 : (currentLimit / attr.maxLimit) * 100}%` }} />
                                                             </div>
 
                                                             {!isMaxed ? (
-                                                                <div className="flex gap-2">
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            if (onUpgrade) onUpgrade(attr.id);
-                                                                        }}
-                                                                        disabled={!canAfford}
-                                                                        className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-cyber-accent text-black hover:bg-emerald-400 active:scale-[0.98]' : 'bg-white/5 text-cyber-muted cursor-not-allowed grayscale'}`}
-                                                                    >
-                                                                        <TrendingUp size={14} />
-                                                                        {attr.isAura ? 'Upgrade & Equip' : 'Upgrade Limit'}
-                                                                        <span className="ml-auto opacity-70 tracking-widest">${upgradeCost.toLocaleString()}</span>
-                                                                    </button>
-                                                                </div>
+                                                                <button onClick={(e) => { e.stopPropagation(); if (onUpgrade) onUpgrade(attr.id); }}
+                                                                    disabled={!canAfford}
+                                                                    className={`w-full py-2 rounded-lg font-black text-[9px] uppercase flex items-center justify-center gap-1.5 transition-all ${canAfford ? 'bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/20 hover:bg-cyber-accent hover:text-black active:scale-[0.98]' : 'bg-white/3 text-white/15 cursor-not-allowed'}`}>
+                                                                    <TrendingUp size={11} />
+                                                                    {attr.isAura ? 'Upgrade & Equip' : 'Upgrade'}
+                                                                    <span className="ml-auto opacity-60">${upgradeCost.toLocaleString()}</span>
+                                                                </button>
                                                             ) : attr.isAura ? (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        if (onEquipAura) onEquipAura(attr.id);
-                                                                    }}
-                                                                    className={`w-full py-2.5 rounded-xl font-black text-[10px] uppercase text-center flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${userProfile.aura_type === attr.id
-                                                                        ? 'bg-purple-500/30 border-2 border-purple-500 text-purple-300 hover:bg-red-500/20 hover:border-red-500 hover:text-red-300'
-                                                                        : 'bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:border-purple-500/60'
-                                                                        }`}
-                                                                >
-                                                                    {userProfile.aura_type === attr.id ? (
-                                                                        <><CheckCircle2 size={14} /> Equipped — Click to Unequip</>
-                                                                    ) : (
-                                                                        <><Swords size={14} /> Equip Aura</>
-                                                                    )}
+                                                                <button onClick={(e) => { e.stopPropagation(); if (onEquipAura) onEquipAura(attr.id); }}
+                                                                    className={`w-full py-2 rounded-lg font-black text-[9px] uppercase text-center flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${userProfile.aura_type === attr.id
+                                                                        ? 'bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-red-500/15 hover:border-red-500/30 hover:text-red-300'
+                                                                        : 'bg-purple-500/8 border border-purple-500/15 text-purple-400/60 hover:bg-purple-500/15'
+                                                                        }`}>
+                                                                    {userProfile.aura_type === attr.id ? (<><CheckCircle2 size={11} /> Equipped</>) : (<><Swords size={11} /> Equip Aura</>)}
                                                                 </button>
                                                             ) : (
-                                                                <div className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-black text-[10px] uppercase text-center flex items-center justify-center gap-2">
-                                                                    <CheckCircle2 size={14} /> Neural Overload Reached
+                                                                <div className="w-full py-2 rounded-lg bg-blue-500/5 border border-blue-500/10 text-blue-400/40 font-black text-[9px] uppercase text-center flex items-center justify-center gap-1.5">
+                                                                    <CheckCircle2 size={11} /> Maxed
                                                                 </div>
                                                             )}
                                                         </div>
                                                     );
                                                 })}
                                             </div>
-                                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-start gap-3">
-                                                <Info className="text-blue-400 shrink-0" size={16} />
-                                                <p className="text-[9px] text-blue-100 uppercase tracking-wider leading-relaxed font-bold">
-                                                    Level up to receive <span className="text-cyber-accent">Draft Cards</span>. Choose new attributes to expand your logic capabilities. Use money to increase execution limits.
+                                            <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-3 flex items-start gap-2">
+                                                <Info className="text-blue-400/40 shrink-0" size={12} />
+                                                <p className="text-[8px] text-blue-200/30 uppercase tracking-wider leading-relaxed font-bold">
+                                                    Level up to receive <span className="text-cyber-accent/60">Draft Cards</span>. Use money to increase limits.
                                                 </p>
                                             </div>
                                         </>
@@ -753,130 +668,62 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     onEquip={(id) => onEquipTitle?.(id)}
                                 />
                             ) : inventoryTab === 'admin' && username?.toLowerCase() === 'flashlon' ? (
-                                <div className="flex flex-col items-center justify-start py-8 px-4 animate-in fade-in zoom-in duration-300 relative w-full min-h-full">
-                                    {/* Background glow for admin panel */}
-                                    <div className="absolute inset-0 bg-red-500/5 pointer-events-none rounded-2xl" />
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red-500/20 rounded-full blur-[100px] pointer-events-none" />
+                                <div className="flex flex-col items-center justify-start py-6 px-3 animate-in fade-in zoom-in duration-300 relative w-full min-h-full">
+                                    <div className="absolute inset-0 bg-red-500/3 pointer-events-none rounded-xl" />
+                                    <Shield size={48} className="text-red-500 mb-4 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)] z-10" />
+                                    <h3 className="text-2xl font-black text-white uppercase tracking-[0.15em] mb-1 z-10">Admin Override</h3>
+                                    <p className="text-red-300/50 text-[9px] uppercase font-bold tracking-widest mb-6 z-10">Full access granted</p>
 
-                                    <Shield size={64} className="text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] z-10" />
-                                    <h3 className="text-3xl font-black text-white uppercase tracking-[0.2em] mb-2 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] z-10">Admin Override</h3>
-                                    <p className="text-red-300 text-[10px] uppercase font-bold tracking-widest mb-8 z-10">Welcome back, flashlon. Full system access granted.</p>
-
-                                    <div className="w-full max-w-sm space-y-3 z-10">
-                                        <button
-                                            onClick={() => {
-                                                const msg = window.prompt('Enter message to broadcast:');
-                                                if (msg) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('broadcast', { message: msg }));
-                                            }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Globe size={18} className="text-red-500 group-hover:animate-pulse" /> Broadcast Server Message
+                                    <div className="w-full max-w-sm space-y-2 z-10">
+                                        <button onClick={() => { const msg = window.prompt('Enter message:'); if (msg) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('broadcast', { message: msg })); }}
+                                            className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                            <Globe size={14} /> Broadcast Message
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                if (window.confirm('Are you sure you want to kick all other players?')) {
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('kick_all'));
-                                                }
-                                            }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Users2 size={18} className="text-red-500 group-hover:animate-pulse" /> Manage / Kick Connected Nodes
+                                        <button onClick={() => { if (window.confirm('Kick all?')) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('kick_all')); }}
+                                            className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                            <Users2 size={14} /> Kick All Players
                                         </button>
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => {
-                                                    if (window.confirm('Heal all players in all active rooms?')) {
-                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('global_heal'));
-                                                    }
-                                                }}
-                                                className="flex-1 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 font-black py-4 rounded-xl hover:bg-emerald-500/20 hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                                <Target size={18} className="text-emerald-500 group-hover:animate-pulse" /> Global Heal All
+                                        <div className="flex gap-2">
+                                            <button onClick={() => { if (window.confirm('Heal all?')) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('global_heal')); }}
+                                                className="flex-1 bg-emerald-900/15 border border-emerald-500/20 text-emerald-400/70 font-black py-3 rounded-xl hover:bg-emerald-500/15 hover:text-emerald-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <Target size={14} /> Global Heal
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    const username = window.prompt('Enter username (leave empty for self):') || 'flashlon';
-                                                    const amtStr = window.prompt('Enter currency amount:');
-                                                    if (amtStr) {
-                                                        const amount = parseInt(amtStr, 10);
-                                                        if (!isNaN(amount)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('inject_currency', { targetUser: username, amount }));
-                                                    }
-                                                }}
-                                                className="flex-1 bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                                <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Inject Currency
+                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; const a = window.prompt('Amount:'); if (a) { const n = parseInt(a, 10); if (!isNaN(n)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('inject_currency', { targetUser: u, amount: n })); } }}
+                                                className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <DollarSign size={14} /> Inject $
                                             </button>
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
-                                                const levelStr = window.prompt('Enter new level (leave blank to skip):');
-                                                const xpStr = window.prompt('Enter new xp (leave blank to skip):');
-                                                const payload: any = { targetUser };
-                                                if (levelStr) payload.level = parseInt(levelStr, 10);
-                                                if (xpStr) payload.xp = parseInt(xpStr, 10);
-                                                import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('set_user_stats', payload));
-                                            }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Set Target Stats
+                                        <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; const l = window.prompt('Level:'); const x = window.prompt('XP:'); const p: any = { targetUser: u }; if (l) p.level = parseInt(l, 10); if (x) p.xp = parseInt(x, 10); import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('set_user_stats', p)); }}
+                                            className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                            <TrendingUp size={14} /> Set Stats
                                         </button>
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => {
-                                                    const targetUser = window.prompt('Enter target username:') || 'flashlon';
-                                                    if (targetUser) {
-                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_titles', { targetUser }));
-                                                    }
-                                                }}
-                                                className="flex-1 bg-purple-900/20 border border-purple-500/30 text-purple-400 font-black py-4 rounded-xl hover:bg-purple-500/20 hover:border-purple-500/50 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:text-white transition-all text-[10px] uppercase flex flex-col items-center justify-center gap-1 group">
-                                                <Shield size={18} className="text-purple-500 group-hover:animate-pulse" /> Unlock All Titles
+                                        <div className="flex gap-2">
+                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_titles', { targetUser: u })); }}
+                                                className="flex-1 bg-purple-900/15 border border-purple-500/20 text-purple-400/60 font-black py-3 rounded-xl hover:bg-purple-500/15 hover:text-purple-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                <Shield size={12} /> All Titles
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    const targetUser = window.prompt('Enter target username:') || 'flashlon';
-                                                    if (targetUser) {
-                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('max_limits', { targetUser }));
-                                                    }
-                                                }}
-                                                className="flex-1 bg-purple-900/20 border border-purple-500/30 text-purple-400 font-black py-4 rounded-xl hover:bg-purple-500/20 hover:border-purple-500/50 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:text-white transition-all text-[10px] uppercase flex flex-col items-center justify-center gap-1 group">
-                                                <Cpu size={18} className="text-purple-500 group-hover:animate-pulse" /> Max Out Limits
+                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('max_limits', { targetUser: u })); }}
+                                                className="flex-1 bg-purple-900/15 border border-purple-500/20 text-purple-400/60 font-black py-3 rounded-xl hover:bg-purple-500/15 hover:text-purple-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                <Cpu size={12} /> Max Limits
                                             </button>
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
-                                                if (targetUser) {
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_values', { targetUser }));
-                                                }
-                                            }}
-                                            className="w-full bg-gradient-to-r from-red-600/30 to-purple-600/30 border border-red-500/50 text-white font-black py-4 rounded-xl hover:from-red-600/50 hover:to-purple-600/50 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] transition-all text-sm uppercase flex items-center justify-center gap-3 group animate-pulse hover:animate-none">
-                                            <DollarSign size={20} className="text-white group-hover:scale-110 transition-transform" /> Unlock All VALUES (Max Everything)
+                                        <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_values', { targetUser: u })); }}
+                                            className="w-full bg-gradient-to-r from-red-600/20 to-purple-600/20 border border-red-500/30 text-white/70 font-black py-3 rounded-xl hover:from-red-600/30 hover:to-purple-600/30 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                            <Zap size={14} /> Unlock Everything
                                         </button>
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => {
-                                                    const targetRoom = window.prompt('Enter room ID to nuke enemies in (leave blank for ALL rooms):');
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('nuke_enemies', { roomId: targetRoom }));
-                                                }}
-                                                className="flex-[2] bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-[10px] uppercase flex items-center justify-center gap-2 group">
-                                                <Swords size={18} className="text-red-500 group-hover:animate-pulse" /> Nuke Enemies
+                                        <div className="flex gap-2">
+                                            <button onClick={() => { const r = window.prompt('Room ID (blank=ALL):'); import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('nuke_enemies', { roomId: r })); }}
+                                                className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/60 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                <Swords size={12} /> Nuke
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    const targetRoom = window.prompt('Enter room ID to spawn boss in:');
-                                                    if (targetRoom) {
-                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: targetRoom }));
-                                                    }
-                                                }}
-                                                className="flex-1 bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-[10px] uppercase flex items-center justify-center gap-2 group">
-                                                <Target size={18} className="text-red-500 group-hover:animate-pulse" /> Force Boss
+                                            <button onClick={() => { const r = window.prompt('Room ID:'); if (r) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: r })); }}
+                                                className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/60 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                <Target size={12} /> Boss
                                             </button>
                                         </div>
-                                        <button
-                                            onClick={() => {
-                                                const targetUser = window.prompt('Enter target username to wipe:');
-                                                if (targetUser && window.confirm(`WARNING: This will delete ALL progress for ${targetUser}. Continue?`)) {
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_account', { targetUser }));
-                                                }
-                                            }}
-                                            className="w-full bg-red-900/40 border border-red-500/80 text-red-200 font-black py-3 rounded-xl hover:bg-red-600 hover:text-white transition-all text-[10px] uppercase tracking-widest mt-4">
-                                            ⚠️ Wipe Player Account ⚠️
+                                        <button onClick={() => { const u = window.prompt('Username to wipe:'); if (u && window.confirm(`DELETE ALL progress for ${u}?`)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_account', { targetUser: u })); }}
+                                            className="w-full bg-red-900/30 border border-red-500/50 text-red-200/60 font-black py-2.5 rounded-xl hover:bg-red-600/40 hover:text-white transition-all text-[9px] uppercase mt-2">
+                                            ⚠️ Wipe Account ⚠️
                                         </button>
                                     </div>
                                 </div>
@@ -890,57 +737,6 @@ export const Lobby: React.FC<LobbyProps> = ({
                                 />
                             )}
                         </div>
-                    </div>
-                </div>
-
-                {/* Footer Section & Leaderboard */}
-                <div className="flex flex-col lg:flex-row justify-between items-start gap-8 shrink-0 border-t border-cyber-muted/10 pt-6">
-                    <div className="flex-1 w-full lg:w-auto">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Trophy size={18} className="text-cyber-accent" />
-                            <h2 className="text-sm font-black text-white uppercase tracking-widest">Global Top Seekers</h2>
-                        </div>
-                        <div className="bg-black/40 border border-cyber-accent/10 rounded-2xl p-4 overflow-x-auto">
-                            <div className="flex gap-6">
-                                {leaderboard.length > 0 ? leaderboard.map((player: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-3 shrink-0 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
-                                        <span className="text-cyber-accent font-black text-xs">#{i + 1}</span>
-                                        <div>
-                                            <div className="text-[10px] font-black text-white uppercase">{player.username}</div>
-                                            <div className="text-[8px] font-bold text-cyber-muted uppercase">Level {player.level}</div>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest py-2">
-                                        Establishing Satellite Uplink... 📡
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-4 min-w-[200px]">
-                        <div className="flex gap-8">
-                            <div className="flex items-center gap-2 opacity-50">
-                                <Users2 size={14} className="text-cyber-muted" />
-                                <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">{leaderboard.length * 7 + 12} Nodes Active</span>
-                            </div>
-                            <div className="flex items-center gap-2 opacity-50">
-                                <Shield size={14} className="text-cyber-muted" />
-                                <span className="text-[10px] font-bold text-cyber-muted uppercase tracking-widest">Neural Link Secure</span>
-                            </div>
-                        </div>
-                        {isLoggedIn && (
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyber-accent/20 to-blue-500/20 border border-white/10 flex items-center justify-center font-black text-white text-[10px] uppercase">
-                                    {username?.slice(0, 2)}
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-[10px] font-black text-white uppercase leading-none">{username}</div>
-                                    <div className="text-[8px] font-bold text-cyber-accent uppercase tracking-tighter">Status: Active</div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
