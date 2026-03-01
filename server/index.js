@@ -2467,6 +2467,37 @@ setInterval(() => {
                 ent.x += ent.velocity.x * dt;
                 ent.y += ent.velocity.y * dt;
 
+                // Enemy wall collision (same as player wall collision)
+                if (room.walls && room.walls.length > 0) {
+                    const buffer = ent.radius || 20;
+                    room.walls.forEach(w => {
+                        const rect = {
+                            left: w.x - buffer,
+                            right: w.x + w.w + buffer,
+                            top: w.y - buffer,
+                            bottom: w.y + w.h + buffer
+                        };
+
+                        if (ent.x > rect.left && ent.x < rect.right &&
+                            ent.y > rect.top && ent.y < rect.bottom) {
+                            const dxLeft = Math.abs(ent.x - rect.left);
+                            const dxRight = Math.abs(ent.x - rect.right);
+                            const dyTop = Math.abs(ent.y - rect.top);
+                            const dyBottom = Math.abs(ent.y - rect.bottom);
+                            const min = Math.min(dxLeft, dxRight, dyTop, dyBottom);
+
+                            if (min === dxLeft) ent.x = rect.left;
+                            else if (min === dxRight) ent.x = rect.right;
+                            else if (min === dyTop) ent.y = rect.top;
+                            else if (min === dyBottom) ent.y = rect.bottom;
+                        }
+                    });
+                }
+
+                // Clamp enemies to arena bounds
+                ent.x = Math.max(ent.radius, Math.min(800 - ent.radius, ent.x));
+                ent.y = Math.max(ent.radius, Math.min(600 - ent.radius, ent.y));
+
                 // Player Damage on Touch
                 Object.values(room.players).forEach(p => {
                     const dist = Math.sqrt((p.x - ent.x) ** 2 + (p.y - ent.y) ** 2);

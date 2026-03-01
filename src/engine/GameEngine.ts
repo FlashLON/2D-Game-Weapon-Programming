@@ -349,6 +349,9 @@ export class GameEngine {
                 ent.x += ent.velocity.x * dt;
                 ent.y += ent.velocity.y * dt;
 
+                // Wall collision (client-side extrapolation)
+                this.resolveWallCollision(ent);
+
                 const bounds = this.getArenaBounds();
                 ent.x = Math.max(ent.radius, Math.min(bounds.width - ent.radius, ent.x));
                 ent.y = Math.max(ent.radius, Math.min(bounds.height - ent.radius, ent.y));
@@ -453,6 +456,9 @@ export class GameEngine {
 
             ent.x += ent.velocity.x * dt;
             ent.y += ent.velocity.y * dt;
+
+            // Wall collision for all entities (solo mode)
+            this.resolveWallCollision(ent);
 
             if (ent.type === 'player') {
                 const bounds = this.getArenaBounds();
@@ -618,6 +624,43 @@ export class GameEngine {
                         proj.velocity.y *= -proj.bounciness;
                         if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
                     }
+                }
+
+                // Projectile vs Map Wall collision (solo mode)
+                const walls = this.state.walls;
+                if (walls && walls.length > 0) {
+                    let hitWall = false;
+                    for (const w of walls) {
+                        if (proj.x > w.x && proj.x < w.x + w.w &&
+                            proj.y > w.y && proj.y < w.y + w.h) {
+
+                            if (proj.bounciness && proj.bounciness > 0) {
+                                // Bounce off wall
+                                const dxLeft = Math.abs(proj.x - w.x);
+                                const dxRight = Math.abs(proj.x - (w.x + w.w));
+                                const dyTop = Math.abs(proj.y - w.y);
+                                const dyBottom = Math.abs(proj.y - (w.y + w.h));
+                                const min = Math.min(dxLeft, dxRight, dyTop, dyBottom);
+
+                                if (min === dxLeft || min === dxRight) proj.velocity.x *= -proj.bounciness;
+                                else proj.velocity.y *= -proj.bounciness;
+
+                                if (min === dxLeft) proj.x = w.x - 1;
+                                else if (min === dxRight) proj.x = w.x + w.w + 1;
+                                else if (min === dyTop) proj.y = w.y - 1;
+                                else if (min === dyBottom) proj.y = w.y + w.h + 1;
+
+                                if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
+                            } else {
+                                // Destroy projectile on wall hit
+                                this.spawnParticles(proj.x, proj.y, '#666', 4);
+                                proj.lifetime = -1; // Mark for removal
+                                hitWall = true;
+                            }
+                            break;
+                        }
+                    }
+                    if (hitWall) return; // Skip further processing for this projectile
                 }
             }
 
@@ -992,6 +1035,39 @@ export class GameEngine {
     private notify() {
         if (this.onStateChange) {
             this.onStateChange({ ...this.state });
+        }
+    }
+
+    /**
+     * Resolve wall collision for a given entity.
+     * Pushes the entity to the nearest wall edge if overlapping.
+     * Mirrors the server-side algorithm exactly.
+     */
+    private resolveWallCollision(ent: Entity) {
+        const walls = this.state.walls;
+        if (!walls || walls.length === 0) return;
+
+        const buffer = ent.radius || 10;
+
+        for (const w of walls) {
+            const left = w.x - buffer;
+            const right = w.x + w.w + buffer;
+            const top = w.y - buffer;
+            const bottom = w.y + w.h + buffer;
+
+            if (ent.x > left && ent.x < right && ent.y > top && ent.y < bottom) {
+                // Entity is inside the wall — push to nearest edge
+                const dxLeft = Math.abs(ent.x - left);
+                const dxRight = Math.abs(ent.x - right);
+                const dyTop = Math.abs(ent.y - top);
+                const dyBottom = Math.abs(ent.y - bottom);
+                const min = Math.min(dxLeft, dxRight, dyTop, dyBottom);
+
+                if (min === dxLeft) ent.x = left;
+                else if (min === dxRight) ent.x = right;
+                else if (min === dyTop) ent.y = top;
+                else if (min === dyBottom) ent.y = bottom;
+            }
         }
     }
 
