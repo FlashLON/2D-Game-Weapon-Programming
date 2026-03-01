@@ -416,21 +416,8 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Auto-clear vote overlay when endTime passes (handles missed map_change events)
-  useEffect(() => {
-    if (!mapVoteData) return;
-    const msLeft = mapVoteData.endTime - Date.now();
-    if (msLeft <= 0) {
-      setMapVoteData(null);
-      mapVoteActiveRef.current = false;
-      return;
-    }
-    const timer = setTimeout(() => {
-      setMapVoteData(null);
-      mapVoteActiveRef.current = false;
-    }, msLeft + 1000); // 1s grace after endTime
-    return () => clearTimeout(timer);
-  }, [mapVoteData?.endTime]);
+  // Auto-clear vote overlay fallback removed: we now rely on the 'map_change' event
+  // emitted by the server or the server omitting active=true from the periodic state broadcast.
 
   // Saved Code Handlers
   async function loadSavedCodes(user: string) {
@@ -567,6 +554,11 @@ function App() {
               endTime: Date.now() + sv.timeLeft
             };
           });
+        } else if (mapVoteActiveRef.current) {
+          // The server state says there's no active vote, but local UI thinks there is.
+          // This means we missed the map_change event entirely!
+          mapVoteActiveRef.current = false;
+          setMapVoteData(null);
         }
       }
     });
