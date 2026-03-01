@@ -1009,8 +1009,38 @@ io.on('connection', (socket) => {
                     const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
                     const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
                     if (user) {
-                        user.limits = { speed: 10000, damage: 10000, hp: 10000, cooldown: 0.01, pierce: 100, homing: 100, attraction_force: 500, burst: 10 };
-                        user.unlocks = ['speed', 'damage', 'hp', 'cooldown', 'pierce', 'homing', 'aura_fire', 'aura_ice', 'aura_crystal', 'vortex', 'burst'];
+                        user.limits = {
+                            speed: 1200, damage: 250, hp: 2000, cooldown: 0.05,
+                            lifetime: 8.0, radius: 80, homing: 50.0, pierce: 25,
+                            knockback: 500, acceleration: 2.0, vampirism: 50, split_on_death: 8,
+                            attraction_force: 100, bounciness: 1.0, spin: 720,
+                            explosion_radius: 300, explosion_damage: 300,
+                            chain_count: 10, chain_range: 500,
+                            wave_amplitude: 200, wave_frequency: 20,
+                            orbit_speed: 10, orbit_radius: 200, orbit_player: 1,
+                            fade_over_time: 1, focus_fire: 2.0, burst_damage: 500,
+                            execution_damage: 3.0, crit_chance: 100, crit_damage: 5.0,
+                            dot_damage: 200, armor_shred: 1.0,
+                            aura_damage: 3.5, aura_gravity: 5.0, aura_corruption: 400,
+                            aura_execution: 3.0, aura_chaos: 4.0, aura_control: 0.2,
+                            aura_vampire: 0.4, aura_precision: 2.5
+                        };
+                        user.unlocks = [
+                            'speed', 'damage', 'hp', 'cooldown',
+                            'lifetime', 'radius', 'homing', 'pierce',
+                            'knockback', 'acceleration', 'vampirism', 'split_on_death',
+                            'attraction_force', 'bounciness', 'spin',
+                            'explosion_radius', 'explosion_damage',
+                            'chain_count', 'chain_range',
+                            'wave_amplitude', 'wave_frequency',
+                            'orbit_speed', 'orbit_radius', 'orbit_player',
+                            'fade_over_time', 'focus_fire', 'burst_damage',
+                            'execution_damage', 'crit_chance', 'crit_damage',
+                            'dot_damage', 'armor_shred',
+                            'aura_damage', 'aura_gravity', 'aura_corruption',
+                            'aura_execution', 'aura_chaos', 'aura_control',
+                            'aura_vampire', 'aura_precision'
+                        ];
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
@@ -1041,8 +1071,69 @@ io.on('connection', (socket) => {
                         user.money = 99999999;
                         user.killCount = 99999;
                         user.titles = [...TITLES_LIST];
-                        user.limits = { speed: 15000, damage: 15000, hp: 50000, cooldown: 0.001, pierce: 500, homing: 500, attraction_force: 1500, burst: 50, aura_chaos: 5 };
-                        user.unlocks = ['speed', 'damage', 'hp', 'cooldown', 'pierce', 'homing', 'aura_fire', 'aura_ice', 'aura_crystal', 'vortex', 'burst', 'aura_chaos'];
+                        // ALL attributes from AttributeRegistry at their maxLimit values
+                        user.limits = {
+                            // Base stats
+                            speed: 1200,
+                            damage: 250,
+                            hp: 2000,
+                            cooldown: 0.05,
+                            // Combat
+                            lifetime: 8.0,
+                            radius: 80,
+                            homing: 50.0,
+                            pierce: 25,
+                            knockback: 500,
+                            acceleration: 2.0,
+                            vampirism: 50,
+                            split_on_death: 8,
+                            attraction_force: 100,
+                            bounciness: 1.0,
+                            spin: 720,
+                            explosion_radius: 300,
+                            explosion_damage: 300,
+                            chain_count: 10,
+                            chain_range: 500,
+                            wave_amplitude: 200,
+                            wave_frequency: 20,
+                            orbit_speed: 10,
+                            orbit_radius: 200,
+                            orbit_player: 1,
+                            fade_over_time: 1,
+                            focus_fire: 2.0,
+                            burst_damage: 500,
+                            execution_damage: 3.0,
+                            crit_chance: 100,
+                            crit_damage: 5.0,
+                            dot_damage: 200,
+                            armor_shred: 1.0,
+                            // Auras
+                            aura_damage: 3.5,
+                            aura_gravity: 5.0,
+                            aura_corruption: 400,
+                            aura_execution: 3.0,
+                            aura_chaos: 4.0,
+                            aura_control: 0.2,
+                            aura_vampire: 0.4,
+                            aura_precision: 2.5
+                        };
+                        // ALL attribute IDs unlocked
+                        user.unlocks = [
+                            'speed', 'damage', 'hp', 'cooldown',
+                            'lifetime', 'radius', 'homing', 'pierce',
+                            'knockback', 'acceleration', 'vampirism', 'split_on_death',
+                            'attraction_force', 'bounciness', 'spin',
+                            'explosion_radius', 'explosion_damage',
+                            'chain_count', 'chain_range',
+                            'wave_amplitude', 'wave_frequency',
+                            'orbit_speed', 'orbit_radius', 'orbit_player',
+                            'fade_over_time', 'focus_fire', 'burst_damage',
+                            'execution_damage', 'crit_chance', 'crit_damage',
+                            'dot_damage', 'armor_shred',
+                            'aura_damage', 'aura_gravity', 'aura_corruption',
+                            'aura_execution', 'aura_chaos', 'aura_control',
+                            'aura_vampire', 'aura_precision'
+                        ];
 
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
