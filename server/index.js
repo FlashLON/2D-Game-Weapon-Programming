@@ -2202,14 +2202,15 @@ setInterval(() => {
                     });
                 }
 
-                // Auras from nearby players — affect ENEMIES ONLY (not allied players)
+                // Auras from nearby players — affect EVERYONE in range (enemies + other players, not self)
                 Object.values(room.players).forEach(p => {
                     if (p.dead || p.x < -1000) return;
                     const aura = p.aura_type;
                     if (!aura) return;
 
-                    // Only target enemies, never allied players
-                    const targets = room.enemies;
+                    // Build targets list: all enemies + all other players (not self)
+                    const otherPlayers = Object.values(room.players).filter(op => op.id !== p.id && !op.dead && op.x > -1000);
+                    const targets = [...room.enemies, ...otherPlayers];
 
                     targets.forEach(target => {
                         const distSq = (target.x - p.x) ** 2 + (target.y - p.y) ** 2;
@@ -2242,14 +2243,11 @@ setInterval(() => {
                                 target.hp -= (strength * dt);
 
                             } else if (aura === 'aura_execution') {
-                                // Only kicker-in below 30% HP; strength is a damage multiplier (e.g. 1.2 = +20%)
                                 if (target.hp < target.maxHp * 0.3) {
                                     target.hp -= (target.maxHp * (strength - 1) * 0.1 * dt);
                                 }
 
                             } else if (aura === 'aura_control') {
-                                // Friction-based slow: strength < 1 (e.g. 0.7 = 30% slow)
-                                // Apply as a damping multiplier each frame, clamped so velocity can't flip sign
                                 const damping = Math.pow(Math.max(0, strength), dt * 3);
                                 target.velocity.x *= damping;
                                 target.velocity.y *= damping;
@@ -2257,7 +2255,7 @@ setInterval(() => {
                             } else if (aura === 'aura_vampire') {
                                 const siph = strength * dt * 50;
                                 target.hp -= siph;
-                                p.hp = Math.min(p.maxHp, p.hp + siph * 0.5); // heal caster
+                                p.hp = Math.min(p.maxHp, p.hp + siph * 0.5);
 
                             } else if (aura === 'aura_gravity') {
                                 const pullX = p.x - target.x;
