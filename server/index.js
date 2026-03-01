@@ -876,6 +876,15 @@ io.on('connection', (socket) => {
                     if (s.data.username !== 'flashlon') s.disconnect(true);
                 });
                 break;
+            case 'global_heal':
+                io.emit('notification', { type: 'unlock', message: 'Admin activated GLOBAL HEAL!' });
+                for (const roomId in rooms) {
+                    for (const pid in rooms[roomId].players) {
+                        const p = rooms[roomId].players[pid];
+                        p.hp = p.limits?.hp || 2000;
+                    }
+                }
+                break;
             case 'inject_currency':
                 if (payload.targetUser) {
                     const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
@@ -886,6 +895,9 @@ io.on('connection', (socket) => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
+                                    for (const roomId in rooms) {
+                                        if (rooms[roomId].players[s.id]) rooms[roomId].players[s.id].money = user.money;
+                                    }
                                     s.emit('notification', { type: 'unlock', message: `Admin injected $${payload.amount} to your account.` });
                                 }
                             }
@@ -904,6 +916,12 @@ io.on('connection', (socket) => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
+                                    for (const roomId in rooms) {
+                                        if (rooms[roomId].players[s.id]) {
+                                            rooms[roomId].players[s.id].level = user.level;
+                                            rooms[roomId].players[s.id].xp = user.xp;
+                                        }
+                                    }
                                     s.emit('notification', { type: 'unlock', message: `Admin updated your stats.` });
                                 }
                             }
@@ -923,6 +941,9 @@ io.on('connection', (socket) => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
+                                    for (const roomId in rooms) {
+                                        if (rooms[roomId].players[s.id]) rooms[roomId].players[s.id].titles = user.titles;
+                                    }
                                     s.emit('notification', { type: 'unlock', message: `Admin unlocked all titles for you.` });
                                 }
                             }
@@ -943,6 +964,12 @@ io.on('connection', (socket) => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
+                                    for (const roomId in rooms) {
+                                        if (rooms[roomId].players[s.id]) {
+                                            rooms[roomId].players[s.id].limits = user.limits;
+                                            rooms[roomId].players[s.id].unlocks = user.unlocks;
+                                        }
+                                    }
                                     s.emit('notification', { type: 'unlock', message: `Admin maxed out your limits and unlocked all attributes.` });
                                 }
                             }
@@ -957,19 +984,34 @@ io.on('connection', (socket) => {
                     const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
                     const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
                     if (user) {
-                        user.level = 999;
+                        user.level = 9999;
                         user.xp = 0;
                         user.maxXp = 9999999;
                         user.money = 99999999;
                         user.killCount = 99999;
                         user.titles = [...TITLES_LIST];
-                        user.limits = { speed: 10000, damage: 10000, hp: 10000, cooldown: 0.01, pierce: 100, homing: 100, attraction_force: 500, burst: 10 };
-                        user.unlocks = ['speed', 'damage', 'hp', 'cooldown', 'pierce', 'homing', 'aura_fire', 'aura_ice', 'aura_crystal', 'vortex', 'burst'];
+                        user.limits = { speed: 15000, damage: 15000, hp: 50000, cooldown: 0.001, pierce: 500, homing: 500, attraction_force: 1500, burst: 50, aura_chaos: 5 };
+                        user.unlocks = ['speed', 'damage', 'hp', 'cooldown', 'pierce', 'homing', 'aura_fire', 'aura_ice', 'aura_crystal', 'vortex', 'burst', 'aura_chaos'];
 
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
                                     s.emit('profile_update', user);
+                                    for (const roomId in rooms) {
+                                        if (rooms[roomId].players[s.id]) {
+                                            const p = rooms[roomId].players[s.id];
+                                            p.level = user.level;
+                                            p.xp = user.xp;
+                                            p.maxXp = user.maxXp;
+                                            p.money = user.money;
+                                            p.limits = user.limits;
+                                            p.unlocks = user.unlocks;
+                                            p.titles = user.titles;
+                                            p.killCount = user.killCount;
+                                            p.hp = user.limits.hp;
+                                            p.maxHp = user.limits.hp;
+                                        }
+                                    }
                                     s.emit('notification', { type: 'unlock', message: `Admin unlocked ALL VALUES and MAXED your account.` });
                                 }
                             }
@@ -979,24 +1021,82 @@ io.on('connection', (socket) => {
                     }
                 }
                 break;
+            case 'wipe_account':
+                if (payload.targetUser) {
+                    const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
+                    const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
+                    if (user) {
+                        user.level = 1;
+                        user.xp = 0;
+                        user.maxXp = 100;
+                        user.money = 0;
+                        user.killCount = 0;
+                        user.titles = ['beginner'];
+                        user.equippedTitle = null;
+                        user.limits = { speed: 200, damage: 5, hp: 100, cooldown: 0.5 };
+                        user.unlocks = ['speed', 'damage', 'hp', 'cooldown'];
+                        upsertUser(targetNameKey, user).then(() => {
+                            for (const s of io.sockets.sockets.values()) {
+                                if (s.data.username === targetNameKey) {
+                                    s.emit('profile_update', user);
+                                    for (const roomId in rooms) {
+                                        if (rooms[roomId].players[s.id]) {
+                                            const p = rooms[roomId].players[s.id];
+                                            p.level = user.level;
+                                            p.xp = user.xp;
+                                            p.maxXp = user.maxXp;
+                                            p.money = user.money;
+                                            p.limits = user.limits;
+                                            p.unlocks = user.unlocks;
+                                            p.titles = user.titles;
+                                        }
+                                    }
+                                    s.emit('notification', { type: 'error', message: `Admin wiped your account completely.` });
+                                }
+                            }
+                        });
+                    }
+                }
+                break;
             case 'nuke_enemies':
-                const roomToNuke = rooms[payload.roomId];
-                if (roomToNuke) {
-                    roomToNuke.enemies = []; // clears all enemies instantly
-                    io.to(payload.roomId).emit('notification', { type: 'unlock', message: '[SYS] Admin Nuked All Enemies!' });
+                if (payload.roomId) {
+                    const roomToNuke = rooms[payload.roomId];
+                    if (roomToNuke) {
+                        roomToNuke.enemies = []; // clears all enemies instantly
+                        io.to(payload.roomId).emit('notification', { type: 'unlock', message: '[SYS] Admin Nuked All Enemies!' });
+                    } else {
+                        socket.emit('notification', { type: 'error', message: 'Room not found' });
+                    }
                 } else {
-                    socket.emit('notification', { type: 'error', message: 'Room not found' });
+                    for (const roomId in rooms) rooms[roomId].enemies = [];
+                    io.emit('notification', { type: 'unlock', message: '[SYS] Admin Nuked All Enemies Across Server!' });
                 }
                 break;
             case 'spawn_boss':
-                const targetRoom = rooms[payload.roomId];
-                if (targetRoom) {
-                    io.to(payload.roomId).emit('wave_start', { wave: 999 });
-                    setTimeout(() => {
-                        io.to(payload.roomId).emit('boss_spawn', { wave: 999 });
-                    }, 3000);
-                } else {
-                    socket.emit('notification', { type: 'error', message: 'Room not found' });
+                if (payload.roomId) {
+                    const targetRoom = rooms[payload.roomId];
+                    if (targetRoom) {
+                        io.to(payload.roomId).emit('wave_start', { wave: 999 });
+                        setTimeout(() => {
+                            io.to(payload.roomId).emit('boss_spawn', { wave: 999 });
+                            targetRoom.enemies.push({
+                                id: 'boss_admin_' + Math.random().toString(36).substr(2, 5),
+                                type: 'enemy',
+                                isBoss: true,
+                                x: 400, y: -100,
+                                radius: 100,
+                                hp: 25000,
+                                maxHp: 25000,
+                                color: '#ff0000',
+                                velocity: { x: 0, y: 0 },
+                                speed: 60,
+                                bossTimer: 0,
+                                bossState: 'chase'
+                            });
+                        }, 3000);
+                    } else {
+                        socket.emit('notification', { type: 'error', message: 'Room not found' });
+                    }
                 }
                 break;
         }

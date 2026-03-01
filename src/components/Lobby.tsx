@@ -562,18 +562,29 @@ export const Lobby: React.FC<LobbyProps> = ({
                                             className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
                                             <Users2 size={18} className="text-red-500 group-hover:animate-pulse" /> Manage / Kick Connected Nodes
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                const username = window.prompt('Enter username (leave empty for self):') || 'flashlon';
-                                                const amtStr = window.prompt('Enter currency amount:');
-                                                if (amtStr) {
-                                                    const amount = parseInt(amtStr, 10);
-                                                    if (!isNaN(amount)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('inject_currency', { targetUser: username, amount }));
-                                                }
-                                            }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Inject Currency
-                                        </button>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    if (window.confirm('Heal all players in all active rooms?')) {
+                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('global_heal'));
+                                                    }
+                                                }}
+                                                className="flex-1 bg-emerald-900/20 border border-emerald-500/30 text-emerald-400 font-black py-4 rounded-xl hover:bg-emerald-500/20 hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                                <Target size={18} className="text-emerald-500 group-hover:animate-pulse" /> Global Heal All
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const username = window.prompt('Enter username (leave empty for self):') || 'flashlon';
+                                                    const amtStr = window.prompt('Enter currency amount:');
+                                                    if (amtStr) {
+                                                        const amount = parseInt(amtStr, 10);
+                                                        if (!isNaN(amount)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('inject_currency', { targetUser: username, amount }));
+                                                    }
+                                                }}
+                                                className="flex-1 bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
+                                                <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Inject Currency
+                                            </button>
+                                        </div>
                                         <button
                                             onClick={() => {
                                                 const targetUser = window.prompt('Enter target username:') || 'flashlon';
@@ -587,26 +598,28 @@ export const Lobby: React.FC<LobbyProps> = ({
                                             className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
                                             <TrendingUp size={18} className="text-red-500 group-hover:animate-pulse" /> Set Target Stats
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
-                                                if (targetUser) {
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_titles', { targetUser }));
-                                                }
-                                            }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Shield size={18} className="text-red-500 group-hover:animate-pulse" /> Unlock All Titles
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                const targetUser = window.prompt('Enter target username:') || 'flashlon';
-                                                if (targetUser) {
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('max_limits', { targetUser }));
-                                                }
-                                            }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Cpu size={18} className="text-red-500 group-hover:animate-pulse" /> Max Out Limits / UI
-                                        </button>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    const targetUser = window.prompt('Enter target username:') || 'flashlon';
+                                                    if (targetUser) {
+                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_titles', { targetUser }));
+                                                    }
+                                                }}
+                                                className="flex-1 bg-purple-900/20 border border-purple-500/30 text-purple-400 font-black py-4 rounded-xl hover:bg-purple-500/20 hover:border-purple-500/50 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:text-white transition-all text-[10px] uppercase flex flex-col items-center justify-center gap-1 group">
+                                                <Shield size={18} className="text-purple-500 group-hover:animate-pulse" /> Unlock All Titles
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const targetUser = window.prompt('Enter target username:') || 'flashlon';
+                                                    if (targetUser) {
+                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('max_limits', { targetUser }));
+                                                    }
+                                                }}
+                                                className="flex-1 bg-purple-900/20 border border-purple-500/30 text-purple-400 font-black py-4 rounded-xl hover:bg-purple-500/20 hover:border-purple-500/50 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:text-white transition-all text-[10px] uppercase flex flex-col items-center justify-center gap-1 group">
+                                                <Cpu size={18} className="text-purple-500 group-hover:animate-pulse" /> Max Out Limits
+                                            </button>
+                                        </div>
                                         <button
                                             onClick={() => {
                                                 const targetUser = window.prompt('Enter target username:') || 'flashlon';
@@ -614,28 +627,38 @@ export const Lobby: React.FC<LobbyProps> = ({
                                                     import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_values', { targetUser }));
                                                 }
                                             }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <DollarSign size={18} className="text-red-500 group-hover:animate-pulse" /> Unlock All VALUES (Max Everything)
+                                            className="w-full bg-gradient-to-r from-red-600/30 to-purple-600/30 border border-red-500/50 text-white font-black py-4 rounded-xl hover:from-red-600/50 hover:to-purple-600/50 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] transition-all text-sm uppercase flex items-center justify-center gap-3 group animate-pulse hover:animate-none">
+                                            <DollarSign size={20} className="text-white group-hover:scale-110 transition-transform" /> Unlock All VALUES (Max Everything)
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                const targetRoom = window.prompt('Enter room ID to nuke enemies in:');
-                                                if (targetRoom) {
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    const targetRoom = window.prompt('Enter room ID to nuke enemies in (leave blank for ALL rooms):');
                                                     import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('nuke_enemies', { roomId: targetRoom }));
-                                                }
-                                            }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Swords size={18} className="text-red-500 group-hover:animate-pulse" /> Nuke All Enemies
-                                        </button>
+                                                }}
+                                                className="flex-[2] bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-[10px] uppercase flex items-center justify-center gap-2 group">
+                                                <Swords size={18} className="text-red-500 group-hover:animate-pulse" /> Nuke Enemies
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const targetRoom = window.prompt('Enter room ID to spawn boss in:');
+                                                    if (targetRoom) {
+                                                        import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: targetRoom }));
+                                                    }
+                                                }}
+                                                className="flex-1 bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-[10px] uppercase flex items-center justify-center gap-2 group">
+                                                <Target size={18} className="text-red-500 group-hover:animate-pulse" /> Force Boss
+                                            </button>
+                                        </div>
                                         <button
                                             onClick={() => {
-                                                const targetRoom = window.prompt('Enter room ID to spawn boss in:');
-                                                if (targetRoom) {
-                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: targetRoom }));
+                                                const targetUser = window.prompt('Enter target username to wipe:');
+                                                if (targetUser && window.confirm(`WARNING: This will delete ALL progress for ${targetUser}. Continue?`)) {
+                                                    import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_account', { targetUser }));
                                                 }
                                             }}
-                                            className="w-full bg-red-900/20 border border-red-500/30 text-red-400 font-black py-4 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:text-white transition-all text-xs uppercase flex items-center justify-center gap-3 group">
-                                            <Target size={18} className="text-red-500 group-hover:animate-pulse" /> Force Spawn Boss
+                                            className="w-full bg-red-900/40 border border-red-500/80 text-red-200 font-black py-3 rounded-xl hover:bg-red-600 hover:text-white transition-all text-[10px] uppercase tracking-widest mt-4">
+                                            ⚠️ Wipe Player Account ⚠️
                                         </button>
                                     </div>
                                 </div>
