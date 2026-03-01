@@ -551,16 +551,21 @@ function App() {
         // *** MAP VOTE FALLBACK: detect active vote from periodic state ***
         // Only SET data from state — never CLEAR it (clearing is handled by map_change event / expiry)
         const sv = (state as any).mapVote;
-        if (sv?.active && sv.options?.length > 0 && sv.endTime > Date.now()) {
-          if (!mapVoteActiveRef.current) {
+        if (sv?.active && sv.options?.length > 0 && sv.timeLeft > 0) {
+          setMapVoteData(prev => {
+            // If already showing the vote, just update tally to avoid re-rendering and resetting the local timer
+            if (prev && mapVoteActiveRef.current) {
+              return { ...prev, tally: sv.tally || {} };
+            }
+            // Otherwise start the vote (fallback for missed map_vote_start event)
             mapVoteActiveRef.current = true;
             setMapVoteMyVote(null);
             setMapChangeResult(null);
-          }
-          setMapVoteData({
-            options: sv.options,
-            tally: sv.tally || {},
-            endTime: sv.endTime
+            return {
+              options: sv.options,
+              tally: sv.tally || {},
+              endTime: Date.now() + sv.timeLeft
+            };
           });
         }
       }

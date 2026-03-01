@@ -2604,7 +2604,7 @@ setInterval(() => {
                 currentMap: room.currentMap || 'arena_open',
                 mapVote: (room.mapVote && room.mapVote.active) ? {
                     active: true,
-                    endTime: room.mapVote.endTime,
+                    timeLeft: Math.max(0, room.mapVote.endTime - now),
                     options: room.mapVote.options.map(id => ({ id, ...MAPS[id] })),
                     tally: (() => {
                         const t = {};
