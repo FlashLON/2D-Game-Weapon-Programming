@@ -201,6 +201,23 @@ const TITLES_LIST = [
     'god', 'godkiller', 'immortal', 'trueking', 'theultragod'
 ];
 
+// Helper: create a clean profile object for client (strip password, internal fields)
+function cleanProfileForClient(user) {
+    return {
+        username: user.username,
+        level: user.level || 1,
+        xp: user.xp || 0,
+        maxXp: user.maxXp || 100,
+        money: user.money || 0,
+        unlocks: user.unlocks || ['speed', 'damage'],
+        limits: user.limits || { speed: 200, damage: 5 },
+        titles: user.titles && user.titles.length > 0 ? user.titles : ['beginner'],
+        equippedTitle: user.equippedTitle || null,
+        killCount: user.killCount || 0,
+        aura_type: user.aura_type || null
+    };
+}
+
 function unlockTitle(username, titleId, socket) {
     console.log(`[TITLE] Attempting to unlock "${titleId}" for ${username}`);
 
@@ -223,7 +240,7 @@ function unlockTitle(username, titleId, socket) {
             console.log(`[TITLE] Sending notification to socket ${socket.id}`);
             socket.emit('notification', { type: 'unlock', message: `Title Unlocked: ${titleId.toUpperCase()}` });
             // FORCE UPDATE CLIENT PROFILE
-            socket.emit('profile_update', user);
+            socket.emit('profile_update', cleanProfileForClient(user));
         } else {
             console.log(`[TITLE] ⚠️ No socket provided for ${username}`);
         }
@@ -766,6 +783,40 @@ io.on('connection', (socket) => {
 
     socket.on('save_profile', ({ profile }) => {
         if (socket.data.username && profile) {
+            // Guard: don't let client profile sync overwrite admin-set values
+            // If the server user has higher level/money than what client sent, keep server values
+            const serverUser = memoryUsers.get(socket.data.username);
+            if (serverUser) {
+                if (serverUser.level > (profile.level || 0)) profile.level = serverUser.level;
+                if (serverUser.money > (profile.money || 0)) profile.money = serverUser.money;
+                if (serverUser.maxXp > (profile.maxXp || 0)) profile.maxXp = serverUser.maxXp;
+                if (serverUser.killCount > (profile.killCount || 0)) profile.killCount = serverUser.killCount;
+                // Keep server limits if they are higher (admin maxed)
+                if (serverUser.limits) {
+                    profile.limits = profile.limits || {};
+                    for (const key of Object.keys(serverUser.limits)) {
+                        if (key === 'cooldown') {
+                            // For cooldown, lower is better
+                            if ((serverUser.limits[key] || 999) < (profile.limits[key] || 999)) {
+                                profile.limits[key] = serverUser.limits[key];
+                            }
+                        } else {
+                            if ((serverUser.limits[key] || 0) > (profile.limits[key] || 0)) {
+                                profile.limits[key] = serverUser.limits[key];
+                            }
+                        }
+                    }
+                }
+                // Keep server titles if there are more
+                if (serverUser.titles && serverUser.titles.length > (profile.titles?.length || 0)) {
+                    profile.titles = serverUser.titles;
+                }
+                // Keep server unlocks if there are more
+                if (serverUser.unlocks && serverUser.unlocks.length > (profile.unlocks?.length || 0)) {
+                    profile.unlocks = serverUser.unlocks;
+                }
+            }
+
             saveProgress(socket.data.username, profile);
 
             // Sync current room player if active
@@ -894,7 +945,7 @@ io.on('connection', (socket) => {
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
-                                    s.emit('profile_update', user);
+                                    s.emit('profile_update', cleanProfileForClient(user));
                                     for (const roomId in rooms) {
                                         if (rooms[roomId].players[s.id]) rooms[roomId].players[s.id].money = user.money;
                                     }
@@ -915,7 +966,7 @@ io.on('connection', (socket) => {
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
-                                    s.emit('profile_update', user);
+                                    s.emit('profile_update', cleanProfileForClient(user));
                                     for (const roomId in rooms) {
                                         if (rooms[roomId].players[s.id]) {
                                             rooms[roomId].players[s.id].level = user.level;
@@ -940,7 +991,7 @@ io.on('connection', (socket) => {
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
-                                    s.emit('profile_update', user);
+                                    s.emit('profile_update', cleanProfileForClient(user));
                                     for (const roomId in rooms) {
                                         if (rooms[roomId].players[s.id]) rooms[roomId].players[s.id].titles = user.titles;
                                     }
@@ -963,7 +1014,7 @@ io.on('connection', (socket) => {
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
-                                    s.emit('profile_update', user);
+                                    s.emit('profile_update', cleanProfileForClient(user));
                                     for (const roomId in rooms) {
                                         if (rooms[roomId].players[s.id]) {
                                             rooms[roomId].players[s.id].limits = user.limits;
@@ -996,7 +1047,7 @@ io.on('connection', (socket) => {
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
-                                    s.emit('profile_update', user);
+                                    s.emit('profile_update', cleanProfileForClient(user));
                                     for (const roomId in rooms) {
                                         if (rooms[roomId].players[s.id]) {
                                             const p = rooms[roomId].players[s.id];
@@ -1038,7 +1089,7 @@ io.on('connection', (socket) => {
                         upsertUser(targetNameKey, user).then(() => {
                             for (const s of io.sockets.sockets.values()) {
                                 if (s.data.username === targetNameKey) {
-                                    s.emit('profile_update', user);
+                                    s.emit('profile_update', cleanProfileForClient(user));
                                     for (const roomId in rooms) {
                                         if (rooms[roomId].players[s.id]) {
                                             const p = rooms[roomId].players[s.id];
