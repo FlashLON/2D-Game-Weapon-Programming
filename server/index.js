@@ -395,8 +395,8 @@ const MAP_IDS = Object.keys(MAPS);
 
 // MAP VOTING STATE — per room
 // room.mapVote = { options: [], votes: {socketId: mapId}, endTime: ms, active: bool }
-const MAP_VOTE_INTERVAL = 60 * 1000; // 60 seconds between votes
-const MAP_VOTE_DURATION = 20 * 1000;  // 20 seconds to vote
+const MAP_VOTE_INTERVAL = 30 * 1000; // 30 seconds between votes
+const MAP_VOTE_DURATION = 15 * 1000;  // 15 seconds to vote
 
 function startMapVote(roomId) {
     console.log(`[VOTE] Attempting to start vote in room ${roomId}...`);
@@ -918,6 +918,12 @@ io.on('connection', (socket) => {
         console.log(`[ADMIN] Command received: ${command}`, payload);
 
         switch (command) {
+            case 'force_vote':
+                io.emit('notification', { type: 'unlock', message: `[SYS ADMIN] Forcing Map Vote` });
+                if (currentRoomId) {
+                    startMapVote(currentRoomId);
+                }
+                break;
             case 'broadcast':
                 io.emit('notification', { type: 'unlock', message: `[SYS ADMIN] ${payload.message}` });
                 break;

@@ -398,18 +398,7 @@ function App() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.shiftKey && e.key === 'V' && currentRoomRef.current && currentRoomRef.current !== 'offline') {
-        setMapVoteMyVote(null);
-        setMapChangeResult(null);
-        setMapVoteData({
-          options: [
-            { id: 'arena_open', name: 'Open Field', description: 'No obstacles', color: '#00ff9f' },
-            { id: 'arena_cross', name: 'Cross Roads', description: 'Two intersecting walls', color: '#ff6b6b' },
-            { id: 'arena_maze', name: 'Maze Runner', description: 'Complex maze structure', color: '#a78bfa' },
-          ],
-          tally: { arena_open: 0, arena_cross: 0, arena_maze: 0 },
-          endTime: Date.now() + 20000
-        });
-        mapVoteActiveRef.current = true;
+        networkManager.adminCommand('force_vote');
       }
     };
     window.addEventListener('keydown', handler);
@@ -554,11 +543,6 @@ function App() {
               endTime: Date.now() + sv.timeLeft
             };
           });
-        } else if (mapVoteActiveRef.current) {
-          // The server state says there's no active vote, but local UI thinks there is.
-          // This means we missed the map_change event entirely!
-          mapVoteActiveRef.current = false;
-          setMapVoteData(null);
         }
       }
     });
