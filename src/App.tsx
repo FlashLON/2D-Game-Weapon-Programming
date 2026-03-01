@@ -161,8 +161,10 @@ function App() {
     const attr = ATTRIBUTES[attributeId];
     if (!attr) return;
 
-    const currentLimit = userProfile.limits[attributeId] || attr.startLimit;
+    const currentLimit = userProfile.limits[attributeId] ?? attr.startLimit;
     const cost = getUpgradeCost(attributeId, currentLimit);
+    const isInverted = attr.upgradeStep < 0; // lower is better (cooldown, aura_control)
+    const isMaxed = isInverted ? currentLimit <= attr.maxLimit : currentLimit >= attr.maxLimit;
 
     // LEVEL RESTRICTION: Once per level for HP/Cooldown
     const lastLevel = userProfile.lastUpgradeLevel?.[attributeId] || 0;
@@ -171,12 +173,18 @@ function App() {
       return;
     }
 
+    // If it's an aura and already maxed, just equip it (don't block)
+    if (attr.isAura && isMaxed) {
+      handleEquipAura(attributeId);
+      return;
+    }
+
     if (userProfile.money < cost) {
       addLog(`Not enough money! Need $${cost.toLocaleString()}`, 'error');
       return;
     }
 
-    if (currentLimit >= attr.maxLimit) {
+    if (isMaxed) {
       addLog(`${attr.name} is already maxed out!`, 'warning');
       return;
     }
@@ -198,6 +206,21 @@ function App() {
     }));
 
     addLog(`Upgraded ${attr.name} to ${newLimit}!`, 'success');
+  };
+
+  const handleEquipAura = (auraId: string) => {
+    const attr = ATTRIBUTES[auraId];
+    if (!attr || !attr.isAura) return;
+
+    // Toggle: if same aura, unequip
+    if (userProfile.aura_type === auraId) {
+      setUserProfile((prev: any) => ({ ...prev, aura_type: null }));
+      addLog(`Unequipped ${attr.name}`, 'info');
+      return;
+    }
+
+    setUserProfile((prev: any) => ({ ...prev, aura_type: auraId }));
+    addLog(`AURA EQUIPPED: ${attr.name}!`, 'success');
   };
 
   // ENFORCEMENT LOGIC (Shared for api.spawn_projectile and gameEngine.fireWeapon)
@@ -764,6 +787,7 @@ function App() {
             isLoggedIn={isLoggedIn}
             username={username}
             onUpgrade={handleUpgrade}
+            onEquipAura={handleEquipAura}
             leaderboard={globalLeaderboard}
             savedCodes={savedCodes}
             onLoadCode={handleLoadCode}

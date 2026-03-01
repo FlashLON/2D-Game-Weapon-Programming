@@ -28,6 +28,7 @@ interface LobbyProps {
     isLoggedIn?: boolean;
     username?: string;
     onUpgrade?: (attributeId: string) => void;
+    onEquipAura?: (auraId: string) => void;
     onSignup?: (username: string, password?: string) => void;
     leaderboard?: any[];
     savedCodes?: SavedCode[];
@@ -57,7 +58,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     onDeleteCode,
     onRenameCode,
     loadingSavedCodes = false,
-    onEquipTitle
+    onEquipTitle,
+    onEquipAura
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
@@ -447,15 +449,14 @@ export const Lobby: React.FC<LobbyProps> = ({
                                             <div className="grid grid-cols-1 gap-4 pb-4">
                                                 {Object.values(ATTRIBUTES).map((attr) => {
                                                     const isUnlocked = attr.isBase || userProfile.unlocks.includes(attr.id);
-                                                    const currentLimit = userProfile.limits[attr.id] || attr.startLimit;
-                                                    const isMaxed = currentLimit >= attr.maxLimit;
+                                                    const currentLimit = userProfile.limits[attr.id] ?? attr.startLimit;
+                                                    const isInverted = attr.upgradeStep < 0; // lower is better (cooldown, aura_control)
+                                                    const isMaxed = isInverted ? currentLimit <= attr.maxLimit : currentLimit >= attr.maxLimit;
                                                     const upgradeCost = getUpgradeCost(attr.id, currentLimit);
                                                     const canAfford = userProfile.money >= upgradeCost;
                                                     const Icon = attr.icon;
 
-                                                    if (attr.isAura && userProfile.aura_type && userProfile.aura_type !== attr.id) {
-                                                        return null;
-                                                    }
+                                                    // Show all auras, don't hide non-equipped ones
 
                                                     if (!isUnlocked) return (
                                                         <div key={attr.id} className="bg-black/20 border border-cyber-muted/10 rounded-2xl p-4 opacity-50 flex items-center gap-4">
@@ -491,7 +492,11 @@ export const Lobby: React.FC<LobbyProps> = ({
                                                             <div className="w-full bg-black/40 rounded-full h-1 mb-4 overflow-hidden">
                                                                 <div
                                                                     className="bg-cyber-accent h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,255,159,0.5)]"
-                                                                    style={{ width: `${(currentLimit / attr.maxLimit) * 100}%` }}
+                                                                    style={{
+                                                                        width: `${isInverted
+                                                                            ? ((attr.startLimit - currentLimit) / (attr.startLimit - attr.maxLimit)) * 100
+                                                                            : (currentLimit / attr.maxLimit) * 100}%`
+                                                                    }}
                                                                 />
                                                             </div>
 
@@ -506,10 +511,27 @@ export const Lobby: React.FC<LobbyProps> = ({
                                                                         className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2 transition-all ${canAfford ? 'bg-cyber-accent text-black hover:bg-emerald-400 active:scale-[0.98]' : 'bg-white/5 text-cyber-muted cursor-not-allowed grayscale'}`}
                                                                     >
                                                                         <TrendingUp size={14} />
-                                                                        Upgrade Limit
+                                                                        {attr.isAura ? 'Upgrade & Equip' : 'Upgrade Limit'}
                                                                         <span className="ml-auto opacity-70 tracking-widest">${upgradeCost.toLocaleString()}</span>
                                                                     </button>
                                                                 </div>
+                                                            ) : attr.isAura ? (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (onEquipAura) onEquipAura(attr.id);
+                                                                    }}
+                                                                    className={`w-full py-2.5 rounded-xl font-black text-[10px] uppercase text-center flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${userProfile.aura_type === attr.id
+                                                                        ? 'bg-purple-500/30 border-2 border-purple-500 text-purple-300 hover:bg-red-500/20 hover:border-red-500 hover:text-red-300'
+                                                                        : 'bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:border-purple-500/60'
+                                                                        }`}
+                                                                >
+                                                                    {userProfile.aura_type === attr.id ? (
+                                                                        <><CheckCircle2 size={14} /> Equipped — Click to Unequip</>
+                                                                    ) : (
+                                                                        <><Swords size={14} /> Equip Aura</>
+                                                                    )}
+                                                                </button>
                                                             ) : (
                                                                 <div className="w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 font-black text-[10px] uppercase text-center flex items-center justify-center gap-2">
                                                                     <CheckCircle2 size={14} /> Neural Overload Reached

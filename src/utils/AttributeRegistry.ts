@@ -518,7 +518,8 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
 export function getUpgradeCost(attributeId: string, currentLimit: number): number {
     const attr = ATTRIBUTES[attributeId];
     if (!attr) return 999999;
-    const upgrades = Math.max(0, Math.round((currentLimit - attr.startLimit) / Math.max(0.001, attr.upgradeStep)));
+    const step = Math.abs(attr.upgradeStep) || 0.001;
+    const upgrades = Math.max(0, Math.round(Math.abs(currentLimit - attr.startLimit) / step));
     return Math.floor(attr.baseCost * Math.pow(attr.costMultiplier, upgrades));
 }
 
