@@ -795,8 +795,8 @@ io.on('connection', (socket) => {
                 if (serverUser.limits) {
                     profile.limits = profile.limits || {};
                     for (const key of Object.keys(serverUser.limits)) {
-                        if (key === 'cooldown') {
-                            // For cooldown, lower is better
+                        if (key === 'cooldown' || key === 'aura_control') {
+                            // For cooldown and aura_control, lower is better
                             if ((serverUser.limits[key] || 999) < (profile.limits[key] || 999)) {
                                 profile.limits[key] = serverUser.limits[key];
                             }
