@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Terminal, Sword, Target, Share2 } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Terminal, Sword, ShieldAlert, Zap, Globe } from 'lucide-react';
 
 interface TutorialProps {
     onClose: () => void;
@@ -10,70 +10,87 @@ const STEPS = [
         title: "Welcome to CyberCore",
         icon: <Terminal size={48} className="text-cyber-accent" />,
         content: (
-            <p>
-                CyberCore is a programmable arena shooter. Instead of just clicking to shoot,
-                you <strong>write Python code</strong> to define how your weapon behaves.
-                <br /><br />
-                Your goal involves designing smart projectiles, predicting enemy movement, and outsmarting opponents with superior logic.
-            </p>
-        )
-    },
-    {
-        title: "The Weapon Editor",
-        icon: <Target size={48} className="text-blue-400" />,
-        content: (
-            <div className="space-y-4">
+            <div className="space-y-4 text-left">
                 <p>
-                    On the left side of the screen is the <strong>Weapon Editor</strong>.
+                    CyberCore is a top-down arena shooter with a twist: <strong>you program your weapon using Python.</strong>
                 </p>
-                <div className="bg-black/50 p-4 rounded-lg font-mono text-xs text-gray-300 border border-cyber-muted">
-                    <span className="text-purple-400">def</span> <span className="text-yellow-400">on_fire</span>(tx, ty, mx, my):<br />
-                    &nbsp;&nbsp;<span className="text-gray-500"># Return projectile stats</span><br />
-                    &nbsp;&nbsp;<span className="text-purple-400">return</span> {"{"}<br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">"speed"</span>: 300,<br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">"damage"</span>: 50,<br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">"homing"</span>: 1.0<br />
-                    &nbsp;&nbsp;{"}"}
-                </div>
                 <p>
-                    Use the <code>on_fire</code> function to return a dictionary of properties for your projectile.
+                    Use <strong className="text-white">W A S D</strong> to move and click your mouse to fire. Your goal is to survive endless waves of enemies or battle it out against other players.
                 </p>
             </div>
         )
     },
     {
-        title: "Multiplayer Logic",
-        icon: <Share2 size={48} className="text-emerald-400" />,
+        title: "Economy & Upgrades",
+        icon: <Zap size={48} className="text-blue-400" />,
         content: (
-            <p>
-                When you play online, your code runs locally, but the <strong>Server</strong> validates all actions.
-                <br /><br />
-                You can create <strong>Public</strong> or <strong>Private</strong> lobbies.
-                <ul className="list-disc list-inside mt-2 text-cyber-muted">
-                    <li><strong>Private:</strong> Share the room code with friends.</li>
-                    <li><strong>Public:</strong> Match with anyone looking for a fight.</li>
+            <div className="space-y-4 text-left">
+                <p>
+                    Destroy enemies to earn <strong>XP</strong> and <strong>Money</strong>.
+                </p>
+                <ul className="list-disc list-inside mt-2 text-cyber-muted space-y-2">
+                    <li><strong className="text-emerald-400">Level Ups:</strong> Grant you access to new attribute limits.</li>
+                    <li><strong className="text-yellow-400">Money:</strong> Used in the Lobby to upgrade your attributes.</li>
                 </ul>
-            </p>
+                <p>
+                    There are <strong>43 unique attributes</strong> (like Homing, Pierce, Chain Lightning, Explosions) that you can unlock and upgrade.
+                </p>
+            </div>
         )
     },
     {
-        title: "Combat Tips",
-        icon: <Sword size={48} className="text-red-400" />,
+        title: "The Weapon Code",
+        icon: <Sword size={48} className="text-purple-400" />,
         content: (
-            <ul className="space-y-2">
-                <li className="flex gap-2">
-                    <span className="text-cyber-accent">➢</span>
-                    <span>Use <code>api.get_nearest_enemy()</code> to auto-target.</span>
-                </li>
-                <li className="flex gap-2">
-                    <span className="text-cyber-accent">➢</span>
-                    <span>Experiment with <strong>homing</strong> and <strong>acceleration</strong>.</span>
-                </li>
-                <li className="flex gap-2">
-                    <span className="text-cyber-accent">➢</span>
-                    <span>Try the <strong>Solo Sandbox</strong> to test safely.</span>
-                </li>
-            </ul>
+            <div className="space-y-4 text-left">
+                <p>
+                    In the match, open the <strong>Weapon Editor</strong> to write real Python code that controls your projectiles.
+                </p>
+                <div className="bg-black/50 p-4 rounded-lg font-mono text-xs text-gray-300 border border-cyber-muted">
+                    <span className="text-purple-400">def</span> <span className="text-yellow-400">on_fire</span>(tx, ty, mx, my):<br />
+                    &nbsp;&nbsp;<span className="text-purple-400">return</span> {"{"}<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">"speed"</span>: 800,<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">"homing"</span>: 10,<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-green-400">"pierce"</span>: 3<br />
+                    &nbsp;&nbsp;{"}"}
+                </div>
+                <p>
+                    Your code's requested values are <strong>automatically capped</strong> by your upgraded limits. You can't shoot faster or harder than your current hardware allows!
+                </p>
+            </div>
+        )
+    },
+    {
+        title: "Auras & Titles",
+        icon: <ShieldAlert size={48} className="text-emerald-400" />,
+        content: (
+            <div className="space-y-4 text-left">
+                <p>
+                    <strong>Auras</strong> are passive area-of-effect abilities.
+                </p>
+                <p>
+                    You can equip one aura at a time (e.g., <span className="text-green-400">Corruption</span> for poison, <span className="text-purple-400">Gravity</span> for pulling). They affect <strong>everyone</strong> in range. Upgrading an aura increases its strength and radius.
+                </p>
+                <p>
+                    <strong>Titles</strong> display next to your name and are earned by achieving feats (e.g., Maxing out stats, playing for 30 minutes without shooting).
+                </p>
+            </div>
+        )
+    },
+    {
+        title: "Multiplayer Modes",
+        icon: <Globe size={48} className="text-red-400" />,
+        content: (
+            <div className="space-y-4 text-left">
+                <p>
+                    You can play Solo, or join a Room.
+                </p>
+                <ul className="list-disc list-inside mt-2 text-cyber-muted space-y-2">
+                    <li><strong className="text-white">Co-op Waves:</strong> Team up to survive endless enemies. A powerful Boss spawns every 5 waves!</li>
+                    <li><strong className="text-white">PvP Arena:</strong> Free-for-all combat against other players. Use your custom weapon scripts to dominate.</li>
+                    <li><strong className="text-white">Map Voting:</strong> Between rounds, vote for the next arena layout.</li>
+                </ul>
+            </div>
         )
     }
 ];
@@ -103,7 +120,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onClose }) => {
                         {STEPS[step].icon}
                     </div>
                     <h3 className="text-3xl font-bold text-white mb-6">{STEPS[step].title}</h3>
-                    <div className="text-lg text-gray-300 leading-relaxed max-w-lg">
+                    <div className="text-sm text-gray-300 leading-relaxed max-w-lg">
                         {STEPS[step].content}
                     </div>
                 </div>
@@ -134,7 +151,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onClose }) => {
                         }}
                         className="px-6 py-3 rounded-xl font-bold flex items-center gap-2 bg-cyber-accent text-black hover:bg-emerald-400 transition-all shadow-lg shadow-cyber-accent/20"
                     >
-                        {step === STEPS.length - 1 ? "GET STARTED" : "NEXT"} <ChevronRight size={20} />
+                        {step === STEPS.length - 1 ? "ENTER CORE" : "NEXT"} <ChevronRight size={20} />
                     </button>
                 </div>
             </div>
