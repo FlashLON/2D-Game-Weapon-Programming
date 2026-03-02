@@ -373,7 +373,7 @@ function App() {
   // Use a ref for the current room to avoid stale closures in socket callbacks
   const currentRoomRef = useRef<string | null>(null);
 
-  const handleJoinRoom = (roomId: string, settings?: any) => {
+  const handleJoinRoom = (roomId: string, settings?: any, isTravel: boolean = false) => {
     setCurrentRoom(roomId);
     setIsSpectator(false);
     currentRoomRef.current = roomId;
@@ -381,8 +381,12 @@ function App() {
       gameEngine.setMultiplayerMode(false);
       addLog("Starting Solo Sandbox", "info");
     } else {
+      // If we are traveling because the leader moved, we DON'T want to emit a new join_room,
+      // because the server already put us in the room and will init us! Wait, actually if we emit join_room
+      // it might create a loop if we aren't careful, BUT the server does need to give us our init payload.
+      // Let's just pass `isTravel` flag to the settings and let the networkManager join room.
       networkManager.joinRoom(roomId, settings, userProfile);
-      addLog(`Joined party: ${roomId.toUpperCase()}`, "success");
+      addLog(isTravel ? `Followed leader to: ${roomId.toUpperCase()}` : `Joined room: ${roomId.toUpperCase()}`, "success");
     }
   };
 
@@ -663,8 +667,9 @@ function App() {
     });
 
     networkManager.setOnPartyRoomTravel((data) => {
-      handleJoinRoom(data.roomId, data.settings);
-      addLog(`⚡ Party Travel: Following Leader to ${data.roomId.toUpperCase()}`, 'info');
+      // The leader moved; pass true for `isTravel` flag to handleJoinRoom
+      handleJoinRoom(data.roomId, { ...data.settings, isTravel: true }, true);
+      addLog(`⚡ Party Travel: Following Leader to ${data.roomId ? data.roomId.toUpperCase() : 'LOBBY'}`, 'info');
     });
 
     return () => {

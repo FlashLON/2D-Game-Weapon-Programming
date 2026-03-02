@@ -820,10 +820,13 @@ io.on('connection', (socket) => {
         leaveRoom(socket.id);
         if (currentRoomId) socket.leave(currentRoomId);
 
+        const isTravel = settings?.isTravel === true;
+
         // --- PARTY TRAVEL LOGIC ---
         // Both for joining AND leaving (roomId: '')
+        // Only trigger travel if the joining player is the leader AND they are NOT traveling themselves
         const partyId = socket.data?.partyId;
-        if (partyId && parties[partyId] && parties[partyId].leader === socket.id) {
+        if (!isTravel && partyId && parties[partyId] && parties[partyId].leader === socket.id) {
             const party = parties[partyId];
             party.members.forEach(m => {
                 if (m.socketId !== socket.id) {
