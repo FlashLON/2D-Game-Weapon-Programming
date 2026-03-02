@@ -199,7 +199,7 @@ async function getGlobalLeaderboard() {
 function getMemoryLeaderboard() {
     // Memory fallback
     return Array.from(memoryUsers.values())
-        .filter(u => u && u.username)
+        .filter(u => u && u.username && !u.username.startsWith('CyberBot_'))
         .sort((a, b) => (b.level || 1) - (a.level || 1))
         .slice(0, 10)
         .map(u => ({ username: u.username, level: u.level || 1, money: u.money || 0 }));
@@ -2040,6 +2040,8 @@ io.on('connection', (socket) => {
 
 async function saveProgress(username, stats) {
     if (!username || !stats) return;
+    // Never save bot data
+    if (stats.isBot || (username && username.startsWith('CyberBot_'))) return;
     try {
         await upsertUser(username, stats);
         const mode = firebaseDb ? '☁️ [Firebase]' : '💾 [Memory]';
@@ -2699,7 +2701,7 @@ setInterval(() => {
                                     const winnerIds = room.teams[winnerTeam] || [];
                                     winnerIds.forEach(id => {
                                         const p = room.players[id];
-                                        if (p) {
+                                        if (p && !p.isBot) {
                                             p.xp = (p.xp || 0) + (gameConfig.arena_match_reward_xp * gameConfig.xp_multiplier);
                                             p.money = (p.money || 0) + (gameConfig.arena_match_reward_money * gameConfig.money_multiplier);
                                             saveProgress(p.username, p);
@@ -2715,7 +2717,7 @@ setInterval(() => {
                                 ent.x = Math.random() * 700 + 50;
                                 ent.y = Math.random() * 500 + 50;
                             }
-                            if (room.players[proj.playerId]) {
+                            if (room.players[proj.playerId] && !room.players[proj.playerId].isBot) {
                                 const killer = room.players[proj.playerId];
                                 killer.kills++;
                                 killer.xp += (gameConfig.kill_reward_xp * gameConfig.xp_multiplier);
