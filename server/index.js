@@ -56,9 +56,49 @@ if (!memoryUsers.has('flashlon')) {
     } catch (e) { }
 }
 
+// --- REMOTE CONFIG SETUP ---
+let remoteConfig = null;
+const gameConfig = {
+    xp_multiplier: 1.0,
+    money_multiplier: 1.0,
+    base_enemy_hp: 100,
+    base_enemy_speed: 150,
+    arena_match_reward_xp: 100,
+    arena_match_reward_money: 50,
+    kill_reward_xp: 50,
+    kill_reward_money: 25,
+    matchmaking_min_players: 4,
+    coop_wave_interval: 10000,
+    maintenance_mode: false,
+    announcement: "Welcome to CyberCore Arena!"
+};
+
+async function fetchRemoteConfig() {
+    if (!remoteConfig) return;
+    try {
+        const template = await remoteConfig.getTemplate();
+        const params = template.parameters || {};
+
+        for (const [key, param] of Object.entries(params)) {
+            if (gameConfig.hasOwnProperty(key)) {
+                const value = param.defaultValue.value;
+                if (typeof gameConfig[key] === 'number') {
+                    gameConfig[key] = parseFloat(value);
+                } else if (typeof gameConfig[key] === 'boolean') {
+                    gameConfig[key] = value === 'true';
+                } else {
+                    gameConfig[key] = value;
+                }
+            }
+        }
+        console.log("📡 Remote Config Synchronized");
+    } catch (err) {
+        console.warn("⚠️ Failed to fetch Remote Config, using local defaults:", err.message);
+    }
+}
+
 if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
     try {
-        // Check if Firebase is already initialized
         if (!admin.apps.length) {
             admin.initializeApp({
                 credential: admin.credential.cert({
@@ -70,15 +110,17 @@ if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
             });
         }
         firebaseDb = admin.database();
-        console.log("✅ Connected to Firebase: " + FIREBASE_PROJECT_ID);
+        remoteConfig = admin.remoteConfig();
+        console.log("✅ Connected to Firebase & Remote Config: " + FIREBASE_PROJECT_ID);
+
+        fetchRemoteConfig();
+        setInterval(fetchRemoteConfig, 15 * 60 * 1000);
     } catch (err) {
         console.error("❌ Firebase Initialization Error:", err.message);
-        console.warn("⚠️ Persistence disabled. Server will use temporary In-Memory storage.");
         firebaseDb = null;
     }
 } else {
     console.warn("⚠️ Firebase Credentials missing in .env. Server running in 'In-Memory' mode.");
-    console.warn("Required env variables: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_DATABASE_URL");
 }
 
 // --- ACCOUNT HELPERS ---
@@ -728,6 +770,12 @@ io.on('connection', (socket) => {
                 }
             });
 
+            // Send System Announcement on login
+            socket.emit('notification', {
+                type: 'unlock',
+                message: `📢 SYSTEM: ${gameConfig.announcement}`
+            });
+
             // Immediately send leaderboard
             const leaderboard = await getGlobalLeaderboard();
             socket.emit('global_leaderboard', leaderboard);
@@ -817,6 +865,15 @@ io.on('connection', (socket) => {
     });
 
     socket.on('join_room', ({ roomId, settings, profile }) => {
+        // Maintenance Mode Check
+        if (gameConfig.maintenance_mode && socket.data.username !== 'flashlon') {
+            socket.emit('notification', {
+                type: 'error',
+                message: '🚨 Server is currently under maintenance. Please try again soon!'
+            });
+            return;
+        }
+
         leaveRoom(socket.id);
         if (currentRoomId) socket.leave(currentRoomId);
 
@@ -2557,8 +2614,8 @@ setInterval(() => {
                                     winnerIds.forEach(id => {
                                         const p = room.players[id];
                                         if (p) {
-                                            p.xp = (p.xp || 0) + 100;
-                                            p.money = (p.money || 0) + 50;
+                                            p.xp = (p.xp || 0) + (gameConfig.arena_match_reward_xp * gameConfig.xp_multiplier);
+                                            p.money = (p.money || 0) + (gameConfig.arena_match_reward_money * gameConfig.money_multiplier);
                                             saveProgress(p.username, p);
                                         }
                                     });
@@ -2575,8 +2632,8 @@ setInterval(() => {
                             if (room.players[proj.playerId]) {
                                 const killer = room.players[proj.playerId];
                                 killer.kills++;
-                                killer.xp += 50;
-                                killer.money += 25;
+                                killer.xp += (gameConfig.kill_reward_xp * gameConfig.xp_multiplier);
+                                killer.money += (gameConfig.kill_reward_money * gameConfig.money_multiplier);
                                 killer.killstreak = (killer.killstreak || 0) + 1; // Increment streak
 
                                 console.log(`[KILL] ${killer.username} got a kill! Session kills: ${killer.kills}, Killstreak: ${killer.killstreak}`);
