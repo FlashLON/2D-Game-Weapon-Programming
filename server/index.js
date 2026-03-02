@@ -1891,7 +1891,7 @@ io.on('connection', (socket) => {
             id: socket.id,
             type: 'player',
             x: spawnX, y: spawnY,
-            radius: 16,
+            radius: 20,
             color: teamColor,
             hp: user?.limits?.hp || 100,
             maxHp: user?.limits?.hp || 100,
@@ -2651,6 +2651,27 @@ setInterval(() => {
                                 ent.hp = 0;
                                 ent.x = -99999;
                                 ent.deaths = (ent.deaths || 0) + 1;
+
+                                // Notify room about elimination for spectator mode
+                                io.to(roomId).emit('player_eliminated', {
+                                    eliminatedId: ent.id,
+                                    eliminatedName: ent.username || 'Unknown',
+                                    killerName: room.players[proj.playerId]?.username || 'Unknown',
+                                    team: ent.team
+                                });
+
+                                // If the eliminated player is a real socket, tell them to spectate
+                                const elimSock = io.sockets.sockets.get(ent.id);
+                                if (elimSock) {
+                                    // Find a surviving teammate to follow
+                                    const sameTeam = Object.values(room.players).filter(
+                                        p => p.team === ent.team && !p.dead && p.id !== ent.id
+                                    );
+                                    elimSock.emit('enter_spectator', {
+                                        followId: sameTeam.length > 0 ? sameTeam[0].id : null,
+                                        message: 'You have been eliminated!'
+                                    });
+                                }
 
                                 // Check if entire team is eliminated
                                 const victimTeam = ent.team;

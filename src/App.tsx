@@ -655,6 +655,21 @@ function App() {
       setTimeout(() => setMatchResult(null), 8000);
     });
 
+    // 2v2 Spectator mode on death
+    networkManager.setOnEnterSpectator((data) => {
+      setIsSpectator(true);
+      addLog(`💀 ${data.message || 'You have been eliminated!'}`, 'error');
+      if (data.followId) {
+        // Follow the surviving teammate
+        gameEngine.setMultiplayerMode(true, data.followId);
+        addLog(`👁 Spectating teammate...`, 'info');
+      }
+    });
+
+    networkManager.setOnPlayerEliminated((data) => {
+      addLog(`☠️ ${data.eliminatedName} was eliminated by ${data.killerName}!`, 'error');
+    });
+
     // Party events
     networkManager.setOnPartyUpdate((data) => {
       setPartyData(data);

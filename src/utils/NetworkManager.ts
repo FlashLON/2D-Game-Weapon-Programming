@@ -70,6 +70,8 @@ class NetworkManager {
     private onMatchFound: ((data: any) => void) | null = null;
     private onMatchResult: ((data: any) => void) | null = null;
     private onPartyUpdate: ((data: any) => void) | null = null;
+    private onEnterSpectator: ((data: any) => void) | null = null;
+    private onPlayerEliminated: ((data: any) => void) | null = null;
 
     connect(serverUrl: string): Promise<boolean> {
         return new Promise((resolve) => {
@@ -138,6 +140,8 @@ class NetworkManager {
             this.socket.on('match_found', (data: any) => this.onMatchFound?.(data));
             this.socket.on('match_result', (data: any) => this.onMatchResult?.(data));
             this.socket.on('party_update', (data: any) => this.onPartyUpdate?.(data));
+            this.socket.on('enter_spectator', (data: any) => this.onEnterSpectator?.(data));
+            this.socket.on('player_eliminated', (data: any) => this.onPlayerEliminated?.(data));
 
             // Debug: Log all incoming events
             this.socket.onAny((ev, ...args) => {
@@ -351,6 +355,8 @@ class NetworkManager {
     setOnQueueUpdate(cb: (data: any) => void) { this.onQueueUpdate = cb; }
     setOnMatchFound(cb: (data: any) => void) { this.onMatchFound = cb; }
     setOnMatchResult(cb: (data: any) => void) { this.onMatchResult = cb; }
+    setOnEnterSpectator(cb: (data: any) => void) { this.onEnterSpectator = cb; }
+    setOnPlayerEliminated(cb: (data: any) => void) { this.onPlayerEliminated = cb; }
 
     queue2v2() { this.socket?.emit('queue_2v2'); }
     leaveQueue() { this.socket?.emit('leave_queue'); }
