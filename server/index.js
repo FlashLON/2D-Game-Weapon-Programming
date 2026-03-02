@@ -81,13 +81,16 @@ async function fetchRemoteConfig() {
 
         for (const [key, param] of Object.entries(params)) {
             if (gameConfig.hasOwnProperty(key)) {
-                const value = param.defaultValue.value;
-                if (typeof gameConfig[key] === 'number') {
-                    gameConfig[key] = parseFloat(value);
-                } else if (typeof gameConfig[key] === 'boolean') {
-                    gameConfig[key] = value === 'true';
-                } else {
-                    gameConfig[key] = value;
+                // Safely grab the value, ignoring it if it's set to use an in-app default
+                if (param.defaultValue && param.defaultValue.value !== undefined) {
+                    const value = param.defaultValue.value;
+                    if (typeof gameConfig[key] === 'number') {
+                        gameConfig[key] = parseFloat(value);
+                    } else if (typeof gameConfig[key] === 'boolean') {
+                        gameConfig[key] = value === 'true';
+                    } else {
+                        gameConfig[key] = value;
+                    }
                 }
             }
         }
