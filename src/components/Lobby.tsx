@@ -11,8 +11,6 @@ interface LobbyProps {
     onSpectate: (roomId: string) => void;
     onConnect: () => void;
     isConnected: boolean;
-    serverUrl: string;
-    setServerUrl: (url: string) => void;
     userProfile?: {
         level: number;
         xp: number;
@@ -54,8 +52,6 @@ export const Lobby: React.FC<LobbyProps> = ({
     onSpectate,
     onConnect,
     isConnected,
-    serverUrl,
-    setServerUrl,
     userProfile,
     onLogin,
     isLoggedIn,
@@ -300,14 +296,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     </div>
                                     <div>
                                         <div className="text-[9px] text-white/30 uppercase font-black mb-2 tracking-widest">Network</div>
-                                        <label className="text-[9px] text-white/30 uppercase font-bold mb-1.5 block">Relay Server URL</label>
-                                        <input type="text" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)}
-                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-white text-[10px] outline-none focus:border-cyber-accent font-mono" />
                                         {!isConnected && (
                                             <button onClick={onConnect}
                                                 className="mt-2 w-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-black py-2 rounded-lg hover:bg-blue-500/30 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
-                                                <LinkIcon size={12} /> CONNECT
+                                                <LinkIcon size={12} /> CONNECT TO SERVER
                                             </button>
+                                        )}
+                                        {isConnected && (
+                                            <div className="text-[10px] text-cyber-accent text-center bg-cyber-accent/10 border border-cyber-accent/20 rounded-lg p-2 uppercase tracking-widest font-bold">
+                                                Connected
+                                            </div>
                                         )}
                                     </div>
                                 </div>

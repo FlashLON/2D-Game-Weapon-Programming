@@ -57,13 +57,7 @@ function App() {
   const [mapVoteMyVote, setMapVoteMyVote] = useState<string | null>(null);
   const [mapChangeResult, setMapChangeResult] = useState<{ name: string; color: string } | null>(null);
   const mapVoteActiveRef = useRef(false);
-  const [serverUrl, setServerUrl] = useState(() => {
-    return localStorage.getItem('relay_server_url') || "http://localhost:3000";
-  });
-
-  useEffect(() => {
-    localStorage.setItem('relay_server_url', serverUrl);
-  }, [serverUrl]);
+  const serverUrl = "https://2d-game-weapon-programming-production.up.railway.app/";
 
   const addLog = (msg: string, type: LogType = 'info') => {
     setLogs(prev => [...prev, {
@@ -822,8 +816,6 @@ function App() {
             isConnected={isConnected}
             onJoinRoom={handleJoinRoom}
             onConnect={() => networkManager.connect(serverUrl)}
-            serverUrl={serverUrl}
-            setServerUrl={setServerUrl}
             userProfile={userProfile}
             onLogin={handleLogin}
             onSignup={handleSignup}
