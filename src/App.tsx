@@ -662,6 +662,11 @@ function App() {
       setPartyData(data);
     });
 
+    networkManager.setOnPartyRoomTravel((data) => {
+      handleJoinRoom(data.roomId, data.settings);
+      addLog(`⚡ Party Travel: Following Leader to ${data.roomId.toUpperCase()}`, 'info');
+    });
+
     return () => {
       networkManager.removeConnectionListener(handleGlobalConn);
     };

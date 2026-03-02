@@ -479,17 +479,39 @@ function generate2v2RoomId() {
 }
 
 function tryMatchmake() {
-    // Need at least 4 players (or 2 parties of 2, etc.)
     if (matchmakingQueue.length < 4) return;
 
-    // Simple approach: take the first 4 players from the queue
-    // If parties exist, try to keep party members together
+    // We want to take 4 players, but we MUST NOT split a party.
+    // Since parties are max 2, and we need 4 players, we can have combinations like:
+    // (Solo, Solo, Solo, Solo)
+    // (Party, Solo, Solo)
+    // (Party, Party)
+
+    // Because we always push party members together, they are adjacent.
+    // We just need to check if the 4th and 5th members belong to the same party.
+
+    let takeCount = 4;
+    const p4 = matchmakingQueue[3];
+    const p5 = matchmakingQueue[4];
+
+    if (p5 && p4.partyId && p4.partyId === p5.partyId) {
+        // Splitting a party! We can't take the 4th guy alone.
+        // We either take 3 (and wait for 1 more) or skip the party.
+        // For simplicity: if the 4th person is part of a party that starts at index 3, 
+        // we should probably wait until we have enough to take the whole party or take others.
+
+        // Actually, since party size is max 2, if index 3 and 4 are the same party,
+        // it means the party started at index 3.
+        // We can just take the first 3 players instead? No, we need exactly 4 for 2v2.
+        // So we wait.
+        return;
+    }
+
     const matched = matchmakingQueue.splice(0, 4);
     const roomId = generate2v2RoomId();
 
     console.log(`[MATCHMAKING] Creating 2v2 room: ${roomId} with ${matched.map(p => p.username).join(', ')}`);
 
-    // Create the 2v2 room
     rooms[roomId] = {
         id: roomId,
         mode: '2v2',
@@ -506,32 +528,54 @@ function tryMatchmake() {
         currentMap: 'arena_cross',
         walls: MAPS['arena_cross'].walls,
         teams: { red: [], blue: [] },
-        matchState: 'active',   // 'active' | 'finished'
+        matchState: 'active',
         matchWinner: null
     };
 
-    // Assign teams: first 2 = red, last 2 = blue
-    // If there's a party, keep them on the same team
-    const teamRed = matched.slice(0, 2);
-    const teamBlue = matched.slice(2, 4);
+    // Keep parties on the same team
+    // Improved Team Assignment:
+    let teamRed = [];
+    let teamBlue = [];
+
+    // Group by partyId
+    const groups = {};
+    matched.forEach(p => {
+        const id = p.partyId || ('solo_' + p.socketId);
+        if (!groups[id]) groups[id] = [];
+        groups[id].push(p);
+    });
+
+    const sortedGroups = Object.values(groups).sort((a, b) => b.length - a.length);
+
+    sortedGroups.forEach(group => {
+        if (teamRed.length + group.length <= 2) {
+            teamRed.push(...group);
+        } else {
+            teamBlue.push(...group);
+        }
+    });
 
     rooms[roomId].teams.red = teamRed.map(p => p.socketId);
     rooms[roomId].teams.blue = teamBlue.map(p => p.socketId);
 
     // Notify all matched players
-    matched.forEach((player, idx) => {
+    matched.forEach((player) => {
         const sock = io.sockets.sockets.get(player.socketId);
         if (sock) {
-            const team = idx < 2 ? 'red' : 'blue';
+            const team = teamRed.some(p => p.socketId === player.socketId) ? 'red' : 'blue';
+            const teammates = (team === 'red' ? teamRed : teamBlue).filter(p => p.socketId !== player.socketId).map(p => p.username);
+            const opponents = (team === 'red' ? teamBlue : teamRed).map(p => p.username);
+
             sock.emit('match_found', {
                 roomId,
                 team,
-                teammates: (idx < 2 ? teamRed : teamBlue).map(p => p.username),
-                opponents: (idx < 2 ? teamBlue : teamRed).map(p => p.username)
+                teammates,
+                opponents
             });
         }
     });
 }
+
 
 // Check matchmaking queue periodically
 setInterval(() => {
@@ -775,6 +819,23 @@ io.on('connection', (socket) => {
     socket.on('join_room', ({ roomId, settings, profile }) => {
         leaveRoom(socket.id);
         if (currentRoomId) socket.leave(currentRoomId);
+
+        // --- PARTY TRAVEL LOGIC ---
+        // Both for joining AND leaving (roomId: '')
+        const partyId = socket.data?.partyId;
+        if (partyId && parties[partyId] && parties[partyId].leader === socket.id) {
+            const party = parties[partyId];
+            party.members.forEach(m => {
+                if (m.socketId !== socket.id) {
+                    const s = io.sockets.sockets.get(m.socketId);
+                    if (s) {
+                        s.emit('party_room_travel', { roomId, settings });
+                        console.log(`[PARTY] Traveling member ${m.username} to ${roomId || 'LOBBY'}`);
+                    }
+                }
+            });
+        }
+        // -------------------------
 
         if (!roomId) {
             currentRoomId = null;
@@ -1653,38 +1714,72 @@ io.on('connection', (socket) => {
 
     // =================== MATCHMAKING & 2v2 ===================
     socket.on('queue_2v2', () => {
-        // Remove from queue if already in it
-        const existingIdx = matchmakingQueue.findIndex(e => e.socketId === socket.id);
-        if (existingIdx !== -1) {
+        const partyId = socket.data?.partyId;
+        const party = partyId ? parties[partyId] : null;
+
+        // If in a party but NOT the leader, ignore (only leader can queue)
+        if (party && party.leader !== socket.id) {
+            socket.emit('notification', { type: 'error', message: 'Only the party leader can start matchmaking.' });
+            return;
+        }
+
+        const membersToQueue = party ? party.members : [{ socketId: socket.id, username: socket.data.username || 'Guest' }];
+
+        // Check if any member is already in queue
+        const alreadyQueued = membersToQueue.some(m => matchmakingQueue.some(q => q.socketId === m.socketId));
+        if (alreadyQueued) {
             socket.emit('queue_update', { status: 'already_queued' });
             return;
         }
 
-        matchmakingQueue.push({
-            socketId: socket.id,
-            username: socket.data.username || 'Guest',
-            partyId: socket.data.partyId || null,
-            queuedAt: Date.now()
+        // Add all members to queue
+        membersToQueue.forEach(m => {
+            matchmakingQueue.push({
+                socketId: m.socketId,
+                username: m.username || 'Guest',
+                partyId: partyId || null,
+                queuedAt: Date.now()
+            });
+
+            const s = io.sockets.sockets.get(m.socketId);
+            if (s) {
+                s.emit('queue_update', {
+                    status: 'queued',
+                    position: matchmakingQueue.length,
+                    total: matchmakingQueue.length
+                });
+                if (m.socketId !== socket.id) {
+                    s.emit('notification', { type: 'info', message: 'Your party leader joined the 2v2 queue.' });
+                }
+            }
         });
 
-        console.log(`[MATCHMAKING] ${socket.data.username || socket.id} joined queue. Queue: ${matchmakingQueue.length}`);
-        socket.emit('queue_update', {
-            status: 'queued',
-            position: matchmakingQueue.length,
-            total: matchmakingQueue.length
-        });
+        console.log(`[MATCHMAKING] ${socket.data.username || socket.id} queued party ${partyId || 'SOLO'}. Queue: ${matchmakingQueue.length}`);
 
         // Immediately try to matchmake
         if (matchmakingQueue.length >= 4) tryMatchmake();
     });
 
     socket.on('leave_queue', () => {
-        const idx = matchmakingQueue.findIndex(e => e.socketId === socket.id);
-        if (idx !== -1) {
-            matchmakingQueue.splice(idx, 1);
-            console.log(`[MATCHMAKING] ${socket.data.username || socket.id} left queue. Queue: ${matchmakingQueue.length}`);
+        const partyId = socket.data?.partyId;
+        const party = partyId ? parties[partyId] : null;
+
+        if (party && party.leader === socket.id) {
+            // Leader leaves = whole party leaves
+            party.members.forEach(m => {
+                const idx = matchmakingQueue.findIndex(e => e.socketId === m.socketId);
+                if (idx !== -1) matchmakingQueue.splice(idx, 1);
+                const s = io.sockets.sockets.get(m.socketId);
+                if (s) s.emit('queue_update', { status: 'left' });
+            });
+        } else {
+            // Solo or non-leader leaves
+            const idx = matchmakingQueue.findIndex(e => e.socketId === socket.id);
+            if (idx !== -1) {
+                matchmakingQueue.splice(idx, 1);
+                socket.emit('queue_update', { status: 'left' });
+            }
         }
-        socket.emit('queue_update', { status: 'left' });
     });
 
     socket.on('join_match', ({ roomId, team }) => {

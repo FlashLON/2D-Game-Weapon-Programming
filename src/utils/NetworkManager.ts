@@ -200,6 +200,11 @@ class NetworkManager {
     setOnWaveEvent(cb: (event: any) => void) { this.onWaveEvent = cb; }
     setOnProfileUpdate(cb: (profile: any) => void) { this.onProfileUpdate = cb; }
     setOnInit(cb: (data: { isSpectator: boolean }) => void) { this.onInit = cb; }
+    setOnPartyRoomTravel(cb: (data: { roomId: string, settings?: any }) => void) {
+        if (this.socket) {
+            this.socket.on('party_room_travel', cb);
+        }
+    }
 
     // Emitters
     joinRoom(roomId: string, settings?: any, profile?: any) {
