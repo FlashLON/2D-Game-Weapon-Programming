@@ -654,6 +654,7 @@ setInterval(() => {
         const sock = io.sockets.sockets.get(entry.socketId);
         if (sock) {
             sock.emit('queue_update', {
+                status: 'queued',
                 position: idx + 1,
                 total: matchmakingQueue.length,
                 waitTime: Math.floor((Date.now() - entry.queuedAt) / 1000)
