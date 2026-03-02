@@ -523,36 +523,34 @@ function generate2v2RoomId() {
     return '2v2-' + Math.random().toString(36).substr(2, 8);
 }
 
-function tryMatchmake() {
-    if (matchmakingQueue.length < 4) return;
+function tryMatchmake(forceWithBots = false) {
+    if (matchmakingQueue.length === 0) return;
+    if (matchmakingQueue.length < 4 && !forceWithBots) return;
 
     // We want to take 4 players, but we MUST NOT split a party.
-    // Since parties are max 2, and we need 4 players, we can have combinations like:
-    // (Solo, Solo, Solo, Solo)
-    // (Party, Solo, Solo)
-    // (Party, Party)
-
-    // Because we always push party members together, they are adjacent.
-    // We just need to check if the 4th and 5th members belong to the same party.
-
     let takeCount = 4;
-    const p4 = matchmakingQueue[3];
-    const p5 = matchmakingQueue[4];
 
-    if (p5 && p4.partyId && p4.partyId === p5.partyId) {
-        // Splitting a party! We can't take the 4th guy alone.
-        // We either take 3 (and wait for 1 more) or skip the party.
-        // For simplicity: if the 4th person is part of a party that starts at index 3, 
-        // we should probably wait until we have enough to take the whole party or take others.
-
-        // Actually, since party size is max 2, if index 3 and 4 are the same party,
-        // it means the party started at index 3.
-        // We can just take the first 3 players instead? No, we need exactly 4 for 2v2.
-        // So we wait.
-        return;
+    if (matchmakingQueue.length > 4) {
+        const p4 = matchmakingQueue[3];
+        const p5 = matchmakingQueue[4];
+        if (p5 && p4.partyId && p4.partyId === p5.partyId) {
+            // Splitting a party! Take 3 instead.
+            takeCount = 3;
+        }
     }
 
-    const matched = matchmakingQueue.splice(0, 4);
+    const actualTakeCount = Math.min(takeCount, 4);
+    const matched = matchmakingQueue.splice(0, actualTakeCount);
+
+    // Fill the rest with bots
+    while (matched.length < 4) {
+        matched.push({
+            isBot: true,
+            socketId: 'bot_' + Math.random().toString(36).substr(2, 6),
+            username: 'CyberBot_' + Math.floor(Math.random() * 1000)
+            // No partyId, treated as solo
+        });
+    }
     const roomId = generate2v2RoomId();
 
     console.log(`[MATCHMAKING] Creating 2v2 room: ${roomId} with ${matched.map(p => p.username).join(', ')}`);
@@ -603,20 +601,41 @@ function tryMatchmake() {
     rooms[roomId].teams.red = teamRed.map(p => p.socketId);
     rooms[roomId].teams.blue = teamBlue.map(p => p.socketId);
 
-    // Notify all matched players
+    // Initial bot population + notify players
     matched.forEach((player) => {
-        const sock = io.sockets.sockets.get(player.socketId);
-        if (sock) {
-            const team = teamRed.some(p => p.socketId === player.socketId) ? 'red' : 'blue';
-            const teammates = (team === 'red' ? teamRed : teamBlue).filter(p => p.socketId !== player.socketId).map(p => p.username);
-            const opponents = (team === 'red' ? teamBlue : teamRed).map(p => p.username);
+        const team = teamRed.some(p => p.socketId === player.socketId) ? 'red' : 'blue';
+        const teammates = (team === 'red' ? teamRed : teamBlue).filter(p => p.socketId !== player.socketId).map(p => p.username);
+        const opponents = (team === 'red' ? teamBlue : teamRed).map(p => p.username);
 
-            sock.emit('match_found', {
-                roomId,
-                team,
-                teammates,
-                opponents
-            });
+        if (player.isBot) {
+            // Fake the player object since they won't trigger "join_room"
+            rooms[roomId].players[player.socketId] = {
+                id: player.socketId,
+                username: player.username,
+                isBot: true,
+                x: team === 'red' ? 100 : 700,
+                y: 300 + (Math.random() * 100 - 50),
+                radius: 20,
+                hp: 150, maxHp: 150,
+                color: team === 'red' ? '#ff4444' : '#4444ff',
+                type: 'player',
+                velocity: { x: 0, y: 0 },
+                kills: 0, deaths: 0,
+                level: 30, xp: 0, maxXp: 1000, money: 0,
+                unlocks: [], limits: {}, titles: [], equippedTitle: null,
+                lastFireTime: 0,
+                team: team
+            };
+        } else {
+            const sock = io.sockets.sockets.get(player.socketId);
+            if (sock) {
+                sock.emit('match_found', {
+                    roomId,
+                    team,
+                    teammates,
+                    opponents
+                });
+            }
         }
     });
 }
@@ -624,8 +643,11 @@ function tryMatchmake() {
 
 // Check matchmaking queue periodically
 setInterval(() => {
-    if (matchmakingQueue.length >= 4) {
-        tryMatchmake();
+    // If someone has been waiting > 10 seconds, force start with bots
+    const waitingTooLong = matchmakingQueue.length > 0 && (Date.now() - matchmakingQueue[0].queuedAt) > 10000;
+
+    if (matchmakingQueue.length >= 4 || waitingTooLong) {
+        tryMatchmake(waitingTooLong);
     }
     // Notify queue members of their position
     matchmakingQueue.forEach((entry, idx) => {
@@ -2039,6 +2061,45 @@ setInterval(() => {
 
     for (const [roomId, room] of Object.entries(rooms)) {
         try {
+            // --- BOT AI UPDATE ---
+            if (room.mode === '2v2') {
+                Object.values(room.players).forEach(p => {
+                    if (p.isBot && p.hp > 0) {
+                        let target = null;
+                        let minDistSq = Infinity;
+                        Object.values(room.players).forEach(p2 => {
+                            if (p.team !== p2.team && p2.hp > 0) {
+                                const dSq = (p.x - p2.x) ** 2 + (p.y - p2.y) ** 2;
+                                if (dSq < minDistSq) {
+                                    minDistSq = dSq;
+                                    target = p2;
+                                }
+                            }
+                        });
+
+                        if (target) {
+                            const angle = Math.atan2(target.y - p.y, target.x - p.x);
+                            // Slower bot tracking
+                            p.velocity.x += Math.cos(angle) * 15 * dt;
+                            p.velocity.y += Math.sin(angle) * 15 * dt;
+
+                            // Bot shooting! Random rate
+                            if (Math.random() < 0.03) {
+                                room.projectiles.push({
+                                    id: Math.random().toString(36).substr(2, 9),
+                                    playerId: p.id,
+                                    type: 'projectile',
+                                    x: p.x, y: p.y,
+                                    velocity: { x: Math.cos(angle) * 350, y: Math.sin(angle) * 350 },
+                                    lifetime: 2, maxLifetime: 2, radius: 5, damage: 15,
+                                    color: p.team === 'red' ? '#ff4444' : '#4444ff'
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+
             // --- WAVE MODE LOGIC ---
             if (room.mode === 'coop') {
                 room.waveTimer += dt;
