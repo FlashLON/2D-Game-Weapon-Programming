@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAnalytics, logEvent, isSupported } from "firebase/analytics";
 
 // Your web app's Firebase configuration
@@ -13,27 +13,28 @@ const firebaseConfig = {
     measurementId: "G-YPW4VJXWDB"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase safely to avoid "duplicate-app" error
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Analytics safely
 let analytics: any = null;
 
 // Only initialize if supported and in browser
-isSupported().then((supported) => {
-    if (supported && typeof window !== 'undefined') {
-        analytics = getAnalytics(app);
-        console.log("📊 [GA4] Analytics Ready");
-    }
-}).catch(err => {
-    console.warn("📊 [GA4] Analytics not available", err.message);
-});
+if (typeof window !== 'undefined') {
+    isSupported().then((supported) => {
+        if (supported) {
+            analytics = getAnalytics(app);
+            console.log("📊 [GA4] Analytics Ready");
+        }
+    }).catch(err => {
+        console.warn("📊 [GA4] Analytics not available", err.message);
+    });
+}
 
 export const trackGAEvent = (eventName: string, params?: object) => {
     try {
         if (analytics) {
             logEvent(analytics, eventName, params);
-            // console.log(`📊 [GA4] Tracked: ${eventName}`, params);
         }
     } catch (err) {
         console.error(`📊 [GA4] Error tracking ${eventName}`, err);
