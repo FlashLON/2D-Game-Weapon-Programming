@@ -315,45 +315,92 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                     }
                 }
 
-                // --- Helper for Skin Shapes ---
-                const drawEntityShape = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, skinId: string, color: string) => {
-                    if (SKINS_SPRITE_MAP[skinId] && skinsImage.complete) {
+                // --- Helper for Skin Shapes with ANIMATION ---
+                const drawEntityShape = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, skinId: string, color: string, time: number, vel?: { x: number, y: number }) => {
+                    ctx.save();
+
+                    // --- 1. PHYSICAL ANIMATION (Bobbing & Tilting) ---
+                    const isPremium = SKINS_SPRITE_MAP[skinId];
+                    let animY = y;
+                    let animRotation = 0;
+                    let animScale = 1.0;
+
+                    if (isPremium) {
+                        // Floating bobbing effect
+                        animY += Math.sin(time * 2.5 + (x * 0.05)) * 4;
+                        // Tilt based on horizontal velocity
+                        const vx = vel?.x || 0;
+                        animRotation = Math.max(-0.25, Math.min(0.25, vx * 0.0008));
+                    }
+
+                    ctx.translate(x, animY);
+                    ctx.rotate(animRotation);
+
+                    // --- 2. SKIN SPECIFIC EFFECTS ---
+                    if (isPremium && skinsImage.complete) {
                         const coords = SKINS_SPRITE_MAP[skinId];
                         const sw = 242;
                         const sh = 172;
 
-                        // Scale it larger than the radius for better visual impact (show off glows/auras)
-                        const drawSize = r * 4.5;
+                        if (skinId === 'neon_glitch') {
+                            // Jitter effect for "glitch" feel
+                            if (Math.random() > 0.8) {
+                                ctx.translate((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+                            }
+                        } else if (skinId === 'binary_link') {
+                            // Gentle rocking
+                            ctx.rotate(Math.sin(time * 1.5) * 0.05);
+                        } else if (skinId === 'sun_god') {
+                            // Slow hypnotic rotation
+                            ctx.rotate(time * 0.4);
+                        } else if (skinId === 'void_pulse') {
+                            // Breathing scale effect
+                            animScale = 1.0 + Math.sin(time * 3) * 0.04;
+                        } else if (skinId === 'sky_guardian') {
+                            // Faster bobbing + slight tilt
+                            ctx.translate(0, Math.sin(time * 4) * 2);
+                        }
+
+                        const drawSize = r * 4.5 * animScale;
+
+                        // Add a pulsing glow behind the sprite
+                        const pulse = (Math.sin(time * 4) + 1) * 0.5;
+                        ctx.shadowBlur = 15 + pulse * 10;
+                        ctx.shadowColor = color;
+
                         ctx.drawImage(
                             skinsImage,
                             coords.sx, coords.sy, sw, sh,
-                            x - drawSize / 2, y - drawSize / 2, drawSize, drawSize
+                            -drawSize / 2, -drawSize / 2, drawSize, drawSize
                         );
+
+                        ctx.restore();
                         return;
                     }
 
+                    // --- 3. LEGACY SHAPES ---
                     ctx.fillStyle = color;
                     if (ent.type !== 'projectile') {
-                        ctx.shadowBlur = 10;
+                        ctx.shadowBlur = 12;
                         ctx.shadowColor = color;
                     }
                     ctx.beginPath();
 
                     switch (skinId) {
                         case 'sentinel': // Square (Legacy)
-                            ctx.rect(x - r, y - r, r * 2, r * 2);
+                            ctx.rect(-r, -r, r * 2, r * 2);
                             break;
                         case 'vanguard': // Triangle (Legacy)
-                            ctx.moveTo(x, y - r * 1.2);
-                            ctx.lineTo(x - r, y + r);
-                            ctx.lineTo(x + r, y + r);
+                            ctx.moveTo(0, -r * 1.2);
+                            ctx.lineTo(-r, r);
+                            ctx.lineTo(r, r);
                             ctx.closePath();
                             break;
                         default: // Circle (START PLAYER)
-                            ctx.arc(x, y, r, 0, Math.PI * 2);
+                            ctx.arc(0, 0, r, 0, Math.PI * 2);
                     }
                     ctx.fill();
-                    ctx.shadowBlur = 0;
+                    ctx.restore();
                 };
 
                 // --- 2. MAIN ENTITY DRAWING ---
@@ -377,7 +424,7 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                 if (isPlayer) {
                     const skinId = (ent as any).equippedSkin || 'default';
                     const skinColor = (ent as any).color || (isLocal ? '#00ff9f' : '#ff9f00');
-                    drawEntityShape(ctx, drawX, drawY, radius, skinId, skinColor);
+                    drawEntityShape(ctx, drawX, drawY, radius, skinId, skinColor, time, (ent as any).velocity);
                 } else {
                     ctx.fillStyle = drawColor;
                     ctx.beginPath();
