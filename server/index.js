@@ -1007,6 +1007,18 @@ io.on('connection', (socket) => {
                 }
             });
 
+            // DAILY LOGIN REWARD CHECK
+            const rewardResult = checkDailyReward(username, user);
+            if (rewardResult) {
+                // Save updated user data with rewards
+                await upsertUser(username, user);
+                socket.emit('profile_update', cleanProfileForClient(user));
+                socket.emit('notification', {
+                    type: 'unlock',
+                    message: `🎁 DAILY REWARD: Day ${user.loginStreak}! +$${rewardResult.money} and +${rewardResult.xp} XP!`
+                });
+            }
+
             // Send System Announcement on login
             socket.emit('notification', {
                 type: 'unlock',
@@ -1063,11 +1075,22 @@ io.on('connection', (socket) => {
                 equippedTitle: null,
                 killCount: 0,
                 aura_type: null,
+                lastLoginDate: new Date().toISOString().split('T')[0],
+                loginStreak: 1,
                 createdAt: new Date().toISOString()
             };
 
             await upsertUser(username, newUser);
             console.log(`[AUTH] Signup Success: ${username}`);
+
+            // Initial reward for first signup
+            newUser.money += 1000;
+            newUser.xp += 50;
+            await upsertUser(username, newUser);
+            socket.emit('notification', {
+                type: 'unlock',
+                message: `🎁 WELCOME REWARD: +$1000 and +50 XP!`
+            });
 
             // CACHE USER FOR TITLES
             memoryUsers.set(username, newUser);
@@ -1093,7 +1116,9 @@ io.on('connection', (socket) => {
                     titles: newUser.titles || [],
                     equippedTitle: newUser.equippedTitle || null,
                     killCount: newUser.killCount || 0,
-                    aura_type: newUser.aura_type || null
+                    aura_type: newUser.aura_type || null,
+                    loginStreak: newUser.loginStreak || 1,
+                    lastLoginDate: newUser.lastLoginDate
                 }
             });
 
@@ -2281,6 +2306,44 @@ async function saveProgress(username, stats) {
     } catch (err) {
         console.error(`❌ [Save] Failed to save for ${username}:`, err.message);
     }
+}
+
+// =================== DAILY REWARD HELPER ===================
+function checkDailyReward(username, user) {
+    if (!user) return null;
+    const today = new Date().toISOString().split('T')[0];
+    const lastLogin = user.lastLoginDate;
+
+    if (lastLogin === today) {
+        console.log(`[DAILY] ${username} already claimed today.`);
+        return null; // Already login today
+    }
+
+    // Check if it was yesterday
+    const last = new Date(lastLogin || '2000-01-01');
+    const curr = new Date(today);
+    const diffTime = Math.abs(curr - last);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+        // Increment streak
+        user.loginStreak = (user.loginStreak || 0) + 1;
+        if (user.loginStreak > 7) user.loginStreak = 7; // Cap at 7 days
+    } else {
+        // Reset streak
+        user.loginStreak = 1;
+    }
+
+    // Reward calculation (Example: $1000 * streak, 50 XP * streak)
+    const moneyReward = 1000 * user.loginStreak;
+    const xpReward = 50 * user.loginStreak;
+
+    user.money = (user.money || 0) + moneyReward;
+    user.xp = (user.xp || 0) + xpReward;
+    user.lastLoginDate = today;
+
+    console.log(`[DAILY] ${username} claimed reward for Day ${user.loginStreak}. Reward: $${moneyReward}, XP: ${xpReward}`);
+    return { money: moneyReward, xp: xpReward };
 }
 
 const TICK_RATE = 45;

@@ -13,6 +13,7 @@ import { networkManager, type SavedCode } from './utils/NetworkManager';
 import { ATTRIBUTES, getUpgradeCost } from './utils/AttributeRegistry';
 import { Play, RotateCcw, Link as LinkIcon, CheckCircle2, LogOut } from 'lucide-react';
 import { DocsPanel } from './components/DocsPanel';
+import { trackGAEvent } from './utils/firebase';
 
 const DEFAULT_CODE = `
 class Weapon:
@@ -212,6 +213,9 @@ function App() {
       }
     }));
 
+    // GA: Log Purchase/Upgrade event
+    trackGAEvent('upgrade_purchase', { attribute: attributeId, to_level: newLimit, cost: cost });
+
     addLog(`Upgraded ${attr.name} to ${newLimit}!`, 'success');
   };
 
@@ -381,6 +385,8 @@ function App() {
       // Let's just pass `isTravel` flag to the settings and let the networkManager join room.
       networkManager.joinRoom(roomId, settings, userProfile);
       addLog(isTravel ? `Followed leader to: ${roomId.toUpperCase()}` : `Joined room: ${roomId.toUpperCase()}`, "success");
+      // GA: Log join_room event
+      trackGAEvent('join_room', { room_id: roomId, mode: settings?.mode || 'pvp', is_travel: isTravel });
     }
   };
 
@@ -603,6 +609,8 @@ function App() {
             money: effect.money
           });
           setShowLevelUpModal(true);
+          // GA: Log Level Up event
+          trackGAEvent('level_up', { level: effect.level });
         }
       } else if (effect.type === 'boss_fire') {
         gameEngine.spawnParticles(effect.x, effect.y, '#ff00ff', 10);
@@ -659,6 +667,8 @@ function App() {
     networkManager.setOnEnterSpectator((data) => {
       setIsSpectator(true);
       addLog(`💀 ${data.message || 'You have been eliminated!'}`, 'error');
+      // GA: Log Death event
+      trackGAEvent('death', { killer: data.killerName, mode: currentRoomRef.current });
       if (data.followId) {
         // Follow the surviving teammate
         gameEngine.setMultiplayerMode(true, data.followId);
@@ -720,6 +730,8 @@ function App() {
       setUserProfile(mergedProfile);
       setIsLoggedIn(true);
       setStatus("Ready");
+      // GA: Log Login event
+      trackGAEvent('login', { username: name, level: mergedProfile.level });
       // Load saved codes after login
       await loadSavedCodes(name);
     } else {
@@ -758,6 +770,9 @@ function App() {
       setUserProfile(mergedProfile);
       setIsLoggedIn(true);
       setStatus("Ready");
+      // GA: Log Signup event
+      trackGAEvent('sign_up', { username: name, method: 'password' });
+      trackGAEvent('login', { username: name, is_new: true });
       // Load saved codes after signup
       await loadSavedCodes(name);
     } else {
