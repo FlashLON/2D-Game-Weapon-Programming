@@ -235,6 +235,17 @@ const STRIPE_TOKEN_PACKS = {
     matrix_core: { totalTokens: 6500, priceUsd: 4999, name: 'The Matrix Core — 6,500 Coins' }
 };
 
+// Enable CORS for all HTTP routes (matches Socket.IO CORS config)
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 // Enable JSON parsing for all routes EXCEPT the webhook (which needs raw body)
 app.use((req, res, next) => {
     if (req.path === '/api/stripe-webhook') {
