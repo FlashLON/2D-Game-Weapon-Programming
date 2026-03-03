@@ -70,6 +70,7 @@ export interface Entity {
     aura_highlight_timer?: number;
     aura_highlight_color?: string;
     limits?: Record<string, number>;
+    equippedSkin?: string;
 }
 
 export interface DamageNumber {
@@ -160,6 +161,7 @@ export class GameEngine {
         maxXp: 100,
         money: 0,
         aura_type: null,
+        equippedSkin: 'default',
         limits: {}
     };
 
@@ -207,6 +209,7 @@ export class GameEngine {
             maxXp: profile.maxXp || 100,
             money: profile.money || 0,
             aura_type: profile.aura_type,
+            equippedSkin: profile.equippedSkin || 'default',
             limits: profile.limits || {}
         };
         // Update current player if exists
@@ -215,6 +218,7 @@ export class GameEngine {
             player.maxHp = this.playerStats.hp;
             if (player.hp > player.maxHp) player.hp = player.maxHp;
             player.aura_type = this.playerStats.aura_type;
+            (player as any).equippedSkin = this.playerStats.equippedSkin;
             (player as any).limits = this.playerStats.limits;
         }
     }
@@ -273,7 +277,8 @@ export class GameEngine {
                     xp: this.playerStats.xp,
                     maxXp: this.playerStats.maxXp,
                     money: this.playerStats.money,
-                    aura_type: this.playerStats.aura_type
+                    aura_type: this.playerStats.aura_type,
+                    equippedSkin: this.playerStats.equippedSkin
                 },
                 // Dummy Enemy
                 { id: 'enemy1', x: 600, y: 300, radius: 20, color: '#ff0055', hp: 50, maxHp: 50, type: 'enemy', velocity: { x: 0, y: 0 } }

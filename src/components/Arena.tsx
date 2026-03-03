@@ -331,6 +331,18 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                         // Tilt based on horizontal velocity
                         const vx = vel?.x || 0;
                         animRotation = Math.max(-0.25, Math.min(0.25, vx * 0.0008));
+
+                        // --- PRETTIER: Under-Glow (Properly Round silhouette) ---
+                        const pulse = (Math.sin(time * 4) + 1) * 0.5;
+                        const glow = ctx.createRadialGradient(x, animY, r * 0.2, x, animY, r * 2.8);
+                        glow.addColorStop(0, color + '88'); // 50% alpha core
+                        glow.addColorStop(1, 'transparent');
+                        ctx.fillStyle = glow;
+                        ctx.globalCompositeOperation = 'screen';
+                        ctx.beginPath();
+                        ctx.arc(x, animY, r * 2.8 + pulse * 6, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.globalCompositeOperation = 'source-over';
                     }
 
                     ctx.translate(x, animY);
@@ -341,37 +353,39 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                         const coords = SKINS_SPRITE_MAP[skinId];
                         const sw = 242;
                         const sh = 172;
+                        const aspectRatio = sw / sh; // ~1.4
 
                         if (skinId === 'neon_glitch') {
-                            // Jitter effect for "glitch" feel
-                            if (Math.random() > 0.8) {
-                                ctx.translate((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
-                            }
+                            if (Math.random() > 0.8) ctx.translate((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
                         } else if (skinId === 'binary_link') {
-                            // Gentle rocking
                             ctx.rotate(Math.sin(time * 1.5) * 0.05);
                         } else if (skinId === 'sun_god') {
-                            // Slow hypnotic rotation
                             ctx.rotate(time * 0.4);
                         } else if (skinId === 'void_pulse') {
-                            // Breathing scale effect
-                            animScale = 1.0 + Math.sin(time * 3) * 0.04;
-                        } else if (skinId === 'sky_guardian') {
-                            // Faster bobbing + slight tilt
-                            ctx.translate(0, Math.sin(time * 4) * 2);
+                            animScale = 1.0 + Math.sin(time * 3) * 0.06;
                         }
 
-                        const drawSize = r * 4.5 * animScale;
+                        // FIXED: Maintain 1.4 Aspect Ratio from the source file
+                        // This prevents the "P" logo and internal components from looks like vertical ovals.
+                        const drawH = r * 3.8 * animScale;
+                        const drawW = drawH * aspectRatio;
 
-                        // Add a pulsing glow behind the sprite
-                        const pulse = (Math.sin(time * 4) + 1) * 0.5;
-                        ctx.shadowBlur = 15 + pulse * 10;
-                        ctx.shadowColor = color;
+                        // PRETTIER: Orbital 'Byte' Particles
+                        for (let i = 0; i < 3; i++) {
+                            const orbitA = time * 1.8 + (i * Math.PI * 2 / 3);
+                            const orbitR = r * 2.5;
+                            const bx = Math.cos(orbitA) * orbitR;
+                            const by = Math.sin(orbitA) * orbitR;
+                            ctx.fillStyle = color;
+                            ctx.shadowBlur = 6; ctx.shadowColor = color;
+                            ctx.fillRect(bx - 2, by - 2, 4, 4);
+                        }
+                        ctx.shadowBlur = 0;
 
                         ctx.drawImage(
                             skinsImage,
                             coords.sx, coords.sy, sw, sh,
-                            -drawSize / 2, -drawSize / 2, drawSize, drawSize
+                            -drawW / 2, -drawH / 2, drawW, drawH
                         );
 
                         ctx.restore();
