@@ -90,27 +90,48 @@ const TOKEN_PACKS: TokenPack[] = [
 interface TokenShopProps {
     userMoney: number;
     isLoggedIn: boolean;
+    username: string;
+    serverUrl: string;
     onPurchase?: (packId: string, totalTokens: number) => void;
 }
 
-export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, onPurchase }) => {
+export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, username, serverUrl, onPurchase: _onPurchase }) => {
     const [expanded, setExpanded] = useState(false);
     const [purchasing, setPurchasing] = useState<string | null>(null);
     const [showConfirm, setShowConfirm] = useState<TokenPack | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const handleBuy = (pack: TokenPack) => {
+        setError(null);
         setShowConfirm(pack);
     };
 
-    const confirmPurchase = () => {
+    const confirmPurchase = async () => {
         if (!showConfirm) return;
         setPurchasing(showConfirm.id);
-        // Simulate purchase - In production this would go through a payment provider
-        onPurchase?.(showConfirm.id, showConfirm.totalTokens);
-        setTimeout(() => {
+        setError(null);
+
+        try {
+            // Call our server to create a Stripe Checkout session
+            const res = await fetch(`${serverUrl}api/create-checkout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ packId: showConfirm.id, username })
+            });
+
+            const data = await res.json();
+
+            if (data.url) {
+                // Redirect to Stripe's hosted checkout page
+                window.location.href = data.url;
+            } else {
+                setError(data.error || 'Failed to create checkout session.');
+                setPurchasing(null);
+            }
+        } catch (err) {
+            setError('Network error. Please try again.');
             setPurchasing(null);
-            setShowConfirm(null);
-        }, 1500);
+        }
     };
 
     return (
@@ -120,8 +141,8 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, onP
                 <button
                     onClick={() => setExpanded(!expanded)}
                     className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-all duration-300 ${expanded
-                            ? 'bg-gradient-to-r from-yellow-500/15 to-amber-500/10 border-yellow-500/30 shadow-lg shadow-yellow-500/5'
-                            : 'bg-black/30 border-white/5 hover:border-yellow-500/20 hover:bg-yellow-500/5'
+                        ? 'bg-gradient-to-r from-yellow-500/15 to-amber-500/10 border-yellow-500/30 shadow-lg shadow-yellow-500/5'
+                        : 'bg-black/30 border-white/5 hover:border-yellow-500/20 hover:bg-yellow-500/5'
                         }`}
                 >
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500/30 to-amber-600/20 border border-yellow-500/20 flex items-center justify-center shrink-0">
@@ -159,10 +180,10 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, onP
                                 <div
                                     key={pack.id}
                                     className={`relative group rounded-xl border transition-all duration-200 overflow-hidden ${pack.popular
-                                            ? 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-blue-500/5 shadow-lg shadow-cyan-500/5'
-                                            : pack.bestValue
-                                                ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-amber-500/5 shadow-lg shadow-yellow-500/5'
-                                                : 'border-white/5 bg-gradient-to-r ' + pack.color + ' hover:border-white/15'
+                                        ? 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-blue-500/5 shadow-lg shadow-cyan-500/5'
+                                        : pack.bestValue
+                                            ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-amber-500/5 shadow-lg shadow-yellow-500/5'
+                                            : 'border-white/5 bg-gradient-to-r ' + pack.color + ' hover:border-white/15'
                                         }`}
                                 >
                                     {/* Popular / Best Value Badge */}
@@ -217,10 +238,10 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, onP
                                             onClick={() => handleBuy(pack)}
                                             disabled={!isLoggedIn || purchasing === pack.id}
                                             className={`shrink-0 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase transition-all ${purchasing === pack.id
-                                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                                    : !isLoggedIn
-                                                        ? 'bg-white/3 text-white/15 cursor-not-allowed'
-                                                        : `border hover:scale-105 active:scale-95`
+                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                : !isLoggedIn
+                                                    ? 'bg-white/3 text-white/15 cursor-not-allowed'
+                                                    : `border hover:scale-105 active:scale-95`
                                                 }`}
                                             style={
                                                 purchasing !== pack.id && isLoggedIn
@@ -242,7 +263,7 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, onP
                         {/* Footer */}
                         <div className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between">
                             <div className="text-[8px] text-white/15 uppercase tracking-wider flex items-center gap-1.5">
-                                <ShieldCheck size={10} className="text-emerald-400/40" /> Secured by Firebase
+                                <ShieldCheck size={10} className="text-emerald-400/40" /> Powered by Stripe
                             </div>
                             <div className="flex items-center gap-1 text-[8px] text-white/15 hover:text-white/30 cursor-pointer transition-all">
                                 <ExternalLink size={9} /> Terms Apply
@@ -293,8 +314,15 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, onP
                         {/* Price */}
                         <div className="text-center mb-5">
                             <div className="text-3xl font-black text-white">{showConfirm.price}</div>
-                            <div className="text-[9px] text-white/20 mt-1 uppercase tracking-widest">One-time purchase</div>
+                            <div className="text-[9px] text-white/20 mt-1 uppercase tracking-widest">Secure checkout via Stripe</div>
                         </div>
+
+                        {/* Error */}
+                        {error && (
+                            <div className="mb-4 text-center text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                                {error}
+                            </div>
+                        )}
 
                         {/* Buttons */}
                         <div className="flex gap-3">
@@ -320,13 +348,13 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, onP
                                         Processing...
                                     </span>
                                 ) : (
-                                    `Buy for ${showConfirm.price}`
+                                    `Pay ${showConfirm.price}`
                                 )}
                             </button>
                         </div>
 
                         <div className="mt-3 text-center text-[8px] text-white/15 uppercase tracking-wider">
-                            Coins are delivered instantly to your account
+                            You'll be redirected to Stripe's secure checkout
                         </div>
                     </div>
                 </div>

@@ -557,6 +557,20 @@ function App() {
     init();
   }, []);
 
+  // Handle Stripe redirect return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (payment === 'success') {
+      addLog('💰 Payment successful! Your coins are being credited...', 'success');
+      // Clean the URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (payment === 'cancelled') {
+      addLog('Payment was cancelled.', 'warning');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     const handleGlobalConn = (connected: boolean) => {
       setIsConnected(connected);

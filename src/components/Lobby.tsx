@@ -469,6 +469,8 @@ export const Lobby: React.FC<LobbyProps> = ({
                             <TokenShop
                                 userMoney={userProfile?.money || 0}
                                 isLoggedIn={isLoggedIn ?? false}
+                                username={username ?? ''}
+                                serverUrl="https://2d-game-weapon-programming-production.up.railway.app/"
                                 onPurchase={onBuyTokens}
                             />
                         )}

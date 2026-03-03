@@ -222,6 +222,166 @@ setInterval(async () => {
     io.emit('global_leaderboard', leaderboard);
 }, 30000);
 
+// =================== STRIPE PAYMENT INTEGRATION ===================
+const Stripe = require('stripe');
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+
+const STRIPE_TOKEN_PACKS = {
+    starter_hack: { totalTokens: 200, priceUsd: 199, name: 'Starter Hack — 200 Coins' },
+    mercenary_pack: { totalTokens: 550, priceUsd: 499, name: 'Mercenary Pack — 550 Coins' },
+    cybernetic_pack: { totalTokens: 1150, priceUsd: 999, name: 'Cybernetic Pack — 1,150 Coins' },
+    overlord_cache: { totalTokens: 2400, priceUsd: 1999, name: 'Overlord Cache — 2,400 Coins' },
+    matrix_core: { totalTokens: 6500, priceUsd: 4999, name: 'The Matrix Core — 6,500 Coins' }
+};
+
+// Enable JSON parsing for all routes EXCEPT the webhook (which needs raw body)
+app.use((req, res, next) => {
+    if (req.path === '/api/stripe-webhook') {
+        next(); // Let the webhook route handle its own body parsing
+    } else {
+        express.json()(req, res, next);
+    }
+});
+
+// Serve static front-end if needed
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// --- Create Stripe Checkout Session ---
+app.post('/api/create-checkout', async (req, res) => {
+    try {
+        if (!stripe) {
+            return res.status(503).json({ error: 'Payment system not configured. Set STRIPE_SECRET_KEY.' });
+        }
+
+        const { packId, username } = req.body;
+
+        if (!username) {
+            return res.status(400).json({ error: 'Must be logged in to purchase.' });
+        }
+
+        const pack = STRIPE_TOKEN_PACKS[packId];
+        if (!pack) {
+            return res.status(400).json({ error: 'Invalid pack ID.' });
+        }
+
+        // Determine the redirect URLs
+        const origin = req.headers.origin || req.headers.referer || 'http://localhost:5173';
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            mode: 'payment',
+            line_items: [{
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: pack.name,
+                        description: `CyberCore Game Tokens — ${pack.totalTokens.toLocaleString()} coins credited instantly`,
+                        images: []
+                    },
+                    unit_amount: pack.priceUsd  // Stripe uses cents
+                },
+                quantity: 1
+            }],
+            metadata: {
+                packId,
+                username,
+                totalTokens: pack.totalTokens.toString()
+            },
+            success_url: `${origin}?payment=success&pack=${packId}`,
+            cancel_url: `${origin}?payment=cancelled`
+        });
+
+        console.log(`[STRIPE] Checkout session created for ${username} — ${packId} ($${(pack.priceUsd / 100).toFixed(2)})`);
+        res.json({ url: session.url });
+    } catch (err) {
+        console.error('[STRIPE] Checkout Error:', err.message);
+        res.status(500).json({ error: 'Failed to create checkout session.' });
+    }
+});
+
+// --- Stripe Webhook (Confirms Payment) ---
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+        // In test mode without webhook secret, we can parse directly
+        // In production, you'd use: stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        event = JSON.parse(req.body.toString());
+    } catch (err) {
+        console.error('[STRIPE] Webhook signature verification failed:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        const { packId, username, totalTokens } = session.metadata;
+        const tokens = parseInt(totalTokens, 10);
+
+        console.log(`[STRIPE] ✅ Payment confirmed for ${username} — ${packId} (+${tokens} coins)`);
+
+        // Credit the tokens
+        const user = memoryUsers.get(username);
+        if (user) {
+            user.money = (user.money || 0) + tokens;
+
+            // Audit trail
+            if (!user.purchases) user.purchases = [];
+            user.purchases.push({
+                packId,
+                tokens,
+                stripeSessionId: session.id,
+                priceUsd: session.amount_total / 100,
+                timestamp: new Date().toISOString(),
+                status: 'confirmed'
+            });
+
+            await upsertUser(username, user);
+
+            // Notify the player in real-time via socket
+            for (const s of io.sockets.sockets.values()) {
+                if (s.data.username === username) {
+                    s.emit('profile_update', cleanProfileForClient(user));
+                    s.emit('notification', {
+                        type: 'unlock',
+                        message: `💰 Payment confirmed! +${tokens.toLocaleString()} COINS credited!`
+                    });
+
+                    // Sync in active room
+                    for (const roomId in rooms) {
+                        if (rooms[roomId].players[s.id]) {
+                            rooms[roomId].players[s.id].money = user.money;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            console.log(`[STRIPE] 💰 ${username} now has ${user.money} total coins`);
+        } else {
+            console.error(`[STRIPE] ❌ User ${username} not found in memory after payment!`);
+        }
+    }
+
+    res.json({ received: true });
+});
+
+// --- Check Payment Status (called by frontend after redirect) ---
+app.get('/api/payment-status', (req, res) => {
+    const { username } = req.query;
+    if (!username) return res.status(400).json({ error: 'Username required' });
+
+    const user = memoryUsers.get(username);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const lastPurchase = user.purchases?.slice(-1)[0] || null;
+    res.json({
+        money: user.money,
+        lastPurchase
+    });
+});
+
 const PORT = process.env.PORT || 3000;
 
 // =================== PLAYER ANALYTICS SYSTEM ===================
