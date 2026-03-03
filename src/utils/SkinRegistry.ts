@@ -1,7 +1,7 @@
 import {
-    Circle, Square, Triangle,
-    Hexagon, Diamond, Star,
-    Ghost, Cpu
+    Circle, Zap, Cpu,
+    Star, Ghost, Triangle,
+    Shield
 } from 'lucide-react';
 
 export interface SkinConfig {
@@ -23,68 +23,59 @@ export const SKINS: Record<string, SkinConfig> = {
         icon: Circle,
         rarity: 'common'
     },
-    vanguard: {
-        id: 'vanguard',
-        name: 'Vanguard Frame',
-        description: 'A sharp, aerodynamic frame designed for aggressive maneuvers.',
-        cost: 5000,
-        icon: Triangle,
-        rarity: 'common',
-        color: '#00ff9f'
-    },
-    sentinel: {
-        id: 'sentinel',
-        name: 'Sentinel Block',
-        description: 'A heavy-duty square chassis focused on stability and defense.',
-        cost: 7500,
-        icon: Square,
-        rarity: 'common',
-        color: '#3a86ff'
-    },
-    interceptor: {
-        id: 'interceptor',
-        name: 'Interceptor',
-        description: 'A diamond-shaped hull that excels at high-speed tracking.',
+    neon_glitch: {
+        id: 'neon_glitch',
+        name: 'Neon Glitch',
+        description: 'A experimental drone core pulsing with unstable cyan and magenta energy.',
         cost: 15000,
-        icon: Diamond,
-        rarity: 'rare',
-        color: '#ff0055'
-    },
-    technomancer: {
-        id: 'technomancer',
-        name: 'Technomancer',
-        description: 'A complex hexagonal weave that channels energy efficiently.',
-        cost: 25000,
-        icon: Hexagon,
-        rarity: 'rare',
-        color: '#fb923c'
-    },
-    phantom: {
-        id: 'phantom',
-        name: 'Phantom Shift',
-        description: 'A specialized frame that flickers between reality and the void.',
-        cost: 60000,
-        icon: Ghost,
+        icon: Zap,
         rarity: 'epic',
-        color: '#a855f7'
+        color: '#00ffff'
     },
-    starlight: {
-        id: 'starlight',
-        name: 'Starlight Core',
-        description: 'Forged from the heart of a dying pulsar. Radiant and pure.',
-        cost: 120000,
+    binary_link: {
+        id: 'binary_link',
+        name: 'Binary Link',
+        description: 'Two synchronized processing cores sharing a high-speed data stream.',
+        cost: 30000,
+        icon: Cpu,
+        rarity: 'epic',
+        color: '#ffffff'
+    },
+    sun_god: {
+        id: 'sun_god',
+        name: 'Sun God Core',
+        description: 'A radiant golden engine encased in a high-voltage solar ring.',
+        cost: 75000,
         icon: Star,
         rarity: 'legendary',
-        color: '#ffd700'
+        color: '#ffcc00'
     },
-    overlord: {
-        id: 'overlord',
-        name: 'The Overlord',
-        description: 'The ultimate combat platform. Command the arena with authority.',
-        cost: 250000,
-        icon: Cpu,
-        rarity: 'mythic',
+    void_pulse: {
+        id: 'void_pulse',
+        name: 'Void Pulse',
+        description: 'A corrupted variant of the glitch core, drawing power from the null-space.',
+        cost: 50000,
+        icon: Ghost,
+        rarity: 'epic',
         color: '#ff00ff'
+    },
+    sky_guardian: {
+        id: 'sky_guardian',
+        name: 'Sky Guardian',
+        description: 'A winged interceptor frame optimized for aerial domination optics.',
+        cost: 150000,
+        icon: Triangle,
+        rarity: 'legendary',
+        color: '#ffffff'
+    },
+    golden_sentinel: {
+        id: 'golden_sentinel',
+        name: 'Golden Sentinel',
+        description: 'The pinnacle of martial engineering. Heavy, golden, and unstoppable.',
+        cost: 300000,
+        icon: Shield,
+        rarity: 'mythic',
+        color: '#ffd700'
     }
 };
 

@@ -6,6 +6,20 @@ import { ATTRIBUTES } from '../utils/AttributeRegistry';
 
 export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const skinsImage = React.useMemo(() => {
+        const img = new Image();
+        img.src = '/player_skins.png';
+        return img;
+    }, []);
+
+    const SKINS_SPRITE_MAP: Record<string, { sx: number, sy: number }> = {
+        neon_glitch: { sx: 0, sy: 0 },
+        binary_link: { sx: 341, sy: 0 },
+        sun_god: { sx: 682, sy: 0 },
+        void_pulse: { sx: 0, sy: 242 },
+        sky_guardian: { sx: 341, sy: 242 },
+        golden_sentinel: { sx: 682, sy: 242 }
+    };
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -303,6 +317,21 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
 
                 // --- Helper for Skin Shapes ---
                 const drawEntityShape = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, skinId: string, color: string) => {
+                    if (SKINS_SPRITE_MAP[skinId] && skinsImage.complete) {
+                        const coords = SKINS_SPRITE_MAP[skinId];
+                        const sw = 341;
+                        const sh = 242;
+
+                        // Scale it slightly larger than the radius for better visual impact
+                        const drawSize = r * 3;
+                        ctx.drawImage(
+                            skinsImage,
+                            coords.sx, coords.sy, sw, sh,
+                            x - drawSize / 2, y - drawSize / 2, drawSize, drawSize
+                        );
+                        return;
+                    }
+
                     ctx.fillStyle = color;
                     if (ent.type !== 'projectile') {
                         ctx.shadowBlur = 10;
@@ -311,62 +340,16 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                     ctx.beginPath();
 
                     switch (skinId) {
-                        case 'sentinel': // Square
+                        case 'sentinel': // Square (Legacy)
                             ctx.rect(x - r, y - r, r * 2, r * 2);
                             break;
-                        case 'vanguard': // Triangle
+                        case 'vanguard': // Triangle (Legacy)
                             ctx.moveTo(x, y - r * 1.2);
                             ctx.lineTo(x - r, y + r);
                             ctx.lineTo(x + r, y + r);
                             ctx.closePath();
                             break;
-                        case 'interceptor': // Diamond
-                            ctx.moveTo(x, y - r * 1.3);
-                            ctx.lineTo(x - r, y);
-                            ctx.lineTo(x, y + r * 1.3);
-                            ctx.lineTo(x + r, y);
-                            ctx.closePath();
-                            break;
-                        case 'technomancer': // Hexagon
-                            for (let i = 0; i < 6; i++) {
-                                const angle = (i * Math.PI) / 3;
-                                const px = x + r * 1.1 * Math.cos(angle);
-                                const py = y + r * 1.1 * Math.sin(angle);
-                                if (i === 0) ctx.moveTo(px, py);
-                                else ctx.lineTo(px, py);
-                            }
-                            ctx.closePath();
-                            break;
-                        case 'phantom': { // Ghostly
-                            const flicker = Math.sin(Date.now() / 100) * 0.2 + 0.8;
-                            ctx.globalAlpha *= flicker;
-                            ctx.arc(x, y, r, 0, Math.PI * 2);
-                            break;
-                        }
-                        case 'starlight': { // Star
-                            const innerR = r * 0.5;
-                            const outerR = r * 1.2;
-                            for (let i = 0; i < 5; i++) {
-                                let angle = (i * 2 * Math.PI) / 5 - Math.PI / 2;
-                                ctx.lineTo(x + outerR * Math.cos(angle), y + outerR * Math.sin(angle));
-                                angle += Math.PI / 5;
-                                ctx.lineTo(x + innerR * Math.cos(angle), y + innerR * Math.sin(angle));
-                            }
-                            ctx.closePath();
-                            break;
-                        }
-                        case 'overlord': // Octagon
-                            for (let i = 0; i < 8; i++) {
-                                const angle = (i * Math.PI) / 4;
-                                const dist = i % 2 === 0 ? r * 1.2 : r * 0.9;
-                                const px = x + dist * Math.cos(angle);
-                                const py = y + dist * Math.sin(angle);
-                                if (i === 0) ctx.moveTo(px, py);
-                                else ctx.lineTo(px, py);
-                            }
-                            ctx.closePath();
-                            break;
-                        default: // Circle
+                        default: // Circle (START PLAYER)
                             ctx.arc(x, y, r, 0, Math.PI * 2);
                     }
                     ctx.fill();
