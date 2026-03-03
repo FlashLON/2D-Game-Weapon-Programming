@@ -322,8 +322,8 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                         const sw = 341;
                         const sh = 242;
 
-                        // Scale it slightly larger than the radius for better visual impact
-                        const drawSize = r * 3;
+                        // Scale it larger than the radius for better visual impact (show off glows/auras)
+                        const drawSize = r * 4.5;
                         ctx.drawImage(
                             skinsImage,
                             coords.sx, coords.sy, sw, sh,

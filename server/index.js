@@ -1331,7 +1331,12 @@ io.on('connection', (socket) => {
                 p.titles = profile.titles;
                 p.equippedTitle = profile.equippedTitle;
                 p.equippedSkin = profile.equippedSkin;
-                p.ownedSkins = profile.ownedSkins || ['default'];
+                // Important: Merge owned skins to prevent loss during desync
+                if (serverUser && serverUser.ownedSkins && serverUser.ownedSkins.length > (p.ownedSkins?.length || 0)) {
+                    p.ownedSkins = serverUser.ownedSkins;
+                } else {
+                    p.ownedSkins = profile.ownedSkins || ['default'];
+                }
                 p.aura_type = profile.aura_type;
             }
 
@@ -1388,6 +1393,15 @@ io.on('connection', (socket) => {
             user.ownedSkins.push(skinId);
 
             await saveProgress(socket.data.username, user);
+
+            // CRITICAL: Update in room immediately so desync doesn't revert it
+            const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+            if (roomId && rooms[roomId] && rooms[roomId].players[socket.id]) {
+                const p = rooms[roomId].players[socket.id];
+                p.money = user.money;
+                p.ownedSkins = [...user.ownedSkins];
+            }
+
             socket.emit('profile_update', cleanProfileForClient(user));
             socket.emit('notification', { type: 'unlock', message: `✨ SKIN UNLOCKED: ${skinId.toUpperCase()}` });
 

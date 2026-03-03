@@ -148,6 +148,17 @@ function App() {
   };
 
   const handleBuySkin = (skinId: string, cost: number) => {
+    // Optimistic Update: Update locally while server processes
+    setUserProfile((prev: any) => {
+      if (prev.money < cost) return prev;
+      if (prev.ownedSkins.includes(skinId)) return prev;
+      return {
+        ...prev,
+        money: prev.money - cost,
+        ownedSkins: [...prev.ownedSkins, skinId]
+      };
+    });
+
     if (networkManager.isConnected()) {
       const socket = (networkManager as any).socket;
       if (socket) socket.emit('buy_skin', { skinId, cost });
