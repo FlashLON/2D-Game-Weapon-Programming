@@ -93,6 +93,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [coopDifficulty, setCoopDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
     const [searchTimer, setSearchTimer] = useState(0);
     const [copiedPartyId, setCopiedPartyId] = useState(false);
+    const [analyticsData, setAnalyticsData] = useState<any>(null);
+    const [adminSubTab, setAdminSubTab] = useState<'commands' | 'analytics'>('commands');
     const isQueued = queueStatus?.status === 'queued' || queueStatus?.status === 'already_queued';
 
     useEffect(() => {
@@ -666,64 +668,195 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     onEquip={(id) => onEquipTitle?.(id)}
                                 />
                             ) : inventoryTab === 'admin' && username?.toLowerCase() === 'flashlon' ? (
-                                <div className="flex flex-col items-center justify-start py-6 px-3 animate-in fade-in zoom-in duration-300 relative w-full min-h-full">
+                                <div className="flex flex-col items-center justify-start py-4 px-3 animate-in fade-in zoom-in duration-300 relative w-full min-h-full overflow-y-auto max-h-[500px]">
                                     <div className="absolute inset-0 bg-red-500/3 pointer-events-none rounded-xl" />
-                                    <Shield size={48} className="text-red-500 mb-4 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)] z-10" />
-                                    <h3 className="text-2xl font-black text-white uppercase tracking-[0.15em] mb-1 z-10">Admin Override</h3>
-                                    <p className="text-red-300/50 text-[9px] uppercase font-bold tracking-widest mb-6 z-10">Full access granted</p>
+                                    <Shield size={36} className="text-red-500 mb-2 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)] z-10" />
+                                    <h3 className="text-xl font-black text-white uppercase tracking-[0.15em] mb-1 z-10">Admin Override</h3>
+                                    <p className="text-red-300/50 text-[9px] uppercase font-bold tracking-widest mb-3 z-10">Full access granted</p>
 
-                                    <div className="w-full max-w-sm space-y-2 z-10">
-                                        <button onClick={() => { const msg = window.prompt('Enter message:'); if (msg) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('broadcast', { message: msg })); }}
-                                            className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
-                                            <Globe size={14} /> Broadcast Message
+                                    {/* Sub-tabs: Commands | Analytics */}
+                                    <div className="flex gap-1 mb-4 z-10 w-full max-w-sm">
+                                        <button onClick={() => setAdminSubTab('commands')}
+                                            className={`flex-1 py-1.5 text-[9px] font-black uppercase rounded-lg transition-all ${adminSubTab === 'commands' ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'text-white/30 hover:text-white/50'}`}>
+                                            ⚡ Commands
                                         </button>
-                                        <button onClick={() => { if (window.confirm('Kick all?')) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('kick_all')); }}
-                                            className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
-                                            <Users2 size={14} /> Kick All Players
-                                        </button>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { if (window.confirm('Heal all?')) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('global_heal')); }}
-                                                className="flex-1 bg-emerald-900/15 border border-emerald-500/20 text-emerald-400/70 font-black py-3 rounded-xl hover:bg-emerald-500/15 hover:text-emerald-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
-                                                <Target size={14} /> Global Heal
-                                            </button>
-                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; const a = window.prompt('Amount:'); if (a) { const n = parseInt(a, 10); if (!isNaN(n)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('inject_currency', { targetUser: u, amount: n })); } }}
-                                                className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
-                                                <DollarSign size={14} /> Inject $
-                                            </button>
-                                        </div>
-                                        <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; const l = window.prompt('Level:'); const x = window.prompt('XP:'); const p: any = { targetUser: u }; if (l) p.level = parseInt(l, 10); if (x) p.xp = parseInt(x, 10); import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('set_user_stats', p)); }}
-                                            className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
-                                            <TrendingUp size={14} /> Set Stats
-                                        </button>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_titles', { targetUser: u })); }}
-                                                className="flex-1 bg-purple-900/15 border border-purple-500/20 text-purple-400/60 font-black py-3 rounded-xl hover:bg-purple-500/15 hover:text-purple-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
-                                                <Shield size={12} /> All Titles
-                                            </button>
-                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('max_limits', { targetUser: u })); }}
-                                                className="flex-1 bg-purple-900/15 border border-purple-500/20 text-purple-400/60 font-black py-3 rounded-xl hover:bg-purple-500/15 hover:text-purple-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
-                                                <Cpu size={12} /> Max Limits
-                                            </button>
-                                        </div>
-                                        <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_values', { targetUser: u })); }}
-                                            className="w-full bg-gradient-to-r from-red-600/20 to-purple-600/20 border border-red-500/30 text-white/70 font-black py-3 rounded-xl hover:from-red-600/30 hover:to-purple-600/30 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
-                                            <Zap size={14} /> Unlock Everything
-                                        </button>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { const r = window.prompt('Room ID (blank=ALL):'); import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('nuke_enemies', { roomId: r })); }}
-                                                className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/60 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
-                                                <Swords size={12} /> Nuke
-                                            </button>
-                                            <button onClick={() => { const r = window.prompt('Room ID:'); if (r) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: r })); }}
-                                                className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/60 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
-                                                <Target size={12} /> Boss
-                                            </button>
-                                        </div>
-                                        <button onClick={() => { const u = window.prompt('Username to wipe:'); if (u && window.confirm(`DELETE ALL progress for ${u}?`)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_account', { targetUser: u })); }}
-                                            className="w-full bg-red-900/30 border border-red-500/50 text-red-200/60 font-black py-2.5 rounded-xl hover:bg-red-600/40 hover:text-white transition-all text-[9px] uppercase mt-2">
-                                            ⚠️ Wipe Account ⚠️
+                                        <button onClick={() => { setAdminSubTab('analytics'); import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('get_analytics', {})); }}
+                                            className={`flex-1 py-1.5 text-[9px] font-black uppercase rounded-lg transition-all ${adminSubTab === 'analytics' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'text-white/30 hover:text-white/50'}`}>
+                                            📊 Analytics
                                         </button>
                                     </div>
+
+                                    {adminSubTab === 'commands' ? (
+                                        <div className="w-full max-w-sm space-y-2 z-10">
+                                            <button onClick={() => { const msg = window.prompt('Enter message:'); if (msg) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('broadcast', { message: msg })); }}
+                                                className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <Globe size={14} /> Broadcast Message
+                                            </button>
+                                            <button onClick={() => { if (window.confirm('Kick all?')) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('kick_all')); }}
+                                                className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <Users2 size={14} /> Kick All Players
+                                            </button>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { if (window.confirm('Heal all?')) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('global_heal')); }}
+                                                    className="flex-1 bg-emerald-900/15 border border-emerald-500/20 text-emerald-400/70 font-black py-3 rounded-xl hover:bg-emerald-500/15 hover:text-emerald-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                    <Target size={14} /> Global Heal
+                                                </button>
+                                                <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; const a = window.prompt('Amount:'); if (a) { const n = parseInt(a, 10); if (!isNaN(n)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('inject_currency', { targetUser: u, amount: n })); } }}
+                                                    className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                    <DollarSign size={14} /> Inject $
+                                                </button>
+                                            </div>
+                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; const l = window.prompt('Level:'); const x = window.prompt('XP:'); const p: any = { targetUser: u }; if (l) p.level = parseInt(l, 10); if (x) p.xp = parseInt(x, 10); import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('set_user_stats', p)); }}
+                                                className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <TrendingUp size={14} /> Set Stats
+                                            </button>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_titles', { targetUser: u })); }}
+                                                    className="flex-1 bg-purple-900/15 border border-purple-500/20 text-purple-400/60 font-black py-3 rounded-xl hover:bg-purple-500/15 hover:text-purple-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                    <Shield size={12} /> All Titles
+                                                </button>
+                                                <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('max_limits', { targetUser: u })); }}
+                                                    className="flex-1 bg-purple-900/15 border border-purple-500/20 text-purple-400/60 font-black py-3 rounded-xl hover:bg-purple-500/15 hover:text-purple-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                    <Cpu size={12} /> Max Limits
+                                                </button>
+                                            </div>
+                                            <button onClick={() => { const u = window.prompt('Username:') || 'flashlon'; if (u) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('unlock_all_values', { targetUser: u })); }}
+                                                className="w-full bg-gradient-to-r from-red-600/20 to-purple-600/20 border border-red-500/30 text-white/70 font-black py-3 rounded-xl hover:from-red-600/30 hover:to-purple-600/30 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <Zap size={14} /> Unlock Everything
+                                            </button>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { const r = window.prompt('Room ID (blank=ALL):'); import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('nuke_enemies', { roomId: r })); }}
+                                                    className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/60 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                    <Swords size={12} /> Nuke
+                                                </button>
+                                                <button onClick={() => { const r = window.prompt('Room ID:'); if (r) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('spawn_boss', { roomId: r })); }}
+                                                    className="flex-1 bg-red-900/15 border border-red-500/20 text-red-400/60 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[9px] uppercase flex items-center justify-center gap-1">
+                                                    <Target size={12} /> Boss
+                                                </button>
+                                            </div>
+                                            <button onClick={() => { const u = window.prompt('Username to wipe:'); if (u && window.confirm(`DELETE ALL progress for ${u}?`)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_account', { targetUser: u })); }}
+                                                className="w-full bg-red-900/30 border border-red-500/50 text-red-200/60 font-black py-2.5 rounded-xl hover:bg-red-600/40 hover:text-white transition-all text-[9px] uppercase mt-2">
+                                                ⚠️ Wipe Account ⚠️
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        /* Analytics Dashboard */
+                                        <div className="w-full max-w-sm space-y-3 z-10">
+                                            <button onClick={() => import('../utils/NetworkManager').then(m => { m.networkManager.adminCommand('get_analytics', {}); m.networkManager.setOnAnalyticsData((data: any) => setAnalyticsData(data)); })}
+                                                className="w-full bg-cyan-900/20 border border-cyan-500/20 text-cyan-300 font-black py-2 rounded-lg text-[9px] uppercase hover:bg-cyan-500/20 transition-all">
+                                                🔄 Refresh Analytics
+                                            </button>
+                                            {analyticsData ? (
+                                                <>
+                                                    {/* Live Stats */}
+                                                    <div className="bg-black/40 border border-cyan-500/10 rounded-xl p-3">
+                                                        <div className="text-[8px] font-black text-cyan-400/60 uppercase tracking-widest mb-2">📡 Live</div>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <div className="text-center">
+                                                                <div className="text-lg font-black text-emerald-400">{analyticsData.live?.onlineNow || 0}</div>
+                                                                <div className="text-[7px] text-white/30 uppercase">Online</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-lg font-black text-blue-400">{analyticsData.live?.activeRooms || 0}</div>
+                                                                <div className="text-[7px] text-white/30 uppercase">Rooms</div>
+                                                            </div>
+                                                            <div className="text-center">
+                                                                <div className="text-lg font-black text-yellow-400">{analyticsData.live?.queueSize || 0}</div>
+                                                                <div className="text-[7px] text-white/30 uppercase">In Queue</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Today Stats */}
+                                                    <div className="bg-black/40 border border-white/5 rounded-xl p-3">
+                                                        <div className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-2">📅 Today ({analyticsData.today?.date})</div>
+                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                                                            {[
+                                                                ['DAU', analyticsData.today?.dau || 0, 'text-cyan-400'],
+                                                                ['Sessions', analyticsData.today?.sessions || 0, 'text-blue-400'],
+                                                                ['Kills', analyticsData.today?.kills || 0, 'text-red-400'],
+                                                                ['Deaths', analyticsData.today?.deaths || 0, 'text-orange-400'],
+                                                                ['Matches', analyticsData.today?.matchesPlayed || 0, 'text-purple-400'],
+                                                                ['Avg Play', `${analyticsData.today?.avgPlaytimeMin || 0}m`, 'text-emerald-400'],
+                                                                ['Peak Online', analyticsData.today?.peakConcurrent || 0, 'text-yellow-400'],
+                                                                ['Signups', analyticsData.today?.registrations || 0, 'text-pink-400'],
+                                                            ].map(([label, val, color], i) => (
+                                                                <div key={i} className="flex justify-between items-center">
+                                                                    <span className="text-[8px] text-white/30">{label}</span>
+                                                                    <span className={`text-[10px] font-black ${color}`}>{val}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Mode Popularity */}
+                                                    <div className="bg-black/40 border border-white/5 rounded-xl p-3">
+                                                        <div className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-2">🎮 Mode Popularity (Today)</div>
+                                                        <div className="space-y-1.5">
+                                                            {Object.entries(analyticsData.today?.modes || {}).map(([mode, count]: [string, any]) => {
+                                                                const total = Object.values(analyticsData.today?.modes || {}).reduce((a: number, b: any) => a + (b as number), 0) as number;
+                                                                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                                                                const colors: Record<string, string> = { sandbox: '#00ff9f', coop: '#4488ff', '2v2': '#ff4444', custom: '#ff9f00' };
+                                                                return (
+                                                                    <div key={mode}>
+                                                                        <div className="flex justify-between text-[8px] mb-0.5">
+                                                                            <span className="text-white/50 uppercase">{mode}</span>
+                                                                            <span className="text-white/30">{count} ({pct}%)</span>
+                                                                        </div>
+                                                                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: colors[mode] || '#888' }} />
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Global Stats */}
+                                                    <div className="bg-black/40 border border-white/5 rounded-xl p-3">
+                                                        <div className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-2">🌐 All-Time</div>
+                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                                                            {[
+                                                                ['Total Players', analyticsData.global?.totalPlayers || 0, 'text-cyan-400'],
+                                                                ['Total Sessions', analyticsData.global?.totalSessions || 0, 'text-blue-400'],
+                                                                ['Total Kills', analyticsData.global?.totalKills || 0, 'text-red-400'],
+                                                                ['Avg K/D', analyticsData.global?.avgKDRatio || 0, 'text-orange-400'],
+                                                                ['Play Time', `${analyticsData.global?.totalPlayTimeHours || 0}h`, 'text-emerald-400'],
+                                                                ['Total Matches', analyticsData.global?.totalMatchesPlayed || 0, 'text-purple-400'],
+                                                                ['Peak Concurrent', analyticsData.global?.peakConcurrent || 0, 'text-yellow-400'],
+                                                                ['Uptime', `${analyticsData.global?.serverUptimeHours || 0}h`, 'text-white/60'],
+                                                            ].map(([label, val, color], i) => (
+                                                                <div key={i} className="flex justify-between items-center">
+                                                                    <span className="text-[8px] text-white/30">{label}</span>
+                                                                    <span className={`text-[10px] font-black ${color}`}>{val}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 7-Day Trend */}
+                                                    <div className="bg-black/40 border border-white/5 rounded-xl p-3">
+                                                        <div className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-2">📈 7-Day DAU Trend</div>
+                                                        <div className="flex items-end gap-1 h-12">
+                                                            {(analyticsData.recentDays || []).map((day: any, i: number) => {
+                                                                const maxDau = Math.max(1, ...analyticsData.recentDays.map((d: any) => d.dau || 0));
+                                                                const height = Math.max(4, ((day.dau || 0) / maxDau) * 100);
+                                                                return (
+                                                                    <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                                                                        <div className="text-[6px] text-cyan-400 font-bold">{day.dau || 0}</div>
+                                                                        <div className="w-full bg-cyan-500/40 rounded-t" style={{ height: `${height}%` }} />
+                                                                        <div className="text-[5px] text-white/20">{day.date.slice(5)}</div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="text-white/20 text-[9px] text-center py-6">Click Refresh to load analytics data</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <SavedCodePanel

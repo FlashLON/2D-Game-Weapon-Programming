@@ -224,6 +224,211 @@ setInterval(async () => {
 
 const PORT = process.env.PORT || 3000;
 
+// =================== PLAYER ANALYTICS SYSTEM ===================
+function getTodayKey() {
+    return new Date().toISOString().split('T')[0]; // '2026-03-03'
+}
+
+const analytics = {
+    // In-memory counters (synced to Firebase periodically)
+    daily: {},   // keyed by date string
+    global: {
+        totalSessions: 0,
+        totalPlayTimeSeconds: 0,
+        totalKills: 0,
+        totalDeaths: 0,
+        totalMatchesPlayed: 0,
+        totalRegistrations: 0,
+        peakConcurrent: 0
+    },
+    activeSessions: {},  // socketId -> { username, connectedAt }
+    serverStartedAt: Date.now()
+};
+
+function ensureDailyBucket(dateKey) {
+    if (!analytics.daily[dateKey]) {
+        analytics.daily[dateKey] = {
+            dau: new Set(),         // unique usernames
+            sessions: 0,
+            totalPlayTimeSeconds: 0,
+            kills: 0,
+            deaths: 0,
+            matchesPlayed: 0,
+            registrations: 0,
+            modes: { sandbox: 0, coop: 0, '2v2': 0, custom: 0 },
+            peakConcurrent: 0,
+            weaponsFired: {}
+        };
+    }
+    return analytics.daily[dateKey];
+}
+
+function trackEvent(eventType, data = {}) {
+    const today = getTodayKey();
+    const bucket = ensureDailyBucket(today);
+
+    switch (eventType) {
+        case 'session_start': {
+            bucket.sessions++;
+            analytics.global.totalSessions++;
+            if (data.username) bucket.dau.add(data.username);
+            // Track peak concurrent
+            const concurrent = Object.keys(analytics.activeSessions).length;
+            if (concurrent > bucket.peakConcurrent) bucket.peakConcurrent = concurrent;
+            if (concurrent > analytics.global.peakConcurrent) analytics.global.peakConcurrent = concurrent;
+            break;
+        }
+        case 'session_end': {
+            if (data.durationSeconds) {
+                bucket.totalPlayTimeSeconds += data.durationSeconds;
+                analytics.global.totalPlayTimeSeconds += data.durationSeconds;
+            }
+            break;
+        }
+        case 'kill': {
+            bucket.kills++;
+            analytics.global.totalKills++;
+            break;
+        }
+        case 'death': {
+            bucket.deaths++;
+            analytics.global.totalDeaths++;
+            break;
+        }
+        case 'match_start': {
+            bucket.matchesPlayed++;
+            analytics.global.totalMatchesPlayed++;
+            break;
+        }
+        case 'mode_join': {
+            const mode = data.mode || 'custom';
+            if (bucket.modes[mode] !== undefined) {
+                bucket.modes[mode]++;
+            } else {
+                bucket.modes.custom++;
+            }
+            break;
+        }
+        case 'registration': {
+            bucket.registrations++;
+            analytics.global.totalRegistrations++;
+            break;
+        }
+        case 'weapon_fire': {
+            const weaponType = data.weaponType || 'default';
+            bucket.weaponsFired[weaponType] = (bucket.weaponsFired[weaponType] || 0) + 1;
+            break;
+        }
+    }
+}
+
+function getAnalyticsSummary() {
+    const today = getTodayKey();
+    const bucket = ensureDailyBucket(today);
+    const onlineNow = Object.keys(analytics.activeSessions).length;
+    const totalPlayers = memoryUsers.size;
+
+    // Build recent 7 days
+    const recentDays = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split('T')[0];
+        const b = analytics.daily[key];
+        recentDays.push({
+            date: key,
+            dau: b ? (b.dau instanceof Set ? b.dau.size : (b.dau || 0)) : 0,
+            sessions: b?.sessions || 0,
+            kills: b?.kills || 0,
+            deaths: b?.deaths || 0,
+            avgPlaytimeMin: b && b.sessions > 0 ? Math.round(b.totalPlayTimeSeconds / b.sessions / 60 * 10) / 10 : 0,
+            matchesPlayed: b?.matchesPlayed || 0,
+            modes: b?.modes || { sandbox: 0, coop: 0, '2v2': 0, custom: 0 },
+            peakConcurrent: b?.peakConcurrent || 0,
+            registrations: b?.registrations || 0
+        });
+    }
+
+    // Top weapons today
+    const weaponStats = Object.entries(bucket.weaponsFired || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ name, count }));
+
+    return {
+        today: {
+            date: today,
+            dau: bucket.dau instanceof Set ? bucket.dau.size : (bucket.dau || 0),
+            sessions: bucket.sessions,
+            kills: bucket.kills,
+            deaths: bucket.deaths,
+            matchesPlayed: bucket.matchesPlayed,
+            avgPlaytimeMin: bucket.sessions > 0 ? Math.round(bucket.totalPlayTimeSeconds / bucket.sessions / 60 * 10) / 10 : 0,
+            modes: bucket.modes,
+            peakConcurrent: bucket.peakConcurrent,
+            registrations: bucket.registrations,
+            topWeapons: weaponStats
+        },
+        global: {
+            ...analytics.global,
+            totalPlayers,
+            totalPlayTimeHours: Math.round(analytics.global.totalPlayTimeSeconds / 3600 * 10) / 10,
+            avgKDRatio: analytics.global.totalDeaths > 0
+                ? Math.round(analytics.global.totalKills / analytics.global.totalDeaths * 100) / 100
+                : 0,
+            serverUptimeHours: Math.round((Date.now() - analytics.serverStartedAt) / 3600000 * 10) / 10
+        },
+        live: {
+            onlineNow,
+            activeRooms: Object.keys(rooms).length,
+            queueSize: matchmakingQueue?.length || 0
+        },
+        recentDays
+    };
+}
+
+// Sync analytics to Firebase every 60 seconds
+setInterval(async () => {
+    if (!firebaseDb) return;
+    try {
+        const today = getTodayKey();
+        const bucket = analytics.daily[today];
+        if (!bucket) return;
+
+        const dailyData = {
+            dau: bucket.dau instanceof Set ? bucket.dau.size : (bucket.dau || 0),
+            sessions: bucket.sessions,
+            totalPlayTimeSeconds: bucket.totalPlayTimeSeconds,
+            kills: bucket.kills,
+            deaths: bucket.deaths,
+            matchesPlayed: bucket.matchesPlayed,
+            registrations: bucket.registrations,
+            modes: bucket.modes,
+            peakConcurrent: bucket.peakConcurrent,
+            weaponsFired: bucket.weaponsFired
+        };
+
+        await firebaseDb.ref(`analytics/daily/${today}`).set(dailyData);
+        await firebaseDb.ref('analytics/global').set(analytics.global);
+    } catch (e) {
+        console.error('[Analytics] Firebase sync error:', e.message);
+    }
+}, 60000);
+
+// Load analytics from Firebase on startup
+(async () => {
+    if (!firebaseDb) return;
+    try {
+        const globalSnap = await firebaseDb.ref('analytics/global').once('value');
+        if (globalSnap.val()) {
+            Object.assign(analytics.global, globalSnap.val());
+            console.log('📊 Loaded analytics from Firebase');
+        }
+    } catch (e) {
+        console.error('[Analytics] Failed to load from Firebase:', e.message);
+    }
+})();
+
 // Multiple Game Instances (Rooms/Parties)
 const rooms = {};
 
@@ -554,6 +759,8 @@ function tryMatchmake(forceWithBots = false) {
     const roomId = generate2v2RoomId();
 
     console.log(`[MATCHMAKING] Creating 2v2 room: ${roomId} with ${matched.map(p => p.username).join(', ')}`);
+    trackEvent('match_start', { mode: '2v2' });
+    trackEvent('mode_join', { mode: '2v2' });
 
     rooms[roomId] = {
         id: roomId,
@@ -778,6 +985,10 @@ io.on('connection', (socket) => {
             // CACHE USER FOR TITLES (Crucial for Firebase users)
             memoryUsers.set(username, user);
 
+            // Analytics: Track session start
+            analytics.activeSessions[socket.id] = { username, connectedAt: Date.now() };
+            trackEvent('session_start', { username });
+
             socket.emit('login_response', {
                 success: true,
                 isNew: false,
@@ -862,6 +1073,11 @@ io.on('connection', (socket) => {
             memoryUsers.set(username, newUser);
 
             socket.data.username = username;
+
+            // Analytics: Track registration + session
+            trackEvent('registration', { username });
+            analytics.activeSessions[socket.id] = { username, connectedAt: Date.now() };
+            trackEvent('session_start', { username });
             socket.emit('login_response', {
                 success: true,
                 isNew: true,
@@ -949,6 +1165,9 @@ io.on('connection', (socket) => {
                 walls: MAPS['arena_pillars'].walls
             };
         }
+
+        // Analytics: Track mode join
+        trackEvent('mode_join', { mode: rooms[roomId]?.mode || 'pvp' });
 
         const room = rooms[roomId];
 
@@ -1492,6 +1711,11 @@ io.on('connection', (socket) => {
                     }
                 }
                 break;
+            case 'get_analytics': {
+                const summary = getAnalyticsSummary();
+                socket.emit('analytics_data', summary);
+                break;
+            }
         }
     });
 
@@ -2032,6 +2256,14 @@ io.on('connection', (socket) => {
                     });
                 });
             }
+        }
+
+        // Analytics: Track session end
+        const session = analytics.activeSessions[socket.id];
+        if (session) {
+            const durationSeconds = Math.round((Date.now() - session.connectedAt) / 1000);
+            trackEvent('session_end', { username: session.username, durationSeconds });
+            delete analytics.activeSessions[socket.id];
         }
 
         leaveRoom(socket.id);
@@ -2725,6 +2957,8 @@ setInterval(() => {
                                 killer.killstreak = (killer.killstreak || 0) + 1; // Increment streak
 
                                 console.log(`[KILL] ${killer.username} got a kill! Session kills: ${killer.kills}, Killstreak: ${killer.killstreak}`);
+                                trackEvent('kill', { killer: killer.username });
+                                trackEvent('death', { victim: ent.username || ent.id });
 
                                 // Update persistent kill count
                                 let user = memoryUsers.get(killer.username);
