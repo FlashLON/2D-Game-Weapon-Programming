@@ -1,26 +1,42 @@
 import { initializeApp } from "firebase/app";
-import { getAnalytics, logEvent } from "firebase/analytics";
+import { getAnalytics, logEvent, isSupported } from "firebase/analytics";
 
-// Firebase configuration using the provided Measurement ID
-// Replace other values with appropriate project values if available
+// Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSy" + Math.random().toString(36).substring(2, 20), // Placeholder if unknown, analytics may still work with just Measurement ID in some cases or generate a similar pattern
+    apiKey: "AIzaSyDaDTqopDOBVNXRaKfV0Zc2n7lgzkB1IzQ",
     authDomain: "cybercore-2124b.firebaseapp.com",
+    databaseURL: "https://cybercore-2124b-default-rtdb.firebaseio.com",
     projectId: "cybercore-2124b",
-    storageBucket: "cybercore-2124b.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef123456",
+    storageBucket: "cybercore-2124b.firebasestorage.app",
+    messagingSenderId: "91112365800",
+    appId: "1:91112365800:web:e8b1d29387930525deb35d",
     measurementId: "G-YPW4VJXWDB"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+
+// Initialize Analytics safely
+let analytics: any = null;
+
+// Initialize analytics only if supported and in browser
+isSupported().then((supported) => {
+    if (supported && typeof window !== 'undefined') {
+        analytics = getAnalytics(app);
+        console.log("📊 [GA4] Analytics Initialized");
+    }
+}).catch(err => {
+    console.warn("📊 [GA4] Analytics failed to load:", err.message);
+});
 
 export const trackGAEvent = (eventName: string, params?: object) => {
-    if (analytics) {
-        logEvent(analytics, eventName, params);
-        console.log(`📊 [GA4] Event: ${eventName}`, params);
+    try {
+        if (analytics) {
+            logEvent(analytics, eventName, params);
+            // console.log(`📊 [GA4] Event: ${eventName}`, params);
+        }
+    } catch (err) {
+        console.error(`📊 [GA4] Failed to track event ${eventName}:`, err);
     }
 };
 
