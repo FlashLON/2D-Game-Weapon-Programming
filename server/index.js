@@ -1432,6 +1432,60 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- TOKEN STORE (Real Money Packs) ---
+    const TOKEN_PACKS = {
+        starter_hack: { totalTokens: 200, priceUsd: 1.99 },
+        mercenary_pack: { totalTokens: 550, priceUsd: 4.99 },
+        cybernetic_pack: { totalTokens: 1150, priceUsd: 9.99 },
+        overlord_cache: { totalTokens: 2400, priceUsd: 19.99 },
+        matrix_core: { totalTokens: 6500, priceUsd: 49.99 }
+    };
+
+    socket.on('buy_tokens', async ({ packId }) => {
+        if (!socket.data.username) return;
+
+        try {
+            const pack = TOKEN_PACKS[packId];
+            if (!pack) {
+                socket.emit('notification', { type: 'error', message: 'Invalid token pack.' });
+                return;
+            }
+
+            const user = memoryUsers.get(socket.data.username);
+            if (!user) return;
+
+            // Credit tokens
+            user.money = (user.money || 0) + pack.totalTokens;
+
+            // Record purchase for audit trail
+            if (!user.purchases) user.purchases = [];
+            user.purchases.push({
+                packId,
+                tokens: pack.totalTokens,
+                priceUsd: pack.priceUsd,
+                timestamp: new Date().toISOString()
+            });
+
+            await saveProgress(socket.data.username, user);
+
+            // Sync with active room
+            const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+            if (roomId && rooms[roomId] && rooms[roomId].players[socket.id]) {
+                rooms[roomId].players[socket.id].money = user.money;
+            }
+
+            socket.emit('profile_update', cleanProfileForClient(user));
+            socket.emit('notification', {
+                type: 'unlock',
+                message: `💰 +${pack.totalTokens.toLocaleString()} COINS added to your account!`
+            });
+
+            console.log(`[STORE] ${socket.data.username} purchased ${packId} (+${pack.totalTokens} coins)`);
+        } catch (err) {
+            console.error("[STORE] Token Purchase Error:", err);
+            socket.emit('notification', { type: 'error', message: 'Purchase failed. Please try again.' });
+        }
+    });
     // TEST COMMAND - Remove in production
     socket.on('test_unlock_title', ({ titleId }) => {
         console.log(`[TEST] ========== TEST UNLOCK TITLE ==========`);

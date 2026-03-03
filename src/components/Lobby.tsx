@@ -3,6 +3,7 @@ import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpe
 import { Tutorial } from './Tutorial';
 import { SavedCodePanel } from './SavedCodePanel';
 import { TitlesPanel } from './TitlesPanel';
+import { TokenShop } from './TokenShop';
 import { SKINS } from '../utils/SkinRegistry';
 import { ATTRIBUTES, getUpgradeCost } from '../utils/AttributeRegistry';
 import type { SavedCode } from '../utils/NetworkManager';
@@ -40,6 +41,7 @@ interface LobbyProps {
     onEquipTitle?: (titleId: string | null) => void;
     onEquipSkin?: (skinId: string) => void;
     onBuySkin?: (skinId: string, cost: number) => void;
+    onBuyTokens?: (packId: string, totalTokens: number) => void;
     queueStatus?: any;
     partyData?: any;
     onQueue2v2?: () => void;
@@ -82,7 +84,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     gameSettings,
     onUpdateSettings,
     onEquipSkin,
-    onBuySkin
+    onBuySkin,
+    onBuyTokens
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
@@ -460,6 +463,15 @@ export const Lobby: React.FC<LobbyProps> = ({
                                 )}
                             </div>
                         </div>
+
+                        {/* ──── Token Shop ──── */}
+                        {isLoggedIn && isConnected && (
+                            <TokenShop
+                                userMoney={userProfile?.money || 0}
+                                isLoggedIn={isLoggedIn ?? false}
+                                onPurchase={onBuyTokens}
+                            />
+                        )}
 
                         {/* ──── Custom Room Section ──── */}
                         <div className="bg-black/30 border border-white/5 rounded-2xl p-4">

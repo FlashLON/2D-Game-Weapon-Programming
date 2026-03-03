@@ -173,6 +173,19 @@ function App() {
     }));
   };
 
+  const handleBuyTokens = (packId: string, totalTokens: number) => {
+    // Optimistic local update
+    setUserProfile((prev: any) => ({
+      ...prev,
+      money: (prev.money || 0) + totalTokens
+    }));
+
+    if (networkManager.isConnected()) {
+      const socket = (networkManager as any).socket;
+      if (socket) socket.emit('buy_tokens', { packId });
+    }
+  };
+
   const handleCardSelect = (type: 'unlock' | 'upgrade', attributeId: string, value: number) => {
     setUserProfile((prev: any) => {
       const isNewUnlock = type === 'unlock' && !prev.unlocks.includes(attributeId);
@@ -892,6 +905,7 @@ function App() {
             loadingSavedCodes={loadingSavedCodes}
             onEquipSkin={handleEquipSkin}
             onBuySkin={handleBuySkin}
+            onBuyTokens={handleBuyTokens}
             onEquipTitle={handleEquipTitle}
             onSpectate={handleSpectate}
             queueStatus={queueStatus}
