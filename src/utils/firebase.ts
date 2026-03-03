@@ -19,24 +19,24 @@ const app = initializeApp(firebaseConfig);
 // Initialize Analytics safely
 let analytics: any = null;
 
-// Initialize analytics only if supported and in browser
+// Only initialize if supported and in browser
 isSupported().then((supported) => {
     if (supported && typeof window !== 'undefined') {
         analytics = getAnalytics(app);
-        console.log("📊 [GA4] Analytics Initialized");
+        console.log("📊 [GA4] Analytics Ready");
     }
 }).catch(err => {
-    console.warn("📊 [GA4] Analytics failed to load:", err.message);
+    console.warn("📊 [GA4] Analytics not available", err.message);
 });
 
 export const trackGAEvent = (eventName: string, params?: object) => {
     try {
         if (analytics) {
             logEvent(analytics, eventName, params);
-            // console.log(`📊 [GA4] Event: ${eventName}`, params);
+            // console.log(`📊 [GA4] Tracked: ${eventName}`, params);
         }
     } catch (err) {
-        console.error(`📊 [GA4] Failed to track event ${eventName}:`, err);
+        console.error(`📊 [GA4] Error tracking ${eventName}`, err);
     }
 };
 

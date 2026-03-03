@@ -794,11 +794,11 @@ function App() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 mr-4 px-3 py-1 rounded bg-[#0a0a0c] border border-cyber-muted/50">
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-xs font-bold text-blue-400">LVL {userProfile.level}</span>
+            <span className="text-xs font-bold text-blue-400">LVL {userProfile?.level || 1}</span>
             <span className="text-cyber-muted text-[10px] mx-1">|</span>
-            <span className="text-xs font-bold text-yellow-400">XP {Math.floor(userProfile.xp)}</span>
+            <span className="text-xs font-bold text-yellow-400">XP {Math.floor(userProfile?.xp || 0)}</span>
             <span className="text-cyber-muted text-[10px] mx-1">|</span>
-            <span className="text-xs font-bold text-emerald-400">${userProfile.money.toLocaleString()}</span>
+            <span className="text-xs font-bold text-emerald-400">${(userProfile?.money || 0).toLocaleString()}</span>
           </div>
 
           <div className={`text-xs px-3 py-1 rounded-full border ${status.includes("Failed") ? "border-cyber-danger text-cyber-danger" :
