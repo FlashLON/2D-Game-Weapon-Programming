@@ -85,6 +85,8 @@ function App() {
       lastUpgradeLevel: {},
       titles: [],
       equippedTitle: null,
+      equippedSkin: 'default',
+      ownedSkins: ['default'],
       killCount: 0,
       aura_type: null,
       ...profile
@@ -129,8 +131,26 @@ function App() {
       equippedTitle: titleId
     }));
     if (networkManager.isConnected()) {
-      const socket = (networkManager as any).socket; // Access socket directly if needed or add method
+      const socket = (networkManager as any).socket;
       if (socket) socket.emit('equip_title', { titleId });
+    }
+  };
+
+  const handleEquipSkin = (skinId: string) => {
+    setUserProfile((prev: any) => ({
+      ...prev,
+      equippedSkin: skinId
+    }));
+    if (networkManager.isConnected()) {
+      const socket = (networkManager as any).socket;
+      if (socket) socket.emit('equip_skin', { skinId });
+    }
+  };
+
+  const handleBuySkin = (skinId: string, cost: number) => {
+    if (networkManager.isConnected()) {
+      const socket = (networkManager as any).socket;
+      if (socket) socket.emit('buy_skin', { skinId, cost });
     }
   };
 
@@ -859,6 +879,8 @@ function App() {
             onDeleteCode={handleDeleteCode}
             onRenameCode={handleRenameCode}
             loadingSavedCodes={loadingSavedCodes}
+            onEquipSkin={handleEquipSkin}
+            onBuySkin={handleBuySkin}
             onEquipTitle={handleEquipTitle}
             onSpectate={handleSpectate}
             queueStatus={queueStatus}

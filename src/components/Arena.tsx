@@ -301,6 +301,78 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                     }
                 }
 
+                // --- Helper for Skin Shapes ---
+                const drawEntityShape = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, skinId: string, color: string) => {
+                    ctx.fillStyle = color;
+                    if (ent.type !== 'projectile') {
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = color;
+                    }
+                    ctx.beginPath();
+
+                    switch (skinId) {
+                        case 'sentinel': // Square
+                            ctx.rect(x - r, y - r, r * 2, r * 2);
+                            break;
+                        case 'vanguard': // Triangle
+                            ctx.moveTo(x, y - r * 1.2);
+                            ctx.lineTo(x - r, y + r);
+                            ctx.lineTo(x + r, y + r);
+                            ctx.closePath();
+                            break;
+                        case 'interceptor': // Diamond
+                            ctx.moveTo(x, y - r * 1.3);
+                            ctx.lineTo(x - r, y);
+                            ctx.lineTo(x, y + r * 1.3);
+                            ctx.lineTo(x + r, y);
+                            ctx.closePath();
+                            break;
+                        case 'technomancer': // Hexagon
+                            for (let i = 0; i < 6; i++) {
+                                const angle = (i * Math.PI) / 3;
+                                const px = x + r * 1.1 * Math.cos(angle);
+                                const py = y + r * 1.1 * Math.sin(angle);
+                                if (i === 0) ctx.moveTo(px, py);
+                                else ctx.lineTo(px, py);
+                            }
+                            ctx.closePath();
+                            break;
+                        case 'phantom': { // Ghostly
+                            const flicker = Math.sin(Date.now() / 100) * 0.2 + 0.8;
+                            ctx.globalAlpha *= flicker;
+                            ctx.arc(x, y, r, 0, Math.PI * 2);
+                            break;
+                        }
+                        case 'starlight': { // Star
+                            const innerR = r * 0.5;
+                            const outerR = r * 1.2;
+                            for (let i = 0; i < 5; i++) {
+                                let angle = (i * 2 * Math.PI) / 5 - Math.PI / 2;
+                                ctx.lineTo(x + outerR * Math.cos(angle), y + outerR * Math.sin(angle));
+                                angle += Math.PI / 5;
+                                ctx.lineTo(x + innerR * Math.cos(angle), y + innerR * Math.sin(angle));
+                            }
+                            ctx.closePath();
+                            break;
+                        }
+                        case 'overlord': // Octagon
+                            for (let i = 0; i < 8; i++) {
+                                const angle = (i * Math.PI) / 4;
+                                const dist = i % 2 === 0 ? r * 1.2 : r * 0.9;
+                                const px = x + dist * Math.cos(angle);
+                                const py = y + dist * Math.sin(angle);
+                                if (i === 0) ctx.moveTo(px, py);
+                                else ctx.lineTo(px, py);
+                            }
+                            ctx.closePath();
+                            break;
+                        default: // Circle
+                            ctx.arc(x, y, r, 0, Math.PI * 2);
+                    }
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                };
+
                 // --- 2. MAIN ENTITY DRAWING ---
                 let drawColor = ent.color || (isPlayer ? '#00ff9f' : '#ff0055');
 
@@ -315,20 +387,26 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                 const isPhased = isGhost && (ent as any).phased;
 
                 ctx.globalAlpha = isPhased ? 0.25 : 1.0;
-                if (ent.type === 'projectile' && ent.fade_over_time && ent.lifetime && ent.maxLifetime) {
+                if (ent.type === 'projectile' && (ent as any).fade_over_time && ent.lifetime && ent.maxLifetime) {
                     ctx.globalAlpha = Math.max(0.2, (ent.lifetime || 0) / (ent.maxLifetime || 1));
                 }
 
-                ctx.fillStyle = drawColor;
-                ctx.beginPath();
-                ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+                if (isPlayer) {
+                    const skinId = (ent as any).equippedSkin || 'default';
+                    const skinColor = (ent as any).color || (isLocal ? '#00ff9f' : '#ff9f00');
+                    drawEntityShape(ctx, drawX, drawY, radius, skinId, skinColor);
+                } else {
+                    ctx.fillStyle = drawColor;
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
 
-                if (ent.type !== 'projectile') {
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = drawColor;
+                    if (ent.type !== 'projectile') {
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = drawColor;
+                    }
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
                 }
-                ctx.fill();
-                ctx.shadowBlur = 0;
 
                 // Entry Highlights
                 if (ent.aura_highlight_timer && ent.aura_highlight_timer > 0) {

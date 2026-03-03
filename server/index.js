@@ -1002,6 +1002,8 @@ io.on('connection', (socket) => {
                     limits: user.limits || { speed: 200, damage: 5 },
                     titles: user.titles && user.titles.length > 0 ? user.titles : ['beginner'],
                     equippedTitle: user.equippedTitle || null,
+                    equippedSkin: user.equippedSkin || 'default',
+                    ownedSkins: user.ownedSkins || ['default'],
                     killCount: user.killCount || 0,
                     aura_type: user.aura_type || null
                 }
@@ -1073,6 +1075,8 @@ io.on('connection', (socket) => {
                 lastUpgradeLevel: {},
                 titles: ['beginner'],
                 equippedTitle: null,
+                equippedSkin: 'default',
+                ownedSkins: ['default'],
                 killCount: 0,
                 aura_type: null,
                 lastLoginDate: new Date().toISOString().split('T')[0],
@@ -1247,6 +1251,8 @@ io.on('connection', (socket) => {
                 limits: profile?.limits || { speed: 200, damage: 5 },
                 titles: profile?.titles || [],
                 equippedTitle: profile?.equippedTitle || null,
+                equippedSkin: profile?.equippedSkin || 'default',
+                ownedSkins: profile?.ownedSkins || ['default'],
                 aura_type: profile?.aura_type || null,
                 joinedAt: Date.now(),
                 lastFireTime: 0,
@@ -1304,6 +1310,10 @@ io.on('connection', (socket) => {
                 if (serverUser.unlocks && serverUser.unlocks.length > (profile.unlocks?.length || 0)) {
                     profile.unlocks = serverUser.unlocks;
                 }
+                // Keep server skins if there are more
+                if (serverUser.ownedSkins && serverUser.ownedSkins.length > (profile.ownedSkins?.length || 0)) {
+                    profile.ownedSkins = serverUser.ownedSkins;
+                }
             }
 
             saveProgress(socket.data.username, profile);
@@ -1320,6 +1330,8 @@ io.on('connection', (socket) => {
                 p.limits = profile.limits;
                 p.titles = profile.titles;
                 p.equippedTitle = profile.equippedTitle;
+                p.equippedSkin = profile.equippedSkin;
+                p.ownedSkins = profile.ownedSkins || ['default'];
                 p.aura_type = profile.aura_type;
             }
 
@@ -1350,6 +1362,59 @@ io.on('connection', (socket) => {
                     }
                 }
             }
+        }
+    });
+
+    socket.on('buy_skin', async ({ skinId, cost }) => {
+        if (!socket.data.username) return;
+
+        try {
+            const user = memoryUsers.get(socket.data.username);
+            if (!user) return;
+
+            if (user.ownedSkins && user.ownedSkins.includes(skinId)) {
+                socket.emit('notification', { type: 'error', message: "You already own this skin." });
+                return;
+            }
+
+            if ((user.money || 0) < cost) {
+                socket.emit('notification', { type: 'error', message: "Insufficient Funds" });
+                return;
+            }
+
+            // Deduct & Add
+            user.money -= cost;
+            if (!user.ownedSkins) user.ownedSkins = ['default'];
+            user.ownedSkins.push(skinId);
+
+            await saveProgress(socket.data.username, user);
+            socket.emit('profile_update', cleanProfileForClient(user));
+            socket.emit('notification', { type: 'unlock', message: `✨ SKIN UNLOCKED: ${skinId.toUpperCase()}` });
+
+            console.log(`[SKINS] ${socket.data.username} bought skin: ${skinId}`);
+        } catch (err) {
+            console.error("[SKINS] Buy Error:", err);
+        }
+    });
+
+    socket.on('equip_skin', ({ skinId }) => {
+        if (!socket.data.username) return;
+
+        const user = memoryUsers.get(socket.data.username);
+        if (!user) return;
+
+        if (user.ownedSkins && user.ownedSkins.includes(skinId)) {
+            user.equippedSkin = skinId;
+            saveProgress(socket.data.username, user);
+            socket.emit('profile_update', cleanProfileForClient(user));
+
+            // Update in room
+            const roomId = Array.from(socket.rooms).find(r => r !== socket.id);
+            if (roomId && rooms[roomId] && rooms[roomId].players[socket.id]) {
+                rooms[roomId].players[socket.id].equippedSkin = skinId;
+            }
+
+            socket.emit('notification', { type: 'info', message: `Equipped: ${skinId.toUpperCase()}` });
         }
     });
 

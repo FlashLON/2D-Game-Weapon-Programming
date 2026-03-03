@@ -3,6 +3,7 @@ import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpe
 import { Tutorial } from './Tutorial';
 import { SavedCodePanel } from './SavedCodePanel';
 import { TitlesPanel } from './TitlesPanel';
+import { SKINS } from '../utils/SkinRegistry';
 import { ATTRIBUTES, getUpgradeCost } from '../utils/AttributeRegistry';
 import type { SavedCode } from '../utils/NetworkManager';
 
@@ -20,6 +21,8 @@ interface LobbyProps {
         limits: Record<string, number>;
         titles: string[];
         equippedTitle: string | null;
+        equippedSkin?: string;
+        ownedSkins?: string[];
         aura_type?: string | null;
     };
     onLogin?: (username: string, password?: string) => void;
@@ -35,6 +38,8 @@ interface LobbyProps {
     onRenameCode?: (codeId: string, newName: string) => void;
     loadingSavedCodes?: boolean;
     onEquipTitle?: (titleId: string | null) => void;
+    onEquipSkin?: (skinId: string) => void;
+    onBuySkin?: (skinId: string, cost: number) => void;
     queueStatus?: any;
     partyData?: any;
     onQueue2v2?: () => void;
@@ -75,7 +80,9 @@ export const Lobby: React.FC<LobbyProps> = ({
     onLeaveParty,
     onSetCoopDifficulty,
     gameSettings,
-    onUpdateSettings
+    onUpdateSettings,
+    onEquipSkin,
+    onBuySkin
 }) => {
     const [roomCode, setRoomCode] = useState('');
     const [loginName, setLoginName] = useState('');
@@ -87,7 +94,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     const [createName, setCreateName] = useState('');
     const [isPublic] = useState(true);
 
-    const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code' | 'titles' | 'admin'>('inventory');
+    const [inventoryTab, setInventoryTab] = useState<'inventory' | 'saved-code' | 'titles' | 'skins' | 'admin'>('inventory');
 
     const [partyCodeInput, setPartyCodeInput] = useState('');
     const [coopDifficulty, setCoopDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
@@ -534,10 +541,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                             <div className="flex-1">
                                 <h2 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-tight">
                                     <Wrench className="text-cyber-accent" size={16} />
-                                    {inventoryTab === 'inventory' ? 'Inventory' : inventoryTab === 'titles' ? 'Titles' : inventoryTab === 'admin' ? 'Admin' : 'Saved Code'}
+                                    {inventoryTab === 'inventory' ? 'Inventory' : inventoryTab === 'titles' ? 'Titles' : inventoryTab === 'skins' ? 'Skins' : inventoryTab === 'admin' ? 'Admin' : 'Saved Code'}
                                 </h2>
                                 <div className="text-[9px] text-white/20 uppercase font-bold tracking-widest">
-                                    {inventoryTab === 'inventory' ? 'Upgrades & Equipment' : inventoryTab === 'titles' ? 'Identity Matrix' : inventoryTab === 'admin' ? 'System Override' : 'Your Scripts'}
+                                    {inventoryTab === 'inventory' ? 'Upgrades & Equipment' : inventoryTab === 'titles' ? 'Identity Matrix' : inventoryTab === 'skins' ? 'Visual Core' : inventoryTab === 'admin' ? 'System Override' : 'Your Scripts'}
                                 </div>
                             </div>
                         </div>
@@ -545,7 +552,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                         {/* Tab Buttons */}
                         {isLoggedIn && (
                             <div className="px-4 py-2 border-b border-white/5 flex gap-1">
-                                {(['inventory', 'saved-code', 'titles'] as const).map(tab => (
+                                {(['inventory', 'saved-code', 'titles', 'skins'] as const).map(tab => (
                                     <button key={tab} onClick={() => setInventoryTab(tab)}
                                         className={`flex-1 py-1.5 text-[9px] font-bold uppercase rounded-lg transition-all ${inventoryTab === tab ? 'bg-white/8 text-white' : 'text-white/25 hover:text-white/50'}`}>
                                         {tab === 'saved-code' ? 'Code' : tab}
@@ -857,6 +864,74 @@ export const Lobby: React.FC<LobbyProps> = ({
                                             )}
                                         </div>
                                     )}
+                                </div>
+                            ) : inventoryTab === 'skins' ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div>
+                                            <h3 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                                                <Zap className="text-pink-500" size={16} /> Chassis Customization
+                                            </h3>
+                                            <p className="text-white/40 text-[9px] uppercase font-bold tracking-tighter">Modify your combat frame geometry</p>
+                                        </div>
+                                        <div className="bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full flex items-center gap-2">
+                                            <DollarSign size={12} className="text-emerald-400" />
+                                            <span className="text-emerald-400 font-black text-xs">{(userProfile?.money || 0).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {Object.values(SKINS).map((skin) => {
+                                            const isOwned = userProfile?.ownedSkins?.includes(skin.id);
+                                            const isEquipped = userProfile?.equippedSkin === skin.id;
+                                            const canAfford = (userProfile?.money || 0) >= skin.cost;
+                                            const rarityColors = {
+                                                common: 'text-gray-400 border-gray-500/30',
+                                                rare: 'text-blue-400 border-blue-500/30',
+                                                epic: 'text-purple-400 border-purple-500/30',
+                                                legendary: 'text-yellow-400 border-yellow-500/30',
+                                                mythic: 'text-pink-400 border-pink-500/30'
+                                            };
+
+                                            return (
+                                                <div key={skin.id} className={`bg-black/40 border rounded-xl p-3 flex flex-col gap-2 transition-all hover:bg-black/60 ${isEquipped ? 'border-pink-500/60 ring-1 ring-pink-500/30' : 'border-white/5'}`}>
+                                                    <div className="flex justify-between items-start">
+                                                        <div className={`p-2 rounded-lg bg-white/5 ${rarityColors[skin.rarity].split(' ')[0]}`}>
+                                                            <skin.icon size={20} />
+                                                        </div>
+                                                        <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded border ${rarityColors[skin.rarity]}`}>
+                                                            {skin.rarity}
+                                                        </span>
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="text-[10px] font-black text-white uppercase">{skin.name}</div>
+                                                        <div className="text-[8px] text-white/40 line-clamp-2 leading-relaxed h-5 mt-0.5">{skin.description}</div>
+                                                    </div>
+
+                                                    <div className="mt-auto pt-2 flex items-center gap-2">
+                                                        {isOwned ? (
+                                                            <button
+                                                                onClick={() => onEquipSkin?.(skin.id)}
+                                                                disabled={isEquipped}
+                                                                className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${isEquipped ? 'bg-pink-500/20 text-pink-400 cursor-default' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                                                            >
+                                                                {isEquipped ? 'Equipped' : 'Equip'}
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => onBuySkin?.(skin.id, skin.cost)}
+                                                                disabled={!canAfford}
+                                                                className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${canAfford ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/50' : 'bg-red-500/10 text-red-400/50 cursor-not-allowed border border-red-500/20'}`}
+                                                            >
+                                                                <DollarSign size={10} /> {skin.cost.toLocaleString()}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             ) : (
                                 <SavedCodePanel
