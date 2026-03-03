@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DollarSign, Zap, Crown, Star, Gem, ShieldCheck, X, ExternalLink } from 'lucide-react';
+import { DollarSign, Zap, Crown, Star, Gem, ShieldCheck, X, ExternalLink, Lock } from 'lucide-react';
 
 interface TokenPack {
     id: string;
@@ -90,48 +90,17 @@ const TOKEN_PACKS: TokenPack[] = [
 interface TokenShopProps {
     userMoney: number;
     isLoggedIn: boolean;
-    username: string;
-    serverUrl: string;
+    username?: string;
+    serverUrl?: string;
     onPurchase?: (packId: string, totalTokens: number) => void;
 }
 
-export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, username, serverUrl, onPurchase: _onPurchase }) => {
+export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn }) => {
     const [expanded, setExpanded] = useState(false);
-    const [purchasing, setPurchasing] = useState<string | null>(null);
-    const [showConfirm, setShowConfirm] = useState<TokenPack | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [showComingSoon, setShowComingSoon] = useState<TokenPack | null>(null);
 
     const handleBuy = (pack: TokenPack) => {
-        setError(null);
-        setShowConfirm(pack);
-    };
-
-    const confirmPurchase = async () => {
-        if (!showConfirm) return;
-        setPurchasing(showConfirm.id);
-        setError(null);
-
-        try {
-            // Call our server to create a Stripe Checkout session
-            const res = await fetch(`${serverUrl}api/create-checkout`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ packId: showConfirm.id, username })
-            });
-
-            const data = await res.json();
-
-            if (data.url) {
-                // Redirect to Stripe's hosted checkout page
-                window.location.href = data.url;
-            } else {
-                setError(data.error || 'Failed to create checkout session.');
-                setPurchasing(null);
-            }
-        } catch (err) {
-            setError('Network error. Please try again.');
-            setPurchasing(null);
-        }
+        setShowComingSoon(pack);
     };
 
     return (
@@ -141,8 +110,8 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                 <button
                     onClick={() => setExpanded(!expanded)}
                     className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-2xl border transition-all duration-300 ${expanded
-                        ? 'bg-gradient-to-r from-yellow-500/15 to-amber-500/10 border-yellow-500/30 shadow-lg shadow-yellow-500/5'
-                        : 'bg-black/30 border-white/5 hover:border-yellow-500/20 hover:bg-yellow-500/5'
+                            ? 'bg-gradient-to-r from-yellow-500/15 to-amber-500/10 border-yellow-500/30 shadow-lg shadow-yellow-500/5'
+                            : 'bg-black/30 border-white/5 hover:border-yellow-500/20 hover:bg-yellow-500/5'
                         }`}
                 >
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500/30 to-amber-600/20 border border-yellow-500/20 flex items-center justify-center shrink-0">
@@ -150,7 +119,7 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                     </div>
                     <div className="flex-1 text-left">
                         <div className="text-[11px] font-black text-white uppercase tracking-wider">Token Shop</div>
-                        <div className="text-[8px] font-bold text-yellow-400/50 uppercase tracking-widest">Buy Coins With Real Money</div>
+                        <div className="text-[8px] font-bold text-yellow-400/50 uppercase tracking-widest">Premium Coin Packs</div>
                     </div>
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
                         <DollarSign size={10} className="text-yellow-400" />
@@ -167,7 +136,7 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                                 <div className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
                                     <Gem size={12} className="text-yellow-400" /> Premium Token Packs
                                 </div>
-                                <div className="text-[8px] text-white/20 mt-0.5">Instant delivery • Secure payment</div>
+                                <div className="text-[8px] text-white/20 mt-0.5">Support the game • Get coins</div>
                             </div>
                             <button onClick={() => setExpanded(false)} className="p-1 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all">
                                 <X size={14} />
@@ -180,10 +149,10 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                                 <div
                                     key={pack.id}
                                     className={`relative group rounded-xl border transition-all duration-200 overflow-hidden ${pack.popular
-                                        ? 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-blue-500/5 shadow-lg shadow-cyan-500/5'
-                                        : pack.bestValue
-                                            ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-amber-500/5 shadow-lg shadow-yellow-500/5'
-                                            : 'border-white/5 bg-gradient-to-r ' + pack.color + ' hover:border-white/15'
+                                            ? 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 to-blue-500/5 shadow-lg shadow-cyan-500/5'
+                                            : pack.bestValue
+                                                ? 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-amber-500/5 shadow-lg shadow-yellow-500/5'
+                                                : 'border-white/5 bg-gradient-to-r ' + pack.color + ' hover:border-white/15'
                                         }`}
                                 >
                                     {/* Popular / Best Value Badge */}
@@ -236,15 +205,13 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                                         {/* Price & Buy */}
                                         <button
                                             onClick={() => handleBuy(pack)}
-                                            disabled={!isLoggedIn || purchasing === pack.id}
-                                            className={`shrink-0 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase transition-all ${purchasing === pack.id
-                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                                : !isLoggedIn
+                                            disabled={!isLoggedIn}
+                                            className={`shrink-0 px-4 py-2.5 rounded-xl font-black text-[11px] uppercase transition-all ${!isLoggedIn
                                                     ? 'bg-white/3 text-white/15 cursor-not-allowed'
                                                     : `border hover:scale-105 active:scale-95`
                                                 }`}
                                             style={
-                                                purchasing !== pack.id && isLoggedIn
+                                                isLoggedIn
                                                     ? {
                                                         background: `linear-gradient(135deg, ${pack.accent}22, ${pack.accent}11)`,
                                                         borderColor: `${pack.accent}44`,
@@ -253,7 +220,7 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                                                     : undefined
                                             }
                                         >
-                                            {purchasing === pack.id ? '✓ DONE' : pack.price}
+                                            {pack.price}
                                         </button>
                                     </div>
                                 </div>
@@ -263,7 +230,7 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                         {/* Footer */}
                         <div className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between">
                             <div className="text-[8px] text-white/15 uppercase tracking-wider flex items-center gap-1.5">
-                                <ShieldCheck size={10} className="text-emerald-400/40" /> Powered by Stripe
+                                <ShieldCheck size={10} className="text-emerald-400/40" /> Secure Payments
                             </div>
                             <div className="flex items-center gap-1 text-[8px] text-white/15 hover:text-white/30 cursor-pointer transition-all">
                                 <ExternalLink size={9} /> Terms Apply
@@ -273,8 +240,8 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                 )}
             </div>
 
-            {/* Confirmation Modal */}
-            {showConfirm && (
+            {/* Coming Soon Modal */}
+            {showComingSoon && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999] flex items-center justify-center animate-in fade-in duration-200">
                     <div className="bg-gradient-to-b from-[#151520] to-[#0a0a12] border border-white/10 rounded-3xl p-6 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
                         {/* Header */}
@@ -282,79 +249,55 @@ export const TokenShop: React.FC<TokenShopProps> = ({ userMoney, isLoggedIn, use
                             <div
                                 className="w-16 h-16 rounded-2xl mx-auto mb-3 flex items-center justify-center border"
                                 style={{
-                                    background: `linear-gradient(135deg, ${showConfirm.accent}33, ${showConfirm.accent}11)`,
-                                    borderColor: `${showConfirm.accent}44`,
-                                    color: showConfirm.accent
+                                    background: `linear-gradient(135deg, ${showComingSoon.accent}33, ${showComingSoon.accent}11)`,
+                                    borderColor: `${showComingSoon.accent}44`,
+                                    color: showComingSoon.accent
                                 }}
                             >
-                                {showConfirm.icon}
+                                <Lock size={24} />
                             </div>
-                            <h3 className="text-lg font-black text-white uppercase">{showConfirm.name}</h3>
-                            <div className="text-[10px] text-white/30 mt-1">{showConfirm.tag}</div>
+                            <h3 className="text-lg font-black text-white uppercase">{showComingSoon.name}</h3>
+                            <div className="text-[10px] text-white/30 mt-1">{showComingSoon.price} — {showComingSoon.totalTokens.toLocaleString()} Coins</div>
                         </div>
 
-                        {/* Breakdown */}
+                        {/* Coming Soon Message */}
+                        <div className="bg-yellow-500/5 border border-yellow-500/15 rounded-xl p-4 mb-5 text-center">
+                            <div className="text-[13px] font-black text-yellow-400 uppercase tracking-wider mb-1">
+                                🚧 Coming Soon
+                            </div>
+                            <div className="text-[10px] text-white/40 leading-relaxed">
+                                Payments are not available yet. This feature is under development and will be enabled in a future update.
+                            </div>
+                        </div>
+
+                        {/* Breakdown Preview */}
                         <div className="bg-black/40 rounded-xl p-4 mb-5 space-y-2 border border-white/5">
                             <div className="flex justify-between text-[11px]">
                                 <span className="text-white/40">Base Tokens</span>
-                                <span className="text-white font-bold">{showConfirm.baseTokens.toLocaleString()}</span>
+                                <span className="text-white font-bold">{showComingSoon.baseTokens.toLocaleString()}</span>
                             </div>
-                            {showConfirm.bonusTokens > 0 && (
+                            {showComingSoon.bonusTokens > 0 && (
                                 <div className="flex justify-between text-[11px]">
                                     <span className="text-emerald-400/60">Bonus Tokens</span>
-                                    <span className="text-emerald-400 font-bold">+{showConfirm.bonusTokens.toLocaleString()}</span>
+                                    <span className="text-emerald-400 font-bold">+{showComingSoon.bonusTokens.toLocaleString()}</span>
                                 </div>
                             )}
                             <div className="border-t border-white/5 pt-2 flex justify-between text-[12px]">
                                 <span className="text-white/60 font-bold">Total</span>
-                                <span className="font-black" style={{ color: showConfirm.accent }}>{showConfirm.totalTokens.toLocaleString()} Coins</span>
+                                <span className="font-black" style={{ color: showComingSoon.accent }}>{showComingSoon.totalTokens.toLocaleString()} Coins</span>
                             </div>
                         </div>
 
-                        {/* Price */}
-                        <div className="text-center mb-5">
-                            <div className="text-3xl font-black text-white">{showConfirm.price}</div>
-                            <div className="text-[9px] text-white/20 mt-1 uppercase tracking-widest">Secure checkout via Stripe</div>
-                        </div>
-
-                        {/* Error */}
-                        {error && (
-                            <div className="mb-4 text-center text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
-                                {error}
-                            </div>
-                        )}
-
-                        {/* Buttons */}
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowConfirm(null)}
-                                className="flex-1 py-3 rounded-xl text-[11px] font-black text-white/40 border border-white/10 hover:bg-white/5 hover:text-white/60 transition-all uppercase"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmPurchase}
-                                disabled={purchasing !== null}
-                                className="flex-1 py-3 rounded-xl text-[11px] font-black uppercase transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-                                style={{
-                                    background: `linear-gradient(135deg, ${showConfirm.accent}44, ${showConfirm.accent}22)`,
-                                    border: `1px solid ${showConfirm.accent}66`,
-                                    color: showConfirm.accent
-                                }}
-                            >
-                                {purchasing ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        Processing...
-                                    </span>
-                                ) : (
-                                    `Pay ${showConfirm.price}`
-                                )}
-                            </button>
-                        </div>
+                        {/* Close Button */}
+                        <button
+                            onClick={() => setShowComingSoon(null)}
+                            className="w-full py-3 rounded-xl text-[11px] font-black text-white/60 border border-white/10 hover:bg-white/5 hover:text-white transition-all uppercase"
+                        >
+                            Got it
+                        </button>
 
                         <div className="mt-3 text-center text-[8px] text-white/15 uppercase tracking-wider">
-                            You'll be redirected to Stripe's secure checkout
+                            Stay tuned for updates
                         </div>
                     </div>
                 </div>
