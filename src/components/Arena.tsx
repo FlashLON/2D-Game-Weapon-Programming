@@ -14,11 +14,11 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
 
     const SKINS_SPRITE_MAP: Record<string, { sx: number, sy: number }> = {
         neon_glitch: { sx: 0, sy: 0 },
-        binary_link: { sx: 341, sy: 0 },
-        sun_god: { sx: 682, sy: 0 },
-        void_pulse: { sx: 0, sy: 242 },
-        sky_guardian: { sx: 341, sy: 242 },
-        golden_sentinel: { sx: 682, sy: 242 }
+        binary_link: { sx: 242, sy: 0 },
+        sun_god: { sx: 484, sy: 0 },
+        void_pulse: { sx: 0, sy: 172 },
+        sky_guardian: { sx: 242, sy: 172 },
+        golden_sentinel: { sx: 484, sy: 172 }
     };
 
     useEffect(() => {
@@ -319,8 +319,8 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                 const drawEntityShape = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, skinId: string, color: string) => {
                     if (SKINS_SPRITE_MAP[skinId] && skinsImage.complete) {
                         const coords = SKINS_SPRITE_MAP[skinId];
-                        const sw = 341;
-                        const sh = 242;
+                        const sw = 242;
+                        const sh = 172;
 
                         // Scale it larger than the radius for better visual impact (show off glows/auras)
                         const drawSize = r * 4.5;
