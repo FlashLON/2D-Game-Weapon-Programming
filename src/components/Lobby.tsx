@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords, Zap, Clock, UserPlus, X, Volume2, Eye, Monitor, Copy } from 'lucide-react';
+import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords, Zap, Clock, UserPlus, X, Volume2, Eye, Monitor, Copy, MessageSquare } from 'lucide-react';
 import { Tutorial } from './Tutorial';
 import { SavedCodePanel } from './SavedCodePanel';
 import { TitlesPanel } from './TitlesPanel';
@@ -165,6 +165,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                                     <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
                                     {isConnected ? 'ONLINE' : 'OFFLINE'}
                                 </div>
+                                <a href="https://discord.gg/aWNbv7cy" target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#5865F2]/10 border border-[#5865F2]/20 text-[#5865F2] text-[8px] font-bold tracking-widest hover:bg-[#5865F2]/20 transition-all uppercase">
+                                    <MessageSquare size={10} /> Discord
+                                </a>
                             </div>
                         </div>
                     </div>
