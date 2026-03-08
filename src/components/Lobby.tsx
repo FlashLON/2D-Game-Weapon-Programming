@@ -348,7 +348,13 @@ export const Lobby: React.FC<LobbyProps> = ({
                                         </div>
                                     </div>
                                 </div>
-                                <button onClick={() => onJoinRoom('offline')}
+                                <button onClick={() => {
+                                    if (partyData && isConnected && partyData.members.length > 1) {
+                                        onJoinRoom(`sandbox-${partyData.partyId}`, { mode: 'sandbox' });
+                                    } else {
+                                        onJoinRoom('offline');
+                                    }
+                                }}
                                     className="w-full bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/20 font-black py-3 rounded-xl hover:bg-cyber-accent hover:text-black transition-all flex items-center justify-center gap-2 text-xs z-10">
                                     <Play size={14} fill="currentColor" /> ENTER SANDBOX
                                 </button>

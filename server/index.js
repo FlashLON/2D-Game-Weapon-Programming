@@ -2855,6 +2855,25 @@ setInterval(() => {
                 }
             }
 
+            // --- SANDBOX MODE LOGIC ---
+            if (room.mode === 'sandbox') {
+                if (room.enemies.length < 5 && Math.random() < 0.05 * 45 * dt) {
+                    room.enemies.push({
+                        id: 'dummy_' + Math.random().toString(36).substr(2, 5),
+                        type: 'enemy',
+                        enemyType: 'standard',
+                        x: Math.random() * 700 + 50,
+                        y: Math.random() * 500 + 50,
+                        radius: 20,
+                        hp: 100,
+                        maxHp: 100,
+                        color: '#ff0055',
+                        velocity: { x: (Math.random() - 0.5) * 50, y: (Math.random() - 0.5) * 50 },
+                        speed: 50
+                    });
+                }
+            }
+
             updateRoomGrid(room);
 
             // Update Physics — iterate in reverse so splice(i,1) does not corrupt loop
