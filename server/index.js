@@ -2045,6 +2045,22 @@ io.on('connection', (socket) => {
                 socket.emit('analytics_data', summary);
                 break;
             }
+            case 'reset_password':
+                if (payload.targetUser && payload.newPassword) {
+                    const targetNameKey = Array.from(memoryUsers.keys()).find(k => k.toLowerCase() === payload.targetUser.toLowerCase());
+                    const user = targetNameKey ? memoryUsers.get(targetNameKey) : null;
+                    if (user) {
+                        const newHashed = hashPassword(payload.newPassword);
+                        user.password = newHashed;
+                        upsertUser(targetNameKey, user).then(() => {
+                            console.log(`[ADMIN] Password reset for ${targetNameKey}`);
+                            socket.emit('notification', { type: 'unlock', message: `Successfully reset password for ${targetNameKey}` });
+                        });
+                    } else {
+                        socket.emit('notification', { type: 'error', message: `User ${payload.targetUser} not found.` });
+                    }
+                }
+                break;
         }
     });
 

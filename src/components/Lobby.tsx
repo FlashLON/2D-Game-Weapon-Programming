@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords, Zap, Clock, UserPlus, X, Volume2, Eye, Monitor, Copy, MessageSquare } from 'lucide-react';
+import { Target, Users2, Shield, Cpu, Globe, Link as LinkIcon, Settings, BookOpen, Lock, Play, Wrench, DollarSign, TrendingUp, Info, CheckCircle2, Trophy, Swords, Zap, Clock, UserPlus, X, Volume2, Eye, Monitor, Copy, MessageSquare, Key } from 'lucide-react';
 import { Tutorial } from './Tutorial';
 import { SavedCodePanel } from './SavedCodePanel';
 import { TitlesPanel } from './TitlesPanel';
@@ -765,6 +765,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                                                     <Target size={12} /> Boss
                                                 </button>
                                             </div>
+                                            <button onClick={() => { const u = window.prompt('Username:'); if (u) { const p = window.prompt('New Password:'); if (p) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('reset_password', { targetUser: u, newPassword: p })); } }}
+                                                className="w-full bg-red-900/15 border border-red-500/20 text-red-400/70 font-black py-3 rounded-xl hover:bg-red-500/15 hover:text-red-300 transition-all text-[10px] uppercase flex items-center justify-center gap-2">
+                                                <Key size={14} /> Reset Password
+                                            </button>
                                             <button onClick={() => { const u = window.prompt('Username to wipe:'); if (u && window.confirm(`DELETE ALL progress for ${u}?`)) import('../utils/NetworkManager').then(m => m.networkManager.adminCommand('wipe_account', { targetUser: u })); }}
                                                 className="w-full bg-red-900/30 border border-red-500/50 text-red-200/60 font-black py-2.5 rounded-xl hover:bg-red-600/40 hover:text-white transition-all text-[9px] uppercase mt-2">
                                                 ⚠️ Wipe Account ⚠️
