@@ -124,30 +124,50 @@ api = APIWrapper(_js_api)
 
             const weaponInstance = WeaponClass();
 
+            // --- DRONE: Check if user also defined a 'class Drone' ---
+            let droneInstance: any = null;
+            const DroneClass = namespace.get('Drone');
+            if (DroneClass) {
+                try {
+                    droneInstance = DroneClass();
+                    console.log('[PYODIDE] Drone class detected and instantiated.');
+                } catch (droneErr) {
+                    console.warn('[PYODIDE] Failed to instantiate Drone:', droneErr);
+                }
+            }
+
             // Map Python methods to JS interface
-            return {
-                on_fire: (tx, ty, mx, my) => {
+            const script: any = {
+                on_fire: (tx: number, ty: number, mx: number, my: number) => {
                     if (weaponInstance.on_fire) {
                         return weaponInstance.on_fire(tx, ty, mx, my);
                     }
                     return null;
                 },
-                on_hit: (tid) => {
+                on_hit: (tid: string) => {
                     if (weaponInstance.on_hit) return weaponInstance.on_hit(tid);
                 },
-                on_kill: (tid) => {
+                on_kill: (tid: string) => {
                     if (weaponInstance.on_kill) return weaponInstance.on_kill(tid);
                 },
-                on_hit_wall: (x, y) => {
+                on_hit_wall: (x: number, y: number) => {
                     if (weaponInstance.on_hit_wall) weaponInstance.on_hit_wall(x, y);
                 },
-                update: (dt) => {
+                update: (dt: number) => {
                     if (weaponInstance.update) weaponInstance.update(dt);
                 },
                 init: () => {
                     if (weaponInstance.init) weaponInstance.init();
-                }
+                },
+                // Drone scripting hook
+                drone_update: droneInstance ? (dt: number, dx: number, dy: number) => {
+                    if (droneInstance.update) return droneInstance.update(dt, dx, dy);
+                    return null;
+                } : null,
+                hasDrone: !!droneInstance,
             };
+
+            return script as WeaponScript;
 
         } catch (err) {
             console.error("Error loading weapon code:", err);

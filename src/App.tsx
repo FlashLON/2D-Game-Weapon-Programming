@@ -399,6 +399,14 @@ function App() {
       if (weaponInstance) {
         setStatus("Ready to deploy");
         gameEngine.setWeaponScript(weaponInstance);
+
+        // Drone lifecycle: spawn if script has Drone class, otherwise remove
+        if ((weaponInstance as any).hasDrone) {
+          gameEngine.spawnDrone();
+          addLog("🤖 Companion Drone deployed!", "success");
+        } else {
+          gameEngine.removeDrone();
+        }
       } else {
         setStatus("Compilation failed");
       }

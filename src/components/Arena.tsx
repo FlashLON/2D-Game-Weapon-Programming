@@ -435,6 +435,53 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                     ctx.globalAlpha = Math.max(0.2, (ent.lifetime || 0) / (ent.maxLifetime || 1));
                 }
 
+                // ═══ VFX: PROJECTILE TRAIL RENDERING ═══
+                if (ent.type === 'projectile' && ent.trail && ent.trail.length > 1) {
+                    ctx.save();
+                    const trail = ent.trail;
+                    const trailColor = ent.color || '#00e5ff';
+
+                    // Draw glowing trail line segments
+                    for (let i = 1; i < trail.length; i++) {
+                        const p0 = trail[i - 1];
+                        const p1 = trail[i];
+                        const segAlpha = p1.alpha * 0.7;
+                        const segWidth = (radius * 2) * (i / trail.length);
+
+                        // Outer glow pass
+                        ctx.globalAlpha = segAlpha * 0.3;
+                        ctx.strokeStyle = trailColor;
+                        ctx.lineWidth = segWidth + 6;
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(p0.x, p0.y);
+                        ctx.lineTo(p1.x, p1.y);
+                        ctx.stroke();
+
+                        // Core trail pass
+                        ctx.globalAlpha = segAlpha * 0.8;
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = Math.max(1, segWidth * 0.4);
+                        ctx.beginPath();
+                        ctx.moveTo(p0.x, p0.y);
+                        ctx.lineTo(p1.x, p1.y);
+                        ctx.stroke();
+                    }
+
+                    // Bloom halo at head position
+                    ctx.globalAlpha = 0.35;
+                    ctx.shadowBlur = 18;
+                    ctx.shadowColor = trailColor;
+                    ctx.fillStyle = trailColor;
+                    ctx.beginPath();
+                    ctx.arc(drawX, drawY, radius * 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    ctx.restore();
+                    ctx.globalAlpha = 1.0;
+                }
+
                 if (isPlayer) {
                     const skinId = (ent as any).equippedSkin || 'default';
                     const skinColor = (ent as any).color || (isLocal ? '#00ff9f' : '#ff9f00');
@@ -494,6 +541,71 @@ export const Arena: React.FC<{ isSpectator?: boolean }> = ({ isSpectator = false
                     }
                 }
             });
+
+            // ═══ COMPANION DRONE RENDERING ═══
+            const droneEnt = gameEngine.getDroneEntity();
+            if (droneEnt) {
+                const dx = droneEnt.x;
+                const dy = droneEnt.y;
+                const dr = droneEnt.radius || 8;
+                const dTime = performance.now() / 1000;
+                const dPulse = (Math.sin(dTime * 5) + 1) * 0.5;
+
+                ctx.save();
+
+                // Energy tether to player
+                const localPlayer = gameEngine.getLocalPlayer();
+                if (localPlayer) {
+                    const px = localPlayer.renderX ?? localPlayer.x;
+                    const py = localPlayer.renderY ?? localPlayer.y;
+                    ctx.globalAlpha = 0.25 + dPulse * 0.15;
+                    ctx.strokeStyle = '#00e5ff';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 6]);
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(dx, dy);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // Outer glow
+                ctx.globalAlpha = 0.25 + dPulse * 0.15;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#00e5ff';
+                ctx.fillStyle = '#00e5ff';
+                ctx.beginPath();
+                ctx.arc(dx, dy, dr * 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Hexagonal body
+                ctx.globalAlpha = 0.9;
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = '#0a2a3a';
+                ctx.strokeStyle = '#00e5ff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i - Math.PI / 6 + dTime * 1.5;
+                    const hx = dx + dr * Math.cos(angle);
+                    const hy = dy + dr * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(hx, hy);
+                    else ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Inner core
+                ctx.shadowBlur = 8;
+                ctx.fillStyle = `rgba(0, 229, 255, ${0.5 + dPulse * 0.5})`;
+                ctx.beginPath();
+                ctx.arc(dx, dy, dr * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                ctx.restore();
+            }
 
             // 4. Draw HUD (Local Stats)
             ctx.fillStyle = '#fff';

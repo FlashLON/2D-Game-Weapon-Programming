@@ -151,7 +151,62 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                     </div>
                 </section>
 
-                {/* 5. EXAMPLE */}
+                {/* 5. COMPANION DRONE SYSTEM */}
+                <section>
+                    <h3 className="text-white font-bold mb-3 border-b border-cyan-400/30 pb-2 flex items-center gap-2 uppercase text-[12px]">
+                        <Zap size={16} className="text-cyan-400" /> 5. Companion Drone (Optional)
+                    </h3>
+                    <p className="mb-2 text-[11px] text-gray-400 leading-relaxed">
+                        Optionally define a <code className="text-cyan-400">Drone</code> class alongside your <code>Weapon</code> class. 
+                        The drone orbits your player and fires independently based on your script.
+                    </p>
+                    <pre className="bg-black/80 p-4 rounded-xl text-cyan-400 text-[11px] overflow-x-auto border border-cyan-900/50 shadow-inner">
+                        {`class Drone:
+    """Optional companion that orbits your player."""
+    
+    def __init__(self):
+        self.fire_timer = 0
+    
+    def update(self, dt, drone_x, drone_y):
+        """Called every frame.
+        dt       = delta time (seconds)
+        drone_x  = current drone X position
+        drone_y  = current drone Y position
+        
+        Return a dict to fire a projectile, 
+        or None to skip.
+        """
+        self.fire_timer += dt
+        if self.fire_timer >= 0.8:
+            self.fire_timer = 0
+            nearest = api.get_nearest_enemy(drone_x, drone_y)
+            if nearest:
+                import math
+                angle = math.degrees(math.atan2(
+                    nearest['y'] - drone_y,
+                    nearest['x'] - drone_x
+                ))
+                return {
+                    "speed": 400,
+                    "angle": angle,
+                    "damage": 10,
+                    "color": "#00e5ff"
+                }
+        return None`}
+                    </pre>
+                    <div className="mt-3 space-y-2 text-[10px]">
+                        <div className="flex items-start gap-2 text-gray-500">
+                            <span className="text-cyan-400 font-bold shrink-0">⚡</span>
+                            <span>Drone shots are capped: max <code className="text-white">15 dmg</code>, <code className="text-white">8 radius</code>, <code className="text-white">3s lifetime</code>, <code className="text-white">2 shots/sec</code>.</span>
+                        </div>
+                        <div className="flex items-start gap-2 text-gray-500">
+                            <span className="text-cyan-400 font-bold shrink-0">⚡</span>
+                            <span>The drone auto-orbits your player. You only control when and where it fires.</span>
+                        </div>
+                    </div>
+                </section>
+
+                {/* 6. EXAMPLE */}
                 <section className="pb-10">
                     <h3 className="text-white font-bold mb-3 border-b border-cyber-muted/30 pb-2 uppercase text-[12px]">Example: Predator Missile</h3>
                     <pre className="bg-black/80 p-4 rounded-xl text-yellow-400 text-[11px] border border-gray-800 shadow-inner overflow-x-auto">

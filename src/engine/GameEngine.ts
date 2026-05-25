@@ -13,7 +13,7 @@ export interface Entity {
     color: string;
     hp: number;
     maxHp: number;
-    type: 'player' | 'enemy' | 'projectile';
+    type: 'player' | 'enemy' | 'projectile' | 'drone';
     damage?: number;     // Damage dealt by this entity (if projectile)
     knockback?: number;  // Knockback force applied on hit
     pierce?: number;     // Number of targets it can hit before destroying
@@ -71,6 +71,10 @@ export interface Entity {
     aura_highlight_color?: string;
     limits?: Record<string, number>;
     equippedSkin?: string;
+    // VFX Trail History
+    trail?: { x: number; y: number; alpha: number }[];
+    // Drone fields
+    droneOwnerId?: string;
 }
 
 export interface DamageNumber {
@@ -164,6 +168,13 @@ export class GameEngine {
         equippedSkin: 'default',
         limits: {}
     };
+
+    // --- DRONE PROPERTIES ---
+    private droneEntity: Entity | null = null;
+    private droneAngle: number = 0;
+    private droneLastFireTime: number = 0;
+
+    private static readonly MAX_TRAIL_LENGTH = 12;
 
     constructor() {
         // Initialize default state with empty arrays
@@ -301,6 +312,8 @@ export class GameEngine {
         this.lastTime = now;
 
         this.update(dt);
+        this.updateTrails();
+        this.updateDrone(dt);
         this.notify();
 
         if (!this.state.gameOver) {
@@ -999,7 +1012,9 @@ export class GameEngine {
             wave_amplitude, wave_frequency,
             fade_over_time,
             focus_fire, burst_damage, execution_damage,
-            crit_chance, crit_damage, dot_damage, armor_shred
+            crit_chance, crit_damage, dot_damage, armor_shred,
+            // VFX: Initialize trail with spawn position
+            trail: [{ x, y, alpha: 1.0 }]
         };
         if (!this.isMultiplayer) {
             this.state.projectiles.push(proj);
@@ -1350,6 +1365,102 @@ export class GameEngine {
             id: Math.random().toString(36).substr(2, 9),
             x, y, value, color, life: 1.0
         });
+    }
+
+    // ═══════════════════════════════════════════
+    // TRAIL VFX: Append position to projectile trails
+    // ═══════════════════════════════════════════
+    private updateTrails() {
+        this.state.projectiles.forEach(proj => {
+            if (!proj.trail) proj.trail = [];
+            const drawX = proj.renderX ?? proj.x;
+            const drawY = proj.renderY ?? proj.y;
+            proj.trail.push({ x: drawX, y: drawY, alpha: 1.0 });
+
+            // Fade existing trail points
+            for (let i = 0; i < proj.trail.length; i++) {
+                proj.trail[i].alpha = (i + 1) / proj.trail.length;
+            }
+
+            // Cap trail length
+            if (proj.trail.length > GameEngine.MAX_TRAIL_LENGTH) {
+                proj.trail.splice(0, proj.trail.length - GameEngine.MAX_TRAIL_LENGTH);
+            }
+        });
+    }
+
+    // ═══════════════════════════════════════════
+    // COMPANION DRONE SYSTEM
+    // ═══════════════════════════════════════════
+    getDroneEntity(): Entity | null {
+        return this.droneEntity;
+    }
+
+    spawnDrone() {
+        const player = this.getLocalPlayer();
+        if (!player) return;
+
+        this.droneAngle = 0;
+        this.droneLastFireTime = 0;
+        this.droneEntity = {
+            id: `drone_${player.id}`,
+            x: player.x + 50,
+            y: player.y,
+            radius: 8,
+            color: '#00e5ff',
+            hp: 1,
+            maxHp: 1,
+            type: 'drone',
+            velocity: { x: 0, y: 0 },
+            droneOwnerId: player.id
+        };
+    }
+
+    removeDrone() {
+        this.droneEntity = null;
+    }
+
+    updateDrone(dt: number) {
+        if (!this.droneEntity) return;
+        const player = this.getLocalPlayer();
+        if (!player) { this.droneEntity = null; return; }
+
+        // Orbit around the player
+        const orbitRadius = 55;
+        const orbitSpeed = 2.0;
+        this.droneAngle += orbitSpeed * dt;
+
+        this.droneEntity.x = player.x + Math.cos(this.droneAngle) * orbitRadius;
+        this.droneEntity.y = player.y + Math.sin(this.droneAngle) * orbitRadius;
+
+        // Let Python drone script control firing
+        if (this.weaponScript && (this.weaponScript as any).drone_update) {
+            try {
+                const result = (this.weaponScript as any).drone_update(dt, this.droneEntity.x, this.droneEntity.y);
+                if (result) {
+                    const now = performance.now();
+                    if (now - this.droneLastFireTime > 500) { // 2 shots/sec max
+                        this.droneLastFireTime = now;
+                        const rawParams = result.toJs ? result.toJs() : result;
+                        let params: any = {};
+                        if (rawParams instanceof Map || (rawParams && typeof rawParams.get === 'function')) {
+                            rawParams.forEach((v: any, k: any) => { params[k] = v; });
+                        } else {
+                            params = rawParams;
+                        }
+                        params.x = this.droneEntity.x;
+                        params.y = this.droneEntity.y;
+                        params.color = params.color || '#00e5ff';
+                        params.radius = Math.min(params.radius || 4, 8);
+                        params.damage = Math.min(params.damage || 5, 15); // Drone shots are weaker
+                        params.lifetime = Math.min(params.lifetime || 2, 3);
+                        this.spawnProjectile(params);
+                    }
+                }
+            } catch (e) {
+                console.error('[DRONE] Script error:', e);
+            }
+        }
     }
 }
 
