@@ -76,6 +76,7 @@ export interface Entity {
     trail?: { x: number; y: number; alpha: number }[];
     // Drone fields
     droneOwnerId?: string;
+    hitTargets?: Set<string>;
 }
 
 export interface DamageNumber {
@@ -447,7 +448,7 @@ export class GameEngine {
                         // Initialize orbit angle if not set
                         if ((proj as any).orbitAngle === undefined) {
                             (proj as any).orbitAngle = Math.atan2(proj.y - player.y, proj.x - player.x);
-                            (proj as any).orbitRadius = proj.orbit_radius || 60;
+                            (proj as any).orbitRadius = 60;
                         }
 
                         const orbitSpeed = proj.orbit_speed || 3.0;
@@ -581,9 +582,7 @@ export class GameEngine {
                 if (player) {
                     if ((proj as any).orbitAngle === undefined) {
                         (proj as any).orbitAngle = Math.atan2(proj.y - player.y, proj.x - player.x);
-                        let r = proj.orbit_radius || Math.sqrt((proj.x - player.x) ** 2 + (proj.y - player.y) ** 2);
-                        if (r < 10) r = 60;
-                        (proj as any).orbitRadius = r;
+                        (proj as any).orbitRadius = 60;
                     }
 
                     const orbitSpeed = proj.orbit_speed || 3.0;
@@ -645,20 +644,20 @@ export class GameEngine {
 
                 if (proj.bounciness && proj.bounciness > 0) {
                     const bounds = this.getArenaBounds();
-                    if (proj.x < proj.radius) {
+                    if (proj.x < proj.radius && proj.velocity.x < 0) {
                         proj.x = proj.radius;
                         proj.velocity.x *= -proj.bounciness;
                         if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
-                    } else if (proj.x > bounds.width - proj.radius) {
+                    } else if (proj.x > bounds.width - proj.radius && proj.velocity.x > 0) {
                         proj.x = bounds.width - proj.radius;
                         proj.velocity.x *= -proj.bounciness;
                         if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
                     }
-                    if (proj.y < proj.radius) {
+                    if (proj.y < proj.radius && proj.velocity.y < 0) {
                         proj.y = proj.radius;
                         proj.velocity.y *= -proj.bounciness;
                         if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
-                    } else if (proj.y > bounds.height - proj.radius) {
+                    } else if (proj.y > bounds.height - proj.radius && proj.velocity.y > 0) {
                         proj.y = bounds.height - proj.radius;
                         proj.velocity.y *= -proj.bounciness;
                         if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
@@ -681,13 +680,19 @@ export class GameEngine {
                                 const dyBottom = Math.abs(proj.y - (w.y + w.h));
                                 const min = Math.min(dxLeft, dxRight, dyTop, dyBottom);
 
-                                if (min === dxLeft || min === dxRight) proj.velocity.x *= -proj.bounciness;
-                                else proj.velocity.y *= -proj.bounciness;
-
-                                if (min === dxLeft) proj.x = w.x - 1;
-                                else if (min === dxRight) proj.x = w.x + w.w + 1;
-                                else if (min === dyTop) proj.y = w.y - 1;
-                                else if (min === dyBottom) proj.y = w.y + w.h + 1;
+                                if (min === dxLeft && proj.velocity.x > 0) {
+                                    proj.velocity.x *= -proj.bounciness;
+                                    proj.x = w.x - 1;
+                                } else if (min === dxRight && proj.velocity.x < 0) {
+                                    proj.velocity.x *= -proj.bounciness;
+                                    proj.x = w.x + w.w + 1;
+                                } else if (min === dyTop && proj.velocity.y > 0) {
+                                    proj.velocity.y *= -proj.bounciness;
+                                    proj.y = w.y - 1;
+                                } else if (min === dyBottom && proj.velocity.y < 0) {
+                                    proj.velocity.y *= -proj.bounciness;
+                                    proj.y = w.y + w.h + 1;
+                                }
 
                                 if (this.weaponScript?.on_hit_wall) this.weaponScript.on_hit_wall(proj.x, proj.y);
                             } else {
@@ -766,6 +771,10 @@ export class GameEngine {
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
                     if (dist < p.radius + e.radius) {
+                        // Skip if already hit
+                        if (p.hitTargets?.has(e.id)) continue;
+                        p.hitTargets?.add(e.id);
+
                         let dmg = p.damage || 10;
                         const now = Date.now();
                         const shooterId = p.playerId || 'unknown';
@@ -941,6 +950,7 @@ export class GameEngine {
     }
 
     private spawnFragments(parent: Entity, count: number) {
+        count = Math.min(count, 8); // Cap fragment count to prevent massive lag
         for (let i = 0; i < count; i++) {
             const angle = (Math.PI * 2 * i) / count;
             const speed = 200;
@@ -949,10 +959,14 @@ export class GameEngine {
                 y: parent.y,
                 speed: speed,
                 angle: angle * (180 / Math.PI),
-                radius: Math.max(2, parent.radius * 0.6),
+                radius: 5,
                 color: parent.color,
                 damage: Math.ceil((parent.damage || 10) * 0.5),
-                lifetime: 0.5
+                lifetime: 0.5,
+                // Do NOT pass split_on_death, chain_count, or explosion to prevent infinite recursion
+                split_on_death: 0,
+                chain_count: 0,
+                explosion_radius: 0
             });
         }
     }
@@ -962,7 +976,6 @@ export class GameEngine {
         if (params.speed) cost += Math.max(0, params.speed - 200) * 0.05;
         if (params.damage) cost += Math.max(0, params.damage - 5) * 2.0;
         if (params.knockback) cost += params.knockback * 0.05;
-        if (params.radius) cost += params.radius * 0.5;
         if (params.pierce) cost += (params.pierce - 1) * 15;
         if (params.homing) cost += params.homing * 10;
         if (params.orbit_player) cost += 30;
@@ -997,7 +1010,6 @@ export class GameEngine {
             const scale = budget / complexity;
             if (params.damage) params.damage *= scale;
             if (params.speed) params.speed *= scale;
-            if (params.radius) params.radius *= scale;
             if (params.explosion_damage) params.explosion_damage *= scale;
             
             // Random chance to notify so we don't spam the UI on high fire rates
@@ -1013,7 +1025,7 @@ export class GameEngine {
 
         const x = params.x ?? (player ? player.x : 400);
         const y = params.y ?? (player ? player.y : 300);
-        const radius = params.radius ?? 5;
+        const radius = 5;
         const color = params.color ?? '#fce83a';
         const damage = params.damage ?? 10;
         const knockback = params.knockback ?? 0;
@@ -1074,13 +1086,14 @@ export class GameEngine {
             velocity: { x: vx, y: vy },
             homing, lifetime, maxLifetime: lifetime, acceleration,
             orbit_player, vampirism, split_on_death, attraction_force,
-            bounciness, spin, chain_range, orbit_speed, orbit_radius,
+            bounciness, spin, chain_range, orbit_speed,
             pierce, knockback, chain_count,
             explosion_radius, explosion_damage,
             wave_amplitude, wave_frequency,
             fade_over_time,
             focus_fire, burst_damage, execution_damage,
             crit_chance, crit_damage, dot_damage, armor_shred,
+            hitTargets: new Set<string>(),
             // VFX: Initialize trail with spawn position
             trail: [{ x, y, alpha: 1.0 }]
         };

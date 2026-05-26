@@ -54,7 +54,7 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         description: 'Maximum health points. (Once per Level)',
         isBase: true,
         startLimit: 100,
-        maxLimit: 2000,
+        maxLimit: 500,
         upgradeStep: 50,
         baseCost: 200,
         costMultiplier: 1.7,
@@ -83,18 +83,6 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         baseCost: 300,
         costMultiplier: 1.5,
         icon: Activity
-    },
-    radius: {
-        id: 'radius',
-        name: 'Projectile Size',
-        description: 'Size of the projectile hitbox.',
-        isBase: false,
-        startLimit: 5,
-        maxLimit: 80,
-        upgradeStep: 5,
-        baseCost: 250,
-        costMultiplier: 1.4,
-        icon: Maximize
     },
     homing: {
         id: 'homing',
@@ -150,8 +138,8 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         description: 'Percentage of damage returned as health.',
         isBase: false,
         startLimit: 1,
-        maxLimit: 50,
-        upgradeStep: 5,
+        maxLimit: 10,
+        upgradeStep: 1,
         baseCost: 800,
         costMultiplier: 1.9,
         icon: Heart
@@ -287,18 +275,6 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         baseCost: 550,
         costMultiplier: 1.6,
         icon: RefreshCw
-    },
-    orbit_radius: {
-        id: 'orbit_radius',
-        name: 'Orbit Radius',
-        description: 'Distance from you in orbital mode.',
-        isBase: false,
-        startLimit: 30,
-        maxLimit: 200,
-        upgradeStep: 10,
-        baseCost: 500,
-        costMultiplier: 1.5,
-        icon: Maximize
     },
     orbit_player: {
         id: 'orbit_player',
