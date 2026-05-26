@@ -367,6 +367,9 @@ function App() {
       }
       return proj;
     },
+    spawn_mine: (x: number, y: number, radius?: number, damage?: number) => {
+      gameEngine.spawnMine(x, y, radius, damage);
+    },
     get_time: () => Date.now(),
     rand_float: () => Math.random(),
     predict_position: (targetId: string, bulletSpeed: number) => {

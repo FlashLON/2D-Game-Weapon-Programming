@@ -16,10 +16,10 @@ interface WeaponEditorProps {
 export const WeaponEditor: React.FC<WeaponEditorProps> = ({ code, onChange, onFocus, onBlur, isPaused }) => {
 
     const handleEditorDidMount: OnMount = (editor) => {
-        editor.onDidFocusEditorText(() => {
+        editor.onDidFocusEditorWidget(() => {
             onFocus?.();
         });
-        editor.onDidBlurEditorText(() => {
+        editor.onDidBlurEditorWidget(() => {
             onBlur?.();
         });
     };

@@ -159,6 +159,10 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                             desc="Returns your profile (level, money, titles)."
                         />
                         <ApiMethod
+                            name="api.spawn_mine(x, y, radius=30, damage=50)"
+                            desc="Deploys a static proximity mine that arms after 1s and detonates when enemies approach."
+                        />
+                        <ApiMethod
                             name="api.log(msg)"
                             desc="Prints to the System Console tab."
                         />

@@ -336,6 +336,9 @@ export class GameEngine {
             this.updateTrails();
             this.updateDrone(dt);
         }
+        
+        // Always update visual effects even when paused
+        this.updateVisuals(dt);
         this.notify(); // Always render (so paused screen isn't blank)
 
         if (!this.state.gameOver) {
@@ -343,7 +346,7 @@ export class GameEngine {
         }
     };
 
-    private update(dt: number) {
+    private updateVisuals(dt: number) {
         // Update Feedback Effects
         if (this.state.screenshake > 0) {
             this.state.screenshake -= dt * 5; // Decay
@@ -376,6 +379,9 @@ export class GameEngine {
             gi.life -= dt * 2.0;
         });
         this.state.gridImpulses = this.state.gridImpulses.filter(gi => gi.life > 0);
+    }
+
+    private update(dt: number) {
 
         if (this.isMultiplayer) {
             // CLIENT-SIDE EXTRAPOLATION
@@ -571,8 +577,34 @@ export class GameEngine {
                         }
                     });
                 }
+            } else if (ent.type === 'mine') {
+                if (ent.mine_armed_timer && ent.mine_armed_timer > 0) {
+                    ent.mine_armed_timer -= dt;
+                    if (ent.mine_armed_timer <= 0) {
+                        ent.color = '#ff0000'; // Turn red when armed
+                    }
+                } else {
+                    // Check for enemies
+                    const radius = ent.mine_radius || 30;
+                    let triggered = false;
+                    this.state.entities.forEach(target => {
+                        if (target.type === 'enemy' && target.hp > 0) {
+                            const dist = Math.sqrt((target.x - ent.x) ** 2 + (target.y - ent.y) ** 2);
+                            if (dist < radius + target.radius) {
+                                triggered = true;
+                            }
+                        }
+                    });
+                    if (triggered) {
+                        this.triggerExplosion(ent.x, ent.y, radius * 1.5, ent.mine_damage || 50);
+                        ent.hp = 0; // Destroy mine
+                    }
+                }
             }
         });
+
+        // Cleanup dead entities (mines/enemies)
+        this.state.entities = this.state.entities.filter(e => e.type === 'player' || e.hp > 0);
 
         for (let i = this.state.projectiles.length - 1; i >= 0; i--) {
             const proj = this.state.projectiles[i];
@@ -1507,6 +1539,27 @@ export class GameEngine {
         this.droneEntity = null;
     }
 
+    spawnMine(x: number, y: number, radius: number = 30, damage: number = 50) {
+        if (!this.isMultiplayer) {
+            this.state.entities.push({
+                id: 'mine_' + Math.random().toString(36).substr(2, 9),
+                x, y,
+                radius: 12,
+                color: '#f97316', // Orange
+                hp: 1, maxHp: 1,
+                type: 'mine',
+                velocity: { x: 0, y: 0 },
+                mine_radius: radius,
+                mine_damage: damage,
+                mine_armed_timer: 1.0 // 1 second arming time
+            });
+            this.addGridImpulse(x, y, 5, 20);
+            this.spawnParticles(x, y, '#f97316', 5);
+        } else {
+            // Future multiplayer support for mines
+        }
+    }
+
     updateDrone(dt: number) {
         if (!this.droneEntity) return;
         const player = this.getLocalPlayer();
@@ -1526,7 +1579,7 @@ export class GameEngine {
                 const result = (this.weaponScript as any).drone_update(dt, this.droneEntity.x, this.droneEntity.y);
                 if (result) {
                     const now = performance.now();
-                    if (now - this.droneLastFireTime > 500) { // 2 shots/sec max
+                    if (now - this.droneLastFireTime > 200) { // 5 shots/sec max
                         this.droneLastFireTime = now;
                         const rawParams = result.toJs ? result.toJs() : result;
                         let params: any = {};
@@ -1539,7 +1592,7 @@ export class GameEngine {
                         params.y = this.droneEntity.y;
                         params.color = params.color || '#00e5ff';
                         params.radius = Math.min(params.radius || 4, 8);
-                        params.damage = Math.min(params.damage || 5, 15); // Drone shots are weaker
+                        params.damage = Math.min(params.damage || 5, 5); // Drone shots capped at 5 damage
                         params.lifetime = Math.min(params.lifetime || 2, 3);
                         const proj = this.spawnProjectile(params);
 
