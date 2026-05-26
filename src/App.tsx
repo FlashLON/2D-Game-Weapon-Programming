@@ -80,8 +80,8 @@ function App() {
       xp: 0,
       maxXp: 100,
       money: 0,
-      unlocks: ['speed', 'damage', 'hp', 'cooldown'],
-      limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5 },
+      unlocks: ['speed', 'damage', 'hp', 'cooldown', 'complexity_limit', 'ide_capacity'],
+      limits: { speed: 200, damage: 5, hp: 100, cooldown: 0.5, complexity_limit: 100, ide_capacity: 50 },
       lastUpgradeLevel: {},
       titles: [],
       equippedTitle: null,
@@ -339,6 +339,17 @@ function App() {
       if (!nearest) return null;
       return { id: nearest.id, x: nearest.x, y: nearest.y, hp: nearest.hp, dist: nearest.dist };
     },
+    get_incoming_projectiles: (x: number, y: number, rangeLimit: number = 200) => {
+      return gameEngine.getState().projectiles
+        .filter(p => p.playerId !== 'player' && p.playerId !== gameEngine.localPlayerId) // Hostile
+        .map(p => {
+          const dx = p.x - x;
+          const dy = p.y - y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          return { id: p.id, x: p.x, y: p.y, vx: p.velocity.x, vy: p.velocity.y, dist };
+        })
+        .filter(p => p.dist <= rangeLimit);
+    },
     get_arena_size: () => gameEngine.getArenaBounds(),
     spawn_projectile: (params: any, shouldNetwork: boolean = true) => {
       let jsParams = params;
@@ -395,8 +406,15 @@ function App() {
 
   const handleCompile = async (sourceCode: string) => {
     try {
+      const ideLimit = userProfile.limits?.['ide_capacity'] || 50;
+      const linesCount = sourceCode.split('\n').length;
+      if (linesCount > ideLimit) {
+        addLog(`IDE Capacity Exceeded: ${linesCount} / ${ideLimit} lines. Upgrade IDE in shop!`, "error");
+        return;
+      }
+
       setStatus("Compiling...");
-      const weaponInstance = await pyodideManager.loadWeaponCode(sourceCode, api);
+      const weaponInstance = await pyodideManager.loadWeaponCode(sourceCode, api, userProfile.unlocks || []);
       if (weaponInstance) {
         setStatus("Ready to deploy");
         gameEngine.setWeaponScript(weaponInstance);

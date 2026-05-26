@@ -957,6 +957,28 @@ export class GameEngine {
         }
     }
 
+    calculateComplexity(params: any): number {
+        let cost = 10; // Base cost
+        if (params.speed) cost += Math.max(0, params.speed - 200) * 0.05;
+        if (params.damage) cost += Math.max(0, params.damage - 5) * 2.0;
+        if (params.knockback) cost += params.knockback * 0.05;
+        if (params.radius) cost += params.radius * 0.5;
+        if (params.pierce) cost += (params.pierce - 1) * 15;
+        if (params.homing) cost += params.homing * 10;
+        if (params.orbit_player) cost += 30;
+        if (params.bounciness) cost += params.bounciness * 20;
+        if (params.explosion_radius) cost += params.explosion_radius * 0.1;
+        if (params.explosion_damage) cost += params.explosion_damage * 0.5;
+        if (params.chain_count) cost += params.chain_count * 20;
+        if (params.wave_amplitude) cost += params.wave_amplitude * 0.5;
+        if (params.fade_over_time) cost += 25;
+        if (params.vampirism) cost += params.vampirism * 1.5;
+        if (params.attraction_force) cost += params.attraction_force * 0.5;
+        if (params.dot_damage) cost += params.dot_damage * 1.0;
+        if (params.crit_chance) cost += params.crit_chance * 0.8;
+        return cost;
+    }
+
     spawnProjectile(params: any): Entity | null {
         // APPLY ENFORCEMENT IF REGISTERED
         if (this.enforcer) {
@@ -964,6 +986,31 @@ export class GameEngine {
         }
 
         const player = this.getLocalPlayer();
+
+        // ENERGY BUDGET ENFORCEMENT
+        // Drone projectiles have their own scaling, but use player budget
+        const isDrone = params.is_drone === true;
+        const budget = (player as any)?.limits?.['complexity_limit'] || 100;
+        const complexity = this.calculateComplexity(params);
+
+        if (complexity > budget) {
+            const scale = budget / complexity;
+            if (params.damage) params.damage *= scale;
+            if (params.speed) params.speed *= scale;
+            if (params.radius) params.radius *= scale;
+            if (params.explosion_damage) params.explosion_damage *= scale;
+            
+            // Random chance to notify so we don't spam the UI on high fire rates
+            if (!isDrone && Math.random() < 0.2) {
+                this.state.notifications.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    attacker: 'OVERLOAD',
+                    victim: `Complexity Exceeded! (${Math.round(complexity)} > ${budget})`,
+                    life: 2.0
+                });
+            }
+        }
+
         const x = params.x ?? (player ? player.x : 400);
         const y = params.y ?? (player ? player.y : 300);
         const radius = params.radius ?? 5;

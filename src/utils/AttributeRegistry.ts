@@ -512,6 +512,56 @@ export const ATTRIBUTES: Record<string, AttributeConfig> = {
         baseCost: 5000,
         costMultiplier: 1.8,
         icon: Target
+    },
+    // --- IDE & BUDGET ---
+    complexity_limit: {
+        id: 'complexity_limit',
+        name: 'Energy Budget',
+        description: 'Maximum code complexity budget for weapon calculations.',
+        isBase: true,
+        startLimit: 100,
+        maxLimit: 1000,
+        upgradeStep: 50,
+        baseCost: 300,
+        costMultiplier: 1.5,
+        icon: Activity
+    },
+    ide_capacity: {
+        id: 'ide_capacity',
+        name: 'IDE Capacity',
+        description: 'Maximum lines of code allowed in weapon script files.',
+        isBase: true,
+        startLimit: 50,
+        maxLimit: 300,
+        upgradeStep: 25,
+        baseCost: 150,
+        costMultiplier: 1.5,
+        icon: Layers
+    },
+    // --- MODULES ---
+    module_random: {
+        id: 'module_random',
+        name: 'Python Module: random',
+        description: 'Allows importing the random module to add elements of chance to scripts.',
+        isBase: false,
+        startLimit: 1,
+        maxLimit: 1,
+        upgradeStep: 1,
+        baseCost: 800,
+        costMultiplier: 1,
+        icon: Sparkles
+    },
+    module_cmath: {
+        id: 'module_cmath',
+        name: 'Python Module: cmath',
+        description: 'Allows importing the cmath module for complex mathematical operations.',
+        isBase: false,
+        startLimit: 1,
+        maxLimit: 1,
+        upgradeStep: 1,
+        baseCost: 1200,
+        costMultiplier: 1,
+        icon: Compass
     }
 };
 

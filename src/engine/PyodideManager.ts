@@ -41,13 +41,29 @@ class PyodideManager {
         }
     }
 
-    async loadWeaponCode(code: string, api?: any): Promise<WeaponScript | null> {
+    async loadWeaponCode(code: string, api?: any, unlockedModules: string[] = []): Promise<WeaponScript | null> {
         if (!this.pyodide || !this.isReady) {
             console.warn("Pyodide not ready");
             return null;
         }
 
         try {
+            // Check imports against unlocked modules
+            const premiumModules: Record<string, string> = {
+                'random': 'module_random',
+                'cmath': 'module_cmath'
+            };
+            const importMatch = /(?:^|\n)\s*(?:import\s+([a-zA-Z0-9_, ]+)|from\s+([a-zA-Z0-9_]+)\s+import)/g;
+            let match;
+            while ((match = importMatch.exec(code)) !== null) {
+                const modules = (match[1] || match[2]).split(',').map(s => s.trim());
+                for (const mod of modules) {
+                    if (premiumModules[mod] && !unlockedModules.includes(premiumModules[mod])) {
+                        throw new Error(\`Locked Module: '\${mod}'. Unlock '\${premiumModules[mod]}' in the shop first!\`);
+                    }
+                }
+            }
+
             // Create a clean namespace for the weapon
             const namespace = this.pyodide.toPy({});
 
@@ -93,6 +109,14 @@ class APIWrapper:
     def stats(self):
         func = self._raw.get('get_stats')
         return func() if func else {}
+
+    def get_closest_enemy(self, x, y):
+        func = self._raw.get('get_nearest_enemy')
+        return func(x, y) if func else None
+        
+    def get_incoming_projectiles(self, x, y, range_val=200):
+        func = self._raw.get('get_incoming_projectiles')
+        return func(x, y, range_val) if func else []
 
     # Forward everything else (like .log(), .get_time()) by looking up keys
     def __getattr__(self, name):

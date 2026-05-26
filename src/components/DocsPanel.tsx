@@ -47,7 +47,7 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                     <h3 className="text-white font-bold mb-3 border-b border-cyber-muted/30 pb-2 flex items-center gap-2 uppercase">
                         <Code size={16} className="text-blue-400" /> 1. Class Blueprint
                     </h3>
-                    <p className="mb-2 text-[11px] text-gray-400 leading-relaxed">Your code MUST define a <code>Weapon</code> class. The <code>on_fire</code> method is called automatically when you click the mouse.</p>
+                    <p className="mb-2 text-[11px] text-gray-400 leading-relaxed">Your code MUST define a <code>Weapon</code> class. The <code>on_fire</code> method is called automatically when you click the mouse. <strong>Note:</strong> Some python modules like <code>random</code> or <code>cmath</code> must be unlocked in the shop.</p>
                     <pre className="bg-black/80 p-4 rounded-xl text-green-400 text-[11px] overflow-x-auto border border-gray-800 shadow-inner">
                         {`class Weapon:
     def __init__(self):
@@ -81,7 +81,7 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                     <h3 className="text-white font-bold mb-3 border-b border-cyber-muted/30 pb-2 flex items-center gap-2 uppercase">
                         <Zap size={16} className="text-yellow-400" /> 2. Projectile Attributes
                     </h3>
-                    <p className="mb-4 text-[11px] text-gray-400 leading-relaxed">Keys you can return in <code>on_fire()</code>. Values surpassing your <strong>MAX</strong> limits are automatically capped by the Enforcer. Gray items are locked.</p>
+                    <p className="mb-4 text-[11px] text-gray-400 leading-relaxed">Keys you can return in <code>on_fire()</code>. Values surpassing your <strong>MAX</strong> limits are automatically capped by the Enforcer. Gray items are locked. Exceeding your <strong>Energy Budget</strong> will scale down all weapon stats dynamically!</p>
 
                     <div className="grid grid-cols-1 gap-2">
                         {Object.values(ATTRIBUTES).filter(a => !a.isAura).map(attr => {
@@ -131,6 +131,10 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                         <ApiMethod
                             name="api.predict_position(target_id, speed)"
                             desc="Calculates intercept point. Returns {x, y}."
+                        />
+                        <ApiMethod
+                            name="api.get_incoming_projectiles(x, y, range=200)"
+                            desc="Returns list of hostile projectiles nearby: [{id, x, y, vx, vy, dist}, ...]"
                         />
                         <ApiMethod
                             name="api.get_entities_in_range(x, y, radius)"
