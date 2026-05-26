@@ -128,7 +128,7 @@ class APIWrapper:
 
     # Forward everything else (like .log(), .get_time(), .predict_position()) by looking up keys
     def __getattr__(self, name):
-        val = getattr(self._raw, name, None)
+        val = self._raw.get(name) if isinstance(self._raw, dict) else getattr(self._raw, name, None)
         if val is not None:
             if callable(val):
                 def wrapper(*args, **kwargs):

@@ -17,7 +17,7 @@
     "firebase-admin": "^12.7.0",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
-    "pyodide": "^0.29.0",
+    "pyodide": "^0.29.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.11.0",
