@@ -59,7 +59,7 @@ class PyodideManager {
                 const modules = (match[1] || match[2]).split(',').map(s => s.trim());
                 for (const mod of modules) {
                     if (premiumModules[mod] && !unlockedModules.includes(premiumModules[mod])) {
-                        throw new Error(\`Locked Module: '\${mod}'. Unlock '\${premiumModules[mod]}' in the shop first!\`);
+                        throw new Error(`Locked Module: '${mod}'. Unlock '${premiumModules[mod]}' in the shop first!`);
                     }
                 }
             }
