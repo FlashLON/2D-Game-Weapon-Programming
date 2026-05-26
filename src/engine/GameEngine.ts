@@ -177,6 +177,9 @@ export class GameEngine {
 
     private static readonly MAX_TRAIL_LENGTH = 12;
 
+    // --- PAUSE STATE ---
+    private paused = false;
+
     constructor() {
         // Initialize default state with empty arrays
         this.state = {
@@ -270,6 +273,21 @@ export class GameEngine {
         }
     }
 
+    pause() {
+        this.paused = true;
+    }
+
+    resume() {
+        if (this.paused) {
+            this.paused = false;
+            this.lastTime = performance.now(); // Prevent dt spike after unpause
+        }
+    }
+
+    isPaused() {
+        return this.paused;
+    }
+
     reset() {
         const initialHp = this.playerStats.hp;
         this.state = {
@@ -312,10 +330,12 @@ export class GameEngine {
         const dt = Math.min((now - this.lastTime) / 1000, 0.1);
         this.lastTime = now;
 
-        this.update(dt);
-        this.updateTrails();
-        this.updateDrone(dt);
-        this.notify();
+        if (!this.paused) {
+            this.update(dt);
+            this.updateTrails();
+            this.updateDrone(dt);
+        }
+        this.notify(); // Always render (so paused screen isn't blank)
 
         if (!this.state.gameOver) {
             this.animationFrameId = requestAnimationFrame(this.gameLoop);

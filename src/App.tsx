@@ -11,7 +11,7 @@ import { pyodideManager } from './engine/PyodideManager';
 import { gameEngine } from './engine/GameEngine';
 import { networkManager, type SavedCode } from './utils/NetworkManager';
 import { ATTRIBUTES, getUpgradeCost } from './utils/AttributeRegistry';
-import { Play, RotateCcw, Link as LinkIcon, CheckCircle2, LogOut } from 'lucide-react';
+import { Play, RotateCcw, Link as LinkIcon, CheckCircle2, LogOut, Pause } from 'lucide-react';
 import { DocsPanel } from './components/DocsPanel';
 import { trackGAEvent } from './utils/firebase';
 
@@ -101,6 +101,7 @@ function App() {
   const [saveCodeModalOpen, setSaveCodeModalOpen] = useState(false);
   const [loadCodeModalOpen, setLoadCodeModalOpen] = useState(false);
   const [loadingSavedCodes, setLoadingSavedCodes] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Matchmaking & Party State
   const [queueStatus, setQueueStatus] = useState<any>(null);
@@ -413,6 +414,17 @@ function App() {
     } catch (err) {
       setStatus("Error: " + String(err));
     }
+  };
+
+  // --- EDITOR FOCUS: Auto-pause when editing code ---
+  const handleEditorFocus = () => {
+    setIsEditing(true);
+    gameEngine.pause();
+  };
+
+  const handleEditorBlur = () => {
+    setIsEditing(false);
+    gameEngine.resume();
   };
 
   const handleSave = () => {
@@ -944,12 +956,33 @@ function App() {
         ) : (
           <>
             <div className="w-1/2 min-w-[400px] h-full shadow-xl z-0 overflow-hidden flex flex-col border-r border-cyber-muted">
-              <WeaponEditor code={code} onChange={(val) => setCode(val || "")} />
+              <WeaponEditor
+                code={code}
+                onChange={(val) => setCode(val || "")}
+                onFocus={handleEditorFocus}
+                onBlur={handleEditorBlur}
+                isPaused={isEditing}
+              />
             </div>
 
             <div className="flex-1 h-full relative flex flex-col min-w-0">
               <div className="flex-1 relative bg-black/50 overflow-hidden">
                 <Arena isSpectator={isSpectator} />
+
+                {/* PAUSE OVERLAY — shown when editing code */}
+                {isEditing && (
+                  <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-[2px] transition-all duration-300">
+                    <div className="text-center">
+                      <div className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl border border-amber-500/30 bg-black/60 backdrop-blur-md shadow-[0_0_40px_rgba(245,158,11,0.1)]">
+                        <Pause size={28} className="text-amber-400" />
+                        <div>
+                          <div className="text-amber-400 font-black text-2xl tracking-[0.15em] uppercase">PAUSED</div>
+                          <div className="text-amber-400/50 text-[10px] font-bold tracking-[0.3em] uppercase mt-0.5">Click arena to resume</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Spectator HUD */}
                 {isSpectator && (
