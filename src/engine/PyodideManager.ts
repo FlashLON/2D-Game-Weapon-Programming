@@ -84,8 +84,10 @@ class APIWrapper:
         self._raw = raw_api # Expecting a dict/map-like interface
         
     def _convert(self, val):
-        if hasattr(val, 'to_py'):
+        try:
             return val.to_py()
+        except Exception:
+            pass
         if isinstance(val, list):
             return [self._convert(x) for x in val]
         return val
@@ -126,8 +128,8 @@ class APIWrapper:
 
     # Forward everything else (like .log(), .get_time(), .predict_position()) by looking up keys
     def __getattr__(self, name):
-        if name in self._raw:
-            val = self._raw[name]
+        val = getattr(self._raw, name, None)
+        if val is not None:
             if callable(val):
                 def wrapper(*args, **kwargs):
                     return self._convert(val(*args, **kwargs))
