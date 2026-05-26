@@ -174,6 +174,9 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                         Optionally define a <code className="text-cyan-400">Drone</code> class alongside your <code>Weapon</code> class. 
                         The drone orbits your player and fires independently based on your script.
                     </p>
+                    <div className="mb-3 bg-red-900/20 border border-red-500/50 p-2 rounded text-[10px] text-red-200">
+                        <strong>⚠️ IMPORTANT:</strong> You cannot just paste the Drone class by itself! Your code MUST still contain a <code>class Weapon:</code> at the bottom, or compilation will fail.
+                    </div>
                     <pre className="bg-black/80 p-4 rounded-xl text-cyan-400 text-[11px] overflow-x-auto border border-cyan-900/50 shadow-inner">
                         {`class Drone:
     """Optional companion that orbits your player."""
@@ -224,25 +227,34 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                 <section className="pb-10">
                     <h3 className="text-white font-bold mb-3 border-b border-cyber-muted/30 pb-2 uppercase text-[12px]">Example: Predator Missile</h3>
                     <pre className="bg-black/80 p-4 rounded-xl text-yellow-400 text-[11px] border border-gray-800 shadow-inner overflow-x-auto">
-                        {`def on_fire(self, tx, ty, mx, my):
-    enemies = api.get_enemies()
-    if not enemies:
-        return {"speed": 500, "angle": 0} # Blind fire
+                        {`class Weapon:
+    def __init__(self):
+        self.msg = "Predator Missiles Online"
+
+    def update(self, dt):
+        pass
+
+    def on_hit(self, target_id):
+        pass
+
+    def on_fire(self, tx, ty, mx, my):
+        enemies = api.get_enemies()
+        if not enemies:
+            return {"speed": 500, "angle": 0} # Blind fire
+            
+        nearest = api.get_nearest_enemy(mx, my)
+        target = api.predict_position(nearest['id'], 600)
         
-    nearest = api.get_nearest_enemy(mx, my)
-    
-    # Predict where they will be based on bullet speed
-    target = api.predict_position(nearest['id'], 600)
-    
-    if target:
-        import math
-        angle = math.degrees(math.atan2(target['y'] - my, target['x'] - mx))
-        return {
-            "speed": 600,
-            "angle": angle,
-            "homing": 5.0,
-            "color": "#ff0055"
-        }`}
+        if target:
+            import math
+            angle = math.degrees(math.atan2(target['y'] - my, target['x'] - mx))
+            return {
+                "speed": 600,
+                "angle": angle,
+                "homing": 5.0,
+                "color": "#ff0055"
+            }
+        return None`}
                     </pre>
                 </section>
 
