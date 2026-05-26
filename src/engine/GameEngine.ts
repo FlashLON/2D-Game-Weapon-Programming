@@ -1047,7 +1047,6 @@ export class GameEngine {
         const chain_count = params.chain_count ?? 0;
         const chain_range = params.chain_range ?? 0;
         const orbit_speed = params.orbit_speed ?? 3.0;
-        const orbit_radius = params.orbit_radius ?? 60;
         // AURA EFFECTS (Shoot Time)
         if (player && player.aura_type === 'aura_chaos') {
             const strength = player.limits?.['aura_chaos'] || 1.2;

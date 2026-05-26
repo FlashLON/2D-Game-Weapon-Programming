@@ -1,6 +1,6 @@
 import {
     Zap, Target, Shield,
-    Maximize, Move, Activity,
+    Move, Activity,
     Flame, Skull, Link,
     Compass, RefreshCw, Layers,
     Heart, Magnet, Repeat,
