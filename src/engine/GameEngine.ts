@@ -155,7 +155,7 @@ export class GameEngine {
 
     // --- MULTIPLAYER PROPERTIES ---
     private isMultiplayer = false;
-    private localPlayerId: string | null = null;
+    public localPlayerId: string | null = null;
     private lastHitInfo: any = null;
     private lastFireTime: number = 0;
     private playerStats: any = {
