@@ -20,7 +20,7 @@ class PyodideManager {
         try {
             this.pyodide = await loadPyodide({
                 // Use the matching version from package.json
-                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.0/full/",
+                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.29.4/full/",
                 stdout: (text) => {
                     console.log("Python stdout:", text);
                     if (onLog) onLog(text, false);
