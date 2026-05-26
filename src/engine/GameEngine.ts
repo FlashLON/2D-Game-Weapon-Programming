@@ -1,5 +1,6 @@
 import type { WeaponScript } from './PyodideManager';
 import { ATTRIBUTES } from '../utils/AttributeRegistry';
+import { networkManager } from '../utils/NetworkManager';
 
 /**
  * Represents any moving object in the game world.
@@ -1317,10 +1318,16 @@ export class GameEngine {
         this.state.entities = nextEntities;
 
         // 3. Projectiles (Snapping is fine for fast moving shots)
-        this.state.projectiles = projectilesArray.map((p: any) => ({
-            ...p,
-            velocity: p.vx !== undefined ? { x: p.vx, y: p.vy } : p.velocity
-        }));
+        // Preserve local trail VFX history across server snapshots
+        const oldProjectiles = this.state.projectiles;
+        this.state.projectiles = projectilesArray.map((p: any) => {
+            const localProj = oldProjectiles.find(lp => lp.id === p.id);
+            return {
+                ...p,
+                velocity: p.vx !== undefined ? { x: p.vx, y: p.vy } : p.velocity,
+                trail: localProj?.trail || [{ x: p.x, y: p.y, alpha: 1.0 }]
+            };
+        });
 
         this.state.score = snapshot.score || 0;
         this.state.wave = snapshot.wave || 0;
@@ -1454,7 +1461,32 @@ export class GameEngine {
                         params.radius = Math.min(params.radius || 4, 8);
                         params.damage = Math.min(params.damage || 5, 15); // Drone shots are weaker
                         params.lifetime = Math.min(params.lifetime || 2, 3);
-                        this.spawnProjectile(params);
+                        const proj = this.spawnProjectile(params);
+
+                        // MULTIPLAYER: Send drone projectiles to server for replication
+                        if (this.isMultiplayer && proj && networkManager.isConnected()) {
+                            networkManager.sendFire({
+                                ...proj,
+                                vx: proj.velocity.x,
+                                vy: proj.velocity.y,
+                                explosion_radius: proj.explosion_radius,
+                                explosion_damage: proj.explosion_damage,
+                                wave_amplitude: proj.wave_amplitude,
+                                wave_frequency: proj.wave_frequency,
+                                chain_count: proj.chain_count,
+                                chain_range: proj.chain_range,
+                                fade_over_time: proj.fade_over_time,
+                                vampirism: proj.vampirism,
+                                attraction_force: proj.attraction_force,
+                                focus_fire: proj.focus_fire,
+                                burst_damage: proj.burst_damage,
+                                execution_damage: proj.execution_damage,
+                                crit_chance: proj.crit_chance,
+                                crit_damage: proj.crit_damage,
+                                dot_damage: proj.dot_damage,
+                                armor_shred: proj.armor_shred
+                            });
+                        }
                     }
                 }
             } catch (e) {
