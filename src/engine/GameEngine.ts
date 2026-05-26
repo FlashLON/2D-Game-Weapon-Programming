@@ -753,6 +753,7 @@ export class GameEngine {
             }
         }
 
+        this.updateDrone(dt);
         this.checkCollisions();
     }
 

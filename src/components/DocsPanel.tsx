@@ -84,6 +84,16 @@ export const DocsPanel: React.FC<DocsPanelProps> = ({ onClose, userProfile }) =>
                     <p className="mb-4 text-[11px] text-gray-400 leading-relaxed">Keys you can return in <code>on_fire()</code>. Values surpassing your <strong>MAX</strong> limits are automatically capped by the Enforcer. Gray items are locked. Exceeding your <strong>Energy Budget</strong> will scale down all weapon stats dynamically!</p>
 
                     <div className="grid grid-cols-1 gap-2">
+                        <div className="p-3 rounded-xl border border-cyber-muted/30 bg-cyber-light/5 flex flex-col justify-center transition-all hover:bg-cyber-light/10">
+                            <div className="flex justify-between items-center mb-1.5">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-cyan-400 font-bold shrink-0">🎨</span>
+                                    <span className="text-[11px] font-bold text-white">color</span>
+                                </div>
+                                <span className="text-[9px] font-black text-cyber-accent bg-cyber-accent/10 px-2 py-0.5 rounded uppercase border border-cyber-accent/20">FREE</span>
+                            </div>
+                            <p className="text-[10px] text-gray-500 leading-tight">Visual color of the projectile. e.g. '#ff0055' or 'red'.</p>
+                        </div>
                         {Object.values(ATTRIBUTES).filter(a => !a.isAura).map(attr => {
                             const isUnlocked = attr.isBase || unlocks.includes(attr.id);
                             const currentLimit = limits[attr.id] || (isUnlocked ? attr.startLimit : 0);

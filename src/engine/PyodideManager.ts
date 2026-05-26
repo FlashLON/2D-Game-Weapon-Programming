@@ -82,46 +82,57 @@ class PyodideManager {
 class APIWrapper:
     def __init__(self, raw_api):
         self._raw = raw_api # Expecting a dict/map-like interface
+        
+    def _convert(self, val):
+        if hasattr(val, 'to_py'):
+            return val.to_py()
+        if isinstance(val, list):
+            return [self._convert(x) for x in val]
+        return val
 
     # Explicit properties mapping to JS getters
     @property
     def player(self):
-        # Access the function from the dict and call it
         func = self._raw.get('get_player')
-        return func() if func else None
+        return self._convert(func()) if func else None
 
     @property
     def enemies(self):
         func = self._raw.get('get_enemies')
-        return func() if func else []
+        return self._convert(func()) if func else []
         
     @property
     def arena(self):
         func = self._raw.get('get_arena_size')
-        return func() if func else None
+        return self._convert(func()) if func else None
 
     @property
     def level(self):
         func = self._raw.get('get_level')
-        return func() if func else 1
+        return self._convert(func()) if func else 1
 
     @property
     def stats(self):
         func = self._raw.get('get_stats')
-        return func() if func else {}
+        return self._convert(func()) if func else {}
 
     def get_closest_enemy(self, x, y):
         func = self._raw.get('get_nearest_enemy')
-        return func(x, y) if func else None
+        return self._convert(func(x, y)) if func else None
         
     def get_incoming_projectiles(self, x, y, range_val=200):
         func = self._raw.get('get_incoming_projectiles')
-        return func(x, y, range_val) if func else []
+        return self._convert(func(x, y, range_val)) if func else []
 
-    # Forward everything else (like .log(), .get_time()) by looking up keys
+    # Forward everything else (like .log(), .get_time(), .predict_position()) by looking up keys
     def __getattr__(self, name):
         if name in self._raw:
-            return self._raw[name]
+            val = self._raw[name]
+            if callable(val):
+                def wrapper(*args, **kwargs):
+                    return self._convert(val(*args, **kwargs))
+                return wrapper
+            return self._convert(val)
         raise AttributeError(f"'APIWrapper' object has no attribute '{name}'")
 
 api = APIWrapper(_js_api)
